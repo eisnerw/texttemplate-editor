@@ -4,9 +4,9 @@ import {CommonTokenStream, error, InputStream} from '../../../node_modules/antlr
 import ILineTokens = monaco.languages.ILineTokens;
 import IToken = monaco.languages.IToken;
 
-export class CalcState implements monaco.languages.IState {
+export class TextTemplateState implements monaco.languages.IState {
     clone(): monaco.languages.IState {
-        return new CalcState();
+        return new TextTemplateState();
     }
 
     equals(other: monaco.languages.IState): boolean {
@@ -15,9 +15,9 @@ export class CalcState implements monaco.languages.IState {
 
 }
 
-export class CalcTokensProvider implements monaco.languages.TokensProvider {
+export class TextTemplateTokensProvider implements monaco.languages.TokensProvider {
     getInitialState(): monaco.languages.IState {
-        return new CalcState();
+        return new TextTemplateState();
     }
 
     tokenize(line: string, state: monaco.languages.IState): monaco.languages.ILineTokens {
@@ -29,22 +29,22 @@ export class CalcTokensProvider implements monaco.languages.TokensProvider {
 
 const EOF = -1;
 
-class CalcToken implements IToken {
+class TextTemplateToken implements IToken {
     scopes: string;
     startIndex: number;
 
     constructor(ruleName: String, startIndex: number) {
-        this.scopes = ruleName.toLowerCase() + ".calc";
+        this.scopes = ruleName.toLowerCase() + ".texttemplate";
         this.startIndex = startIndex;
     }
 }
 
-class CalcLineTokens implements ILineTokens {
+class TextTemplateLineTokens implements ILineTokens {
     endState: monaco.languages.IState;
     tokens: monaco.languages.IToken[];
 
     constructor(tokens: monaco.languages.IToken[]) {
-        this.endState = new CalcState();
+        this.endState = new TextTemplateState();
         this.tokens = tokens;
     }
 }
@@ -74,7 +74,7 @@ export function tokensForLine(input: string): monaco.languages.ILineTokens {
                 done = true;
             } else {
                 let tokenTypeName = lexer.symbolicNames[token.type];
-                let myToken = new CalcToken(tokenTypeName, token.column);
+                let myToken = new TextTemplateToken(tokenTypeName, token.column);
                 myTokens.push(myToken);
             }
         }
@@ -82,9 +82,9 @@ export function tokensForLine(input: string): monaco.languages.ILineTokens {
 
     // Add all errors
     for (let e of errorStartingPoints) {
-        myTokens.push(new CalcToken("error.calc", e));
+        myTokens.push(new TextTemplateToken("error.texttemplate", e));
     }
     myTokens.sort((a, b) => (a.startIndex > b.startIndex) ? 1 : -1)
 
-    return new CalcLineTokens(myTokens);
+    return new TextTemplateLineTokens(myTokens);
 }

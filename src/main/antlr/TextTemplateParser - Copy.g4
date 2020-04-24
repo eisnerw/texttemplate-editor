@@ -1,10 +1,10 @@
-parser grammar CalcParser;
+parser grammar TextTemplateParser;
 
-options { tokenVocab=CalcLexer; }
+options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
     (inputs+=input)*
-    (calcs+=calc)*
+    (texttemplates+=texttemplate)*
     (outputs+=output)*
     EOF
     ;
@@ -21,7 +21,7 @@ output:
     OUTPUT_KW ID eol
     ;
 
-calc:
+texttemplate:
 	target=ID EQUAL value=expression eol
 	;
 

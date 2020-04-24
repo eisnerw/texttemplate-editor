@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Calc Editor</title>
+	<title>TextTemplate Editor</title>
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
 	<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<h2>Calc Editor</h2>
+<h2>TextTemplate Editor</h2>
 <div id="container" style="width:800px;height:600px;border:1px solid grey"></div>
 
 <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
@@ -18,9 +18,9 @@
 	require.config({ paths: { 'vs': 'node_modules/monaco-editor/min/vs' }});
 
 	require(['vs/editor/editor.main'], function() {
-		monaco.languages.register({ id: 'calc' });
+		monaco.languages.register({ id: 'texttemplate' });
 
-		monaco.languages.setTokensProvider('calc', new CalcTokensProvider.CalcTokensProvider());
+		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());
 
 		let literalFg = '3b8737';
 		let idFg = '344482';
@@ -32,23 +32,23 @@
 			base: 'vs',
 			inherit: false,
 			rules: [
-				{ token: 'number_lit.calc',   foreground: literalFg },
+				{ token: 'number_lit.texttemplate',   foreground: literalFg },
 
-				{ token: 'id.calc',           foreground: idFg,       fontStyle: 'italic' },
+				{ token: 'id.texttemplate',           foreground: idFg,       fontStyle: 'italic' },
 
-				{ token: 'lparen.calc',       foreground: symbolsFg },
-				{ token: 'rparen.calc',       foreground: symbolsFg },
+				{ token: 'lparen.texttemplate',       foreground: symbolsFg },
+				{ token: 'rparen.texttemplate',       foreground: symbolsFg },
 
-				{ token: 'equal.calc',        foreground: symbolsFg },
-				{ token: 'minus.calc',        foreground: symbolsFg },
-				{ token: 'plus.calc',         foreground: symbolsFg },
-				{ token: 'div.calc',          foreground: symbolsFg },
-				{ token: 'mul.calc',          foreground: symbolsFg },
+				{ token: 'equal.texttemplate',        foreground: symbolsFg },
+				{ token: 'minus.texttemplate',        foreground: symbolsFg },
+				{ token: 'plus.texttemplate',         foreground: symbolsFg },
+				{ token: 'div.texttemplate',          foreground: symbolsFg },
+				{ token: 'mul.texttemplate',          foreground: symbolsFg },
 
-				{ token: 'input_kw.calc',     foreground: keywordFg,  fontStyle: 'bold' },
-				{ token: 'output_kw.calc',    foreground: keywordFg,  fontStyle: 'bold' },
+				{ token: 'input_kw.texttemplate',     foreground: keywordFg,  fontStyle: 'bold' },
+				{ token: 'output_kw.texttemplate',    foreground: keywordFg,  fontStyle: 'bold' },
 
-				{ token: 'unrecognized.calc', foreground: errorFg }
+				{ token: 'unrecognized.texttemplate', foreground: errorFg }
 			]
 		});
 
@@ -69,7 +69,7 @@
 				'output profit',
 				''
 			].join('\n'),
-			language: 'calc',
+			language: 'texttemplate',
 			theme: 'myCoolTheme'
 		});
 		editor.onDidChangeModelContent(function (e) {
@@ -90,7 +90,11 @@
 			let model = monaco.editor.getModels()[0];
 			monaco.editor.setModelMarkers(model, "owner", monacoErrors);
 		});
-
+		monaco.languages.registerDefinitionProvider('texttemplate', {
+			provideDefinition: function(model,position, token){
+				console.log("got here");
+			}
+		});
 	});
 </script>
 </body>

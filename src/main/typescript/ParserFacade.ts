@@ -2,8 +2,8 @@
 
 import {CommonTokenStream, InputStream, Token, error, Parser} from '../../../node_modules/antlr4/index.js'
 import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
-import {CalcLexer} from "../../main-generated/javascript/CalcLexer.js"
-import {CalcParser} from "../../main-generated/javascript/CalcParser.js"
+import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
+import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
@@ -46,13 +46,18 @@ class CollectorErrorListener extends error.ErrorListener {
     }
 
 }
+declare global {
+  interface Window {
+    ParserFacade: any;
+  }
+}
 
 export function createLexer(input: String) {
     const chars = new InputStream(input);
-    const lexer = new CalcLexer(chars);
+    const lexer = new TextTemplateLexer(chars);
 
     lexer.strictMode = false;
-
+	window.ParserFacade = this;
     return lexer;
 }
 
@@ -68,7 +73,7 @@ function createParser(input) {
 
 function createParserFromLexer(lexer) {
     const tokens = new CommonTokenStream(lexer);
-    return new CalcParser(tokens);
+    return new TextTemplateParser(tokens);
 }
 
 function parseTree(input) {
@@ -91,7 +96,7 @@ export function parseTreeStr(input) {
     return tree.toStringTree(parser.ruleNames);
 }
 
-class CalcErrorStrategy extends DefaultErrorStrategy {
+class TextTemplateErrorStrategy extends DefaultErrorStrategy {
 
      reportUnwantedToken(recognizer: Parser) {
          return super.reportUnwantedToken(recognizer);
@@ -99,7 +104,7 @@ class CalcErrorStrategy extends DefaultErrorStrategy {
 
     singleTokenDeletion(recognizer: Parser) {
         var nextTokenType = recognizer.getTokenStream().LA(2);
-        if (recognizer.getTokenStream().LA(1) == CalcParser.NL) {
+        if (recognizer.getTokenStream().LA(1) == TextTemplateParser.NL) {
             return null;
         }
         var expecting = this.getExpectedTokens(recognizer);
@@ -134,7 +139,7 @@ export function validate(input) : Error[] {
     const parser = createParserFromLexer(lexer);
     parser.removeErrorListeners();
     parser.addErrorListener(new CollectorErrorListener(errors));
-    parser._errHandler = new CalcErrorStrategy();
+    parser._errHandler = new TextTemplateErrorStrategy();
 
     const tree = parser.compilationUnit();
     return errors;

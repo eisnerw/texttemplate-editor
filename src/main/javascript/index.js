@@ -1,7 +1,7 @@
-const CalcTokensProvider = require('../../main-generated/javascript/CalcTokensProvider.js');
+const TextTemplateTokensProvider = require('../../main-generated/javascript/TextTemplateTokensProvider.js');
 
 if (typeof window === 'undefined') {
 
 } else {
-    window.CalcTokensProvider = CalcTokensProvider;
+    window.TextTemplateTokensProvider = TextTemplateTokensProvider;
 }

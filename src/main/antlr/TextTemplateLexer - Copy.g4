@@ -1,4 +1,4 @@
-lexer grammar CalcLexer;
+lexer grammar TextTemplateLexer;
 
 channels { WS_CHANNEL }
 

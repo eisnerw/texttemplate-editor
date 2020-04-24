@@ -9,7 +9,7 @@ dependencies {
 }
 
 task generateLexer(type:JavaExec) {
-  def lexerName = "CalcLexer"
+  def lexerName = "TextTemplateLexer"
   inputs.file("$ANTLR_SRC/${lexerName}.g4")
   outputs.file("$GEN_JS_SRC/${lexerName}.js")
   outputs.file("$GEN_JS_SRC/${lexerName}.interp")
@@ -22,8 +22,8 @@ task generateLexer(type:JavaExec) {
 
 task generateParser(type:JavaExec) {
   dependsOn generateLexer
-  def lexerName = "CalcLexer"
-  def parserName = "CalcParser"
+  def lexerName = "TextTemplateLexer"
+  def parserName = "TextTemplateParser"
   inputs.file("$ANTLR_SRC/${parserName}.g4")
   inputs.file("$GEN_JS_SRC/${lexerName}.tokens")
   outputs.file("$GEN_JS_SRC/${parserName}.js")
