@@ -1,10 +1,18 @@
 parser grammar TextTemplateParser;
 
-string: ENTER_STRING stringPart* CLOSE_STRING;
 
-stringPart:
-  TEXT #TextStringPart
-  | ID_INTERP #IdInterpPart
-  | ENTER_EXPR_INTERP CURLY_R #ExprInterpPart
-;
-  
+options {
+    tokenVocab = 'TextTemplateLexer';
+}
+
+start: exp EOF ;
+
+exp : LPAR exp RPAR
+    | IDENTIFIER
+    | DQUOTE stringContents* DQUOTE
+    ;
+
+stringContents : TEXT
+               | ESCAPE_SEQUENCE
+               | BACKSLASH_PAREN exp RPAR
+               ;
