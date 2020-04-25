@@ -1,11 +1,13 @@
 parser grammar TextTemplateParser;
 
+options { tokenVocab=TextTemplateLexer; }
 
-options {
-    tokenVocab = 'TextTemplateLexer';
-}
+compilationUnit:
+    (texttemplates+=texttemplate)*
+    EOF
+    ;
 
-start: exp EOF ;
+texttemplate: exp EOF ;
 
 exp : LPAR exp RPAR
     | IDENTIFIER
