@@ -141,6 +141,6 @@ export function validate(input) : Error[] {
     parser.addErrorListener(new CollectorErrorListener(errors));
     parser._errHandler = new TextTemplateErrorStrategy();
 
-    // for some reason this isn't created, but it isn't used const tree = parser.compilationUnit();
+    const tree = parser.compilationUnit();
     return errors;
 }
