@@ -3,18 +3,15 @@ parser grammar TextTemplateParser;
 options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
-    (texttemplates+=texttemplate)*
+    (texttemplates+=texttemplate)+
     EOF
     ;
 
-texttemplate: exp EOF ;
+texttemplate: text (templatetokens+=templatetoken) | text;
 
-exp : LPAR exp RPAR
-    | IDENTIFIER
-    | DQUOTE stringContents* DQUOTE
+text: TEXT;
+
+templatetoken: LBRACE (identifiers+=identifier) RBRACE
     ;
 
-stringContents : TEXT
-               | ESCAPE_SEQUENCE
-               | BACKSLASH_PAREN exp RPAR
-               ;
+identifier: IDENTIFIER;

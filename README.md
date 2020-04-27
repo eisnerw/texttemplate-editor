@@ -15,13 +15,14 @@ It shows how to integrate ANTLR with monaco.
 ## Build everything and run the server
 
 ```
-npm i -g webpack webpack-cli
 npm install
+npm i -g webpack webpack-cli
 ./gradlew generateParser
 tsc
 webpack
 cd server
-./gradlew runServer
+../gradlew runServer
+cd .. 
 ```
 
 Now visit http://localhost:8888
