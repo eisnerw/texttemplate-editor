@@ -54,19 +54,7 @@
 
 		let editor = monaco.editor.create(document.getElementById('container'), {
 			value: [
-				'input salary',
-				'input nEmployees',
-				'input revenues',
-				'input otherExpenses',
-				'input taxRate',
-				'',
-				'totalExpenses = salary * nEmployees + otherExpenses',
-				'grossProfit = revenues - totalExpenses',
-				'totalTaxes = grossProfit * (taxRate / 100)',
-				'profit = profit - totalTaxes',
-				'',
-				'output totalTaxes',
-				'output profit',
+				'this is a sample of text with a {first} token and {second} token',
 				''
 			].join('\n'),
 			language: 'texttemplate',
