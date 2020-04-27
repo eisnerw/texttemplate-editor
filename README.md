@@ -7,7 +7,6 @@ A browser based editor for the TextTemplate language.
 It shows how to integrate ANTLR with monaco.
 
 ## Generating the lexer and the parser
-
 ```
 ./gradlew generateParser
 ```
