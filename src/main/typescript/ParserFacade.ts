@@ -1,6 +1,6 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
 
-import {CommonTokenStream, InputStream, Token, error, Parser} from '../../../node_modules/antlr4/index.js'
+import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
 import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
 import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
@@ -142,5 +142,28 @@ export function validate(input) : Error[] {
     parser._errHandler = new TextTemplateErrorStrategy();
 
     const tree = parser.compilationUnit();
+	const getCircularReplacer = () => {
+	  const seen = new WeakSet();
+	  return (key, value) => {
+		if (typeof value === "object" && value !== null) {
+		  if (seen.has(value)) {
+			return;
+		  }
+		  seen.add(value);
+		}
+		return value;
+	  };
+	};
+	let treeJson : string = JSON.stringify(tree, getCircularReplacer());
+	let treeTokens : CommonToken[] = tree.children[0].children[0].parser._interp._input.tokens;
+	let symbolicNames : string[] = tree.children[0].children[0].parser.symbolicNames;
+	let editorInput : string = tree.children[0].children[0].children[0].symbol.source[0]._input.strdata;
+	let parsed : string = "";
+	for (let e of treeTokens){
+		if (e.type != -1) {
+			parsed += symbolicNames[e.type] + "(" + editorInput.substring(e.start, e.stop + 1) + ") ";
+		}
+	}
+    document.getElementById("parsed").innerHTML = parsed;console.log(parsed);
     return errors;
 }
