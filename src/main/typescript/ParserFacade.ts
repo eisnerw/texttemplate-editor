@@ -164,6 +164,6 @@ export function validate(input) : Error[] {
 			parsed += symbolicNames[e.type] + "(" + editorInput.substring(e.start, e.stop + 1) + ") ";
 		}
 	}
-    document.getElementById("parsed").innerHTML = parsed;console.log(parsed);
+    document.getElementById("parsed").innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
     return errors;
 }

@@ -5,12 +5,22 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
 	<link rel="stylesheet" href="css/style.css">
+	<style>
+	pre {
+		overflow-x: auto;
+		white-space: pre-wrap;
+		white-space: -moz-pre-wrap;
+		white-space: -pre-wrap;
+		white-space: -o-pre-wrap;
+		word-wrap: break-word;
+	}
+	</style>
 </head>
 <body>
 
 <h2>TextTemplate Editor</h2>
 <div id="container" style="width:800px;height:600px;border:1px solid grey; float:left"></div>
-<div id="parsed">this is where the parsed stuff should go</div>
+<div><pre id="parsed">this is where the parsed stuff should go</pre></div>
 
 <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
 <script src="js/main.js"></script>
@@ -22,6 +32,8 @@
 		monaco.languages.register({ id: 'texttemplate' });
 
 		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());
+		let config = { "surroundingPairs": [{ "open": "{", "close": "}" }], "autoClosingPairs": [{ "open": "{", "close": "}" }], "brackets": [["{", "}"]] };
+		monaco.languages.setLanguageConfiguration("texttemplate", config);
 
 		let literalFg = '3b8737';
 		let idFg = '344482';

@@ -24,4 +24,9 @@ cd server
 cd .. 
 ```
 
-Now visit http://localhost:8888
+The above command have been packaged in the "run" bash shell script.
+Navigate to the project and launch the git bash shell.  run the command ./run
+The server can be stopped by typing CTRL-c
+
+
+when the server starts, visit http://localhost:8888

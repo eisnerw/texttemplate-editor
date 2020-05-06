@@ -7,12 +7,19 @@ compilationUnit:
     EOF
     ;
 
-texttemplate: text (templatetokens+=templatetoken) | text;
+texttemplate: text templatetoken text* | templatecontexttoken | text;
 
 text: TEXT;
 
-templatetoken: LBRACE (identifiers+=identifier method*) RBRACE
-    ;
+templatecontexttoken: LBRACE identifier method* COLON templatespec RBRACE;
+
+templatespec: identifier | bracketedtemplatespec;
+
+bracketedtemplatespec: LBRACKET texttemplate+ RBRACKET;
+
+templatetoken: LBRACE identifier method* RBRACE;
+
+
 
 identifier: IDENTIFIER;
 
@@ -20,4 +27,4 @@ method: DOT IDENTIFIER LP arguments* RP;
 
 arguments: argument (COMMA argument)*;
 
-argument: QUOTE QUOTEDTEXT QUOTE | templatetoken | ARGUMENTTEXT;
+argument: QUOTE ARGUMENTTEXT* QUOTE | APOSTROPHE ARGUMENTTEXT* APOSTROPHE | templatetoken | bracketedtemplatespec | ARGUMENTTEXT;
