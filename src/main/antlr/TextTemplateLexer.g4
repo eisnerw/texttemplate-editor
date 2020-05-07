@@ -7,6 +7,7 @@ E_RBRACE: '}' -> type(RBRACE);
 mode BRACED;
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
 DOT: '.';
+ARROW: '=>';
 RBRACE: '}' -> popMode;
 WS: [ \t\r\n]+ ->skip; // allow white space in braced
 LP: '(' -> pushMode(PARENED);

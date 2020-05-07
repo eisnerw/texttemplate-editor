@@ -17,9 +17,13 @@ templatespec: identifier | bracketedtemplatespec;
 
 bracketedtemplatespec: LBRACKET texttemplate+ RBRACKET;
 
-templatetoken: LBRACE identifier method* RBRACE;
+templatetoken: LBRACE methodcall RBRACE;
 
+methodcall: condition | identifier method*;
 
+condition: identifier method+ ARROW conditiontemplatespec;
+
+conditiontemplatespec: templatespec COMMA templatespec | templatespec;
 
 identifier: IDENTIFIER;
 
