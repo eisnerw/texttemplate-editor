@@ -7,9 +7,9 @@ compilationUnit:
     EOF
     ;
 
-texttemplate: text templatetoken text* | templatecontexttoken | text;
+texttemplate: text* templatetoken text* | templatecontexttoken | text;
 
-text: TEXT;
+text: TEXT+;
 
 templatecontexttoken: LBRACE identifier method* COLON templatespec RBRACE;
 
