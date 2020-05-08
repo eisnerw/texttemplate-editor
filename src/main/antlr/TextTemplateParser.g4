@@ -9,21 +9,21 @@ compilationUnit:
 
 texttemplate: text* templatetoken text* | templatecontexttoken | text;
 
-text: TEXT+;
+text: (texts+=TEXT+);
 
-templatecontexttoken: LBRACE identifier method* COLON templatespec RBRACE;
+templatetoken: LBRACE bracedoptions RBRACE;
+
+bracedoptions: QUOTE ARGUMENTTEXT QUOTE | APOSTROPHE ARGUMENTTEXT APOSTROPHE | bracedcondition | identifier method*;
+
+templatecontexttoken: LBRACE (identifier method* | QUOTE ARGUMENTTEXT QUOTE) COLON templatespec RBRACE;
 
 templatespec: identifier | bracketedtemplatespec;
 
-bracketedtemplatespec: LBRACKET texttemplate+ RBRACKET;
-
-templatetoken: LBRACE methodcall RBRACE;
-
 methodcall: condition | identifier method*;
 
-condition: identifier method+ ARROW conditiontemplatespec;
+bracedcondition: identifier method+ ARROW bracedconditiontemplatespec;
 
-conditiontemplatespec: templatespec COMMA templatespec | templatespec;
+bracedconditiontemplatespec: templatespec COMMA templatespec | templatespec;
 
 identifier: IDENTIFIER;
 

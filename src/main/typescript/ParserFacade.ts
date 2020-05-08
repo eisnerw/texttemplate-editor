@@ -157,16 +157,22 @@ export function validate(input) : Error[] {
 	let treeJson : string = JSON.stringify(tree, getCircularReplacer());
 	let parsed : string = "";
 	try{
-		let treeTokens : CommonToken[] = tree.children[0].children[0].parser._interp._input.tokens;
-		let symbolicNames : string[] = tree.children[0].children[0].parser.symbolicNames;
-		let editorInput : string = tree.children[0].children[0].children[0].symbol.source[0]._input.strdata;
+		/*let parser : TextTemplateParser = null;
+		if (tree.children[0].children){
+			parser = tree.children[0].children[0].parser;
+		} else {
+			parser = tree.children[0].parser;
+		}*/
+		let treeTokens : CommonToken[] = parser._interp._input.tokens;
+		let symbolicNames : string[] = parser.symbolicNames;
+		//let editorInput : string = tree.children[0].children[0].children[0].symbol.source[0]._input.strdata;
 		
 		for (let e of treeTokens){
 			if (e.type != -1) {
-				parsed += symbolicNames[e.type] + "(" + editorInput.substring(e.start, e.stop + 1) + ") ";
+				parsed += symbolicNames[e.type] + "(" + input.substring(e.start, e.stop + 1) + ") ";
 			}
 		}
-	} catch(e) {
+	} catch(err) {
 		parsed = '*****ERROR*****';
 	}
     document.getElementById("parsed").innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');

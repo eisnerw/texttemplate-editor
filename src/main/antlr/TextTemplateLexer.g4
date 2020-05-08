@@ -21,8 +21,13 @@ E_RP: ')';
 E_COMMA: ',' ->type(COMMA);
 COLON : ':';
 LBRACKET: '[' ->pushMode(BRACKETED);
-E_QUOTE: '"' ->type(QUOTE);
-E_ILLEGAL_BRACED: ([!@#$%^&*-={;<>?/\\+] | ']')+;
+BRACED_QUOTE: '"' ->type(QUOTE),pushMode(QUOTED);
+BRACED_APOSTROPHE: '\'' ->type(APOSTROPHE),pushMode(APOSTROPHED);
+EXCLAMATION: '!';
+AND: '&';
+OR: '|';
+NOT: '!';
+E_ILLEGAL_BRACED: ([@#$%^*-={;<>?/\\+] | ']')+;
 
 mode PARENED;
 WS2: [ \t\r\n]+ ->skip; // allow white space in braced
