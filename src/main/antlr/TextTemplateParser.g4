@@ -13,22 +13,24 @@ text: (texts+=TEXT+);
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
-bracedoptions: QUOTE ARGUMENTTEXT QUOTE | APOSTROPHE ARGUMENTTEXT APOSTROPHE | bracedcondition | identifier method*;
+bracedoptions: QUOTE TEXT QUOTE | APOSTROPHE TEXT APOSTROPHE | bracedarrow | identifier method* | conditionalexpression;
 
-templatecontexttoken: LBRACE (identifier method* | QUOTE ARGUMENTTEXT QUOTE) COLON templatespec RBRACE;
+conditionalexpression: LP conditionalexpression RP | conditionalexpression (AND|OR) conditionalexpression | identifier method+;
+	
+templatecontexttoken: LBRACE (identifier method* | QUOTE TEXT QUOTE) COLON templatespec RBRACE;
 
 templatespec: identifier | bracketedtemplatespec;
 
-methodcall: condition | identifier method*;
+bracketedtemplatespec: LBRACKET texttemplate+ RBRACKET;
 
-bracedcondition: identifier method+ ARROW bracedconditiontemplatespec;
+bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 
-bracedconditiontemplatespec: templatespec COMMA templatespec | templatespec;
+bracedarrowtemplatespec: templatespec COMMA templatespec | templatespec;
 
 identifier: IDENTIFIER;
 
-method: DOT IDENTIFIER LP arguments* RP;
+method: DOT FUNCTION LP arguments* RP;
 
 arguments: argument (COMMA argument)*;
 
-argument: QUOTE ARGUMENTTEXT* QUOTE | APOSTROPHE ARGUMENTTEXT* APOSTROPHE | templatetoken | bracketedtemplatespec | ARGUMENTTEXT;
+argument: QUOTE TEXT* QUOTE | APOSTROPHE TEXT* APOSTROPHE | templatetoken | bracketedtemplatespec | TEXT;
