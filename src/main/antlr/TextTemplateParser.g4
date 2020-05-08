@@ -7,9 +7,9 @@ compilationUnit:
     EOF
     ;
 
-texttemplate: text* templatetoken text* | templatecontexttoken | text;
+texttemplate: text* templatetoken text* | templatecontexttoken | text+;
 
-text: (texts+=TEXT+);
+text: (texts+=TEXT) COMMENT*;
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
@@ -17,11 +17,11 @@ bracedoptions: QUOTE TEXT QUOTE | APOSTROPHE TEXT APOSTROPHE | bracedarrow | ide
 
 conditionalexpression: LP conditionalexpression RP | conditionalexpression (AND|OR) conditionalexpression | identifier method+;
 	
-templatecontexttoken: LBRACE (identifier method* | QUOTE TEXT QUOTE) COLON templatespec RBRACE;
+templatecontexttoken: LBRACE ((identifier method* | QUOTE TEXT QUOTE) COLON | COLON) templatespec RBRACE;
 
 templatespec: identifier | bracketedtemplatespec;
 
-bracketedtemplatespec: LBRACKET texttemplate+ RBRACKET;
+bracketedtemplatespec: LBRACKET texttemplate* RBRACKET;
 
 bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 

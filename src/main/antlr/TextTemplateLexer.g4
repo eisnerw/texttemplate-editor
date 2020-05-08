@@ -1,7 +1,7 @@
 lexer grammar TextTemplateLexer;
 
-COMMENT: [ ]+  '/' '/' ~[\n]* '\n' ->skip;
-TEXT: ~[{} \n]+ ;
+COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF)	;
+TEXT: ~[{}/ \n]+ ;
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
 TEXT_SP: ' '+ ->type(TEXT);
@@ -10,7 +10,7 @@ TEXT_NL: '\n' ->type(TEXT);
 
 
 mode BRACED;
-BRACED_COMMENT: [ ]+  '/' '/' ~[\n]* '\n' ->skip;
+BRACED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
 DOT: '.' ->pushMode(DOTTED);
 ARROW: '=>';
@@ -29,6 +29,7 @@ NOT: '!';
 BRACED_ILLEGAL: ([@#$%^*-={;<>?/\\+] | ']')+;
 
 mode PARENED;
+PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 PARENED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
 PARENED_BRACKET: '[' ->type(LBRACKET),pushMode(BRACKETED);	
 ARGUMENTTEXT: ~[(),{}'" \t\r\n\u005b]+ ->type(TEXT); // u005b left bracket
@@ -48,11 +49,14 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
-BRACKETED_COMMENT: [ ]+  '/' '/' ~[\n]* '\n' ->skip;
+BRACKETED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 RBRACKET: ']' -> popMode;
-BRACKETED_TEXT: ~[{}\u005d]+ ->type(TEXT); // u005d right bracket
+BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
 BRACKETED_LBRACE: 	'{' -> type(LBRACE),pushMode(BRACED);
 BRACKETED_RBRACE: '}' -> type(RBRACE);
+BRACKETED_SP: ' '+ ->type(TEXT);
+BRACKETED_SLASH: '/' ->type(TEXT);
+BRACKETED_NL: '\n' ->type(TEXT);
 
 mode DOTTED;
 FUNCTION: [a-zA-Z_][a-zA-Z0-9_]*;
@@ -60,7 +64,7 @@ DOTTED_ILLEGAL: [.=>}{),:"'!&|] | '[' | ']';
 DOTTED_LP: '(' -> type(LP),mode(PARENED);
 
 mode NESTED;
-NESTED_COMMENT5: [ ]+  '/' '/' ~[\n]* '\n' ->skip;
+NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 NESTED_IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_DOT: '.' ->type(DOT),pushMode(DOTTED);
 NESTED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
