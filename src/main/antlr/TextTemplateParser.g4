@@ -13,11 +13,11 @@ text: (texts+=TEXT) COMMENT*;
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
-bracedoptions: QUOTE TEXT QUOTE | APOSTROPHE TEXT APOSTROPHE | bracedarrow | identifier method* | conditionalexpression;
+bracedoptions: QUOTE TEXT QUOTE | APOSTROPHE TEXT APOSTROPHE | bracedarrow | identifier methodInvocation* | conditionalexpression;
 
-conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | identifier method+ #condition;
+conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | identifier methodInvocation+ #condition;
 	
-templatecontexttoken: LBRACE ((identifier method* | QUOTE TEXT QUOTE) COLON | COLON) templatespec RBRACE;
+templatecontexttoken: LBRACE ((identifier methodInvocation* | QUOTE TEXT QUOTE) COLON | COLON) templatespec RBRACE;
 
 templatespec: identifier | bracketedtemplatespec;
 
@@ -29,8 +29,10 @@ bracedarrowtemplatespec: templatespec COMMA templatespec | templatespec;
 
 identifier: IDENTIFIER;
 
-method: DOT FUNCTION LP arguments* RP;
+methodInvocation: DOT method LP arguments* RP;
+
+method: FUNCTION;
 
 arguments: argument (COMMA argument)*;
 
-argument: QUOTE TEXT* QUOTE | APOSTROPHE TEXT* APOSTROPHE | templatetoken | bracketedtemplatespec | TEXT;
+argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templatetoken #tokenedArgument | bracketedtemplatespec #bracketedArgument | TEXT #textedArgument;

@@ -19,19 +19,41 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitIdentifier = function(ctx) {
 		return ctx.getText().toUpperCase();
 	};
-	visitTerminal = function(ctx) {
-		return "";
-	};
+	//visitTerminal = function(ctx) {
+	//	return ctx.getText();
+	//};
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
 		// compute the value of the token and return it as a string.
-		return ctx.children[1].accept(this).join();
+		return ctx.children[1].accept(this).join("");
 	};
 	visitTexttemplate = function(ctx) {
-		return this.visitChildren(ctx).join("");
+		var value = this.visitChildren(ctx);
+		return value != null ? value.join("") :  "";
 	};
 	visitCompilationUnit = function(ctx) {
 		return this.visitChildren(ctx).join("");
+	};
+	visitMethod = function(ctx) {
+		return ctx.getText();
+	};
+	visitMethodInvocation = function(ctx) {
+		return this.visitChildren(ctx);
+	};
+	visitQuotedArgument = function(ctx) {
+		return ctx.children[1].getText();
+	};
+	visitApostrophedArgument = function(ctx) {
+		return ctx.children[1].getText();
+	};
+	visitTokenedArgument = function(ctx) {
+		return this.visitChildren(ctx)[0];
+	};
+	visitBracketedArgument = function(ctx) {
+		return this.visitChildren(ctx);
+	};
+	visitTextedArgument = function(ctx) {
+		return ctx.getText();
 	};
 }
 
