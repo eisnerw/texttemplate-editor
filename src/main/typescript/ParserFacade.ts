@@ -38,7 +38,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.getText();
 	};
 	visitMethodInvocation = function(ctx) {
-		return this.visitChildren(ctx);
+		let children : any = this.visitChildren(ctx);
+		let methodArguments: string[] = children[3]
+		let methodSpec: string[] = [];
+		methodSpec.push(children[1]); // method name
+		for (let i = 0; i < methodArguments.length; i += 2){
+			methodSpec.push(methodArguments[i]);
+		}
+		return methodSpec;
 	};
 	visitQuotedArgument = function(ctx) {
 		return ctx.children[1].getText();
