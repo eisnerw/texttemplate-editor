@@ -4,11 +4,39 @@ import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from 
 import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
 import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
+import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
         console.log("ERROR " + msg);
     }
+}
+
+class TextTemplateVisitor extends TextTemplateParserVisitor {
+	visitText = function(ctx){
+		return ctx.getText();
+	};
+	visitIdentifier = function(ctx) {
+		return ctx.getText().toUpperCase();
+	};
+	visitTerminal = function(ctx) {
+		return "";
+	};
+	visitTemplatetoken = function(ctx) {
+		// there are three children, the left brace, the token, and the right brace
+		// compute the value of the token and return it as a string.
+		return ctx.children[1].accept(this).join();
+	};
+	visitTexttemplate = function(ctx) {
+		return this.visitChildren(ctx).join("");
+	};
+	visitCompilationUnit = function(ctx) {
+		return this.visitChildren(ctx).join("");
+	};
+}
+
+interface TextTemplateVisitor {
+    (source: string, subString: string): boolean;
 }
 
 export class Error {
@@ -157,15 +185,8 @@ export function validate(input) : Error[] {
 	let treeJson : string = JSON.stringify(tree, getCircularReplacer());
 	let parsed : string = "";
 	try{
-		/*let parser : TextTemplateParser = null;
-		if (tree.children[0].children){
-			parser = tree.children[0].children[0].parser;
-		} else {
-			parser = tree.children[0].parser;
-		}*/
 		let treeTokens : CommonToken[] = parser._interp._input.tokens;
 		let symbolicNames : string[] = parser.symbolicNames;
-		//let editorInput : string = tree.children[0].children[0].children[0].symbol.source[0]._input.strdata;
 		
 		for (let e of treeTokens){
 			if (e.type != -1) {
@@ -175,6 +196,9 @@ export function validate(input) : Error[] {
 	} catch(err) {
 		parsed = '*****ERROR*****';
 	}
+	var visitor = new TextTemplateVisitor();
+	var result = visitor.visitCompilationUnit(tree);
+	console.log(result);
     document.getElementById("parsed").innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
     return errors;
 }

@@ -15,7 +15,7 @@ templatetoken: LBRACE bracedoptions RBRACE;
 
 bracedoptions: QUOTE TEXT QUOTE | APOSTROPHE TEXT APOSTROPHE | bracedarrow | identifier method* | conditionalexpression;
 
-conditionalexpression: LP conditionalexpression RP | NOT conditionalexpression | conditionalexpression (AND|OR) conditionalexpression | identifier method+;
+conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | identifier method+ #condition;
 	
 templatecontexttoken: LBRACE ((identifier method* | QUOTE TEXT QUOTE) COLON | COLON) templatespec RBRACE;
 
