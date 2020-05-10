@@ -16,7 +16,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitText = function(ctx){
 		return ctx.getText();
 	};
-	visitIdentifier = function(ctx) {
+	visitIdentifierValue		 = function(ctx) {
 		return ctx.getText().toUpperCase();
 	};
 	//visitTerminal = function(ctx) {
@@ -37,13 +37,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitMethod = function(ctx) {
 		return ctx.getText();
 	};
+	visitBraceIdentifier = function(ctx) {
+		var children = this.visitChildren(ctx);
+		return [children[0] + (children[1] ? ('-'+children[1].join('-')) : "")];
+	};
+	visitQuoteLiteral = function(ctx) {
+		return ctx.children[1].getText();
+	};
+	visitApostropheLiteral = function(ctx) {
+		return ctx.children[1].getText();
+	};
 	visitMethodInvocation = function(ctx) {
 		let children : any = this.visitChildren(ctx);
 		let methodArguments: string[] = children[3]
 		let methodSpec: string[] = [];
 		methodSpec.push(children[1]); // method name
-		for (let i = 0; i < methodArguments.length; i += 2){
-			methodSpec.push(methodArguments[i]);
+		if (methodArguments){
+			for (let i = 0; i < methodArguments.length; i += 2){
+				methodSpec.push(methodArguments[i]);
+			}
 		}
 		return methodSpec;
 	};

@@ -13,7 +13,7 @@ text: (texts+=TEXT) COMMENT*;
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
-bracedoptions: QUOTE TEXT QUOTE | APOSTROPHE TEXT APOSTROPHE | bracedarrow | identifier methodInvocation* | conditionalexpression;
+bracedoptions: bracedarrow #braceArrow | identifier methodInvocation* #braceIdentifier | conditionalexpression #braceConditional;
 
 conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | identifier methodInvocation+ #condition;
 	
@@ -27,7 +27,7 @@ bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 
 bracedarrowtemplatespec: templatespec COMMA templatespec | templatespec;
 
-identifier: IDENTIFIER;
+identifier: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | IDENTIFIER #identifierValue;
 
 methodInvocation: DOT method LP arguments* RP;
 
