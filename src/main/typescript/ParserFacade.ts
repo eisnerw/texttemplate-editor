@@ -13,15 +13,24 @@ class ConsoleErrorListener extends error.ErrorListener {
 }
 
 class TextTemplateVisitor extends TextTemplateParserVisitor {
+	context : any;
 	visitText = function(ctx){
 		return ctx.getText();
 	};
-	visitIdentifierValue		 = function(ctx) {
-		return ctx.getText().toUpperCase();
+	visitIdentifierValue = function(ctx) {
+		var key = ctx.getText();
+		if (!this.context){
+			return "ERROR: No Context";
+		}
+		var Document = this.context.Document;
+		if (!Document){
+			return "ERROR: No Document";
+		}
+		if (!Document[key]){
+			return null;
+		}
+		return Document[key];
 	};
-	//visitTerminal = function(ctx) {
-	//	return ctx.getText();
-	//};
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
 		// compute the value of the token and return it as a string.
@@ -30,6 +39,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTexttemplate = function(ctx) {
 		var value = this.visitChildren(ctx);
 		return value != null ? value.join("") :  "";
+	};
+	visitTemplatecontexttoken = function(ctx) {
+		var oldContext = this.context;
+		this.context = ctx.children[1].accept(this);
+		if (typeof this.context === "string"){
+			try{
+				this.context = JSON.parse(this.context);
+			} catch(e){
+				this.context = oldContext;
+				return "bad JSON";
+			}
+			var result = ctx.children[3].accept(this)[0];
+			this.context = oldContext;
+			return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
+		}
+		return this.visitChildren(ctx);
 	};
 	visitCompilationUnit = function(ctx) {
 		return this.visitChildren(ctx).join("");

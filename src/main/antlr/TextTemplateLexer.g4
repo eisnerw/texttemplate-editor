@@ -60,7 +60,8 @@ BRACKETED_NL: '\n' ->type(TEXT);
 
 mode DOTTED;
 FUNCTION: [a-zA-Z_][a-zA-Z0-9_]*;
-DOTTED_ILLEGAL: [.=>}{),:"'!&|] | '[' | ']';
+DOTTED_DOT: '.' -> type(DOT), popMode;
+DOTTED_ILLEGAL: [=>}{),:"'!&|] | '[' | ']';
 DOTTED_LP: '(' -> type(LP),mode(PARENED);
 
 mode NESTED;

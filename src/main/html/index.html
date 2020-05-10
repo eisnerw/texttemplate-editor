@@ -67,7 +67,8 @@
 
 		let editor = monaco.editor.create(document.getElementById('container'), {
 			value: [
-				'this is a sample of text with a {first} token and {second} token',
+				'{\'{"Document": {"firstName": "John", "lastName": "Smith"}}\': // Document context',
+				'[Hello {lastName}, {firstName}!!]}',
 				''
 			].join('\n'),
 			language: 'texttemplate',

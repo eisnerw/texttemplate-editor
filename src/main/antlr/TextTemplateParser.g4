@@ -17,7 +17,7 @@ bracedoptions: bracedarrow #braceArrow | identifier methodInvocation* #braceIden
 
 conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | identifier methodInvocation+ #condition;
 	
-templatecontexttoken: LBRACE ((identifier methodInvocation* | QUOTE TEXT QUOTE) COLON | COLON) templatespec RBRACE;
+templatecontexttoken: LBRACE (identifier methodInvocation* COLON | COLON) templatespec RBRACE;
 
 templatespec: identifier | bracketedtemplatespec;
 
