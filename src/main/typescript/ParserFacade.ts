@@ -22,6 +22,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!this.context){
 			return "ERROR: No Context";
 		}
+		var keys = key.split('.');
+		
 		var Document = this.context.Document;
 		if (!Document){
 			return "ERROR: No Document";
@@ -67,10 +69,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return [children[0] + (children[1] ? ('-'+children[1].join('-')) : "")];
 	};
 	visitQuoteLiteral = function(ctx) {
-		return ctx.children[1].getText();
+		//return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\"/g,'"').replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus "\/bfnrt
+		// using the JSON parser to unescape the string
+		var tempJson = JSON.parse('{"data":"' + ctx.children[1].getText() + '"}');
+		return tempJson.data;
 	};
 	visitApostropheLiteral = function(ctx) {
-		return ctx.children[1].getText();
+		return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\'/g,"'").replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus '\/bfnrt
 	};
 	visitMethodInvocation = function(ctx) {
 		let children : any = this.visitChildren(ctx);
@@ -264,7 +269,7 @@ export function validate(input) : Error[] {
 	}
 	var visitor = new TextTemplateVisitor();
 	var result = visitor.visitCompilationUnit(tree);
-	console.log(result);
     document.getElementById("parsed").innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+	document.getElementById("interpolated").innerHTML = result;
     return errors;
 }

@@ -27,11 +27,11 @@ bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 
 bracedarrowtemplatespec: templatespec COMMA templatespec | templatespec;
 
-identifier: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | IDENTIFIER #identifierValue;
+identifier: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | IDENTIFIER (DOT IDENTIFIER)* #identifierValue;
 
-methodInvocation: DOT method LP arguments* RP;
+methodInvocation: method arguments* RP;
 
-method: FUNCTION;
+method: METHODNAME;
 
 arguments: argument (COMMA argument)*;
 

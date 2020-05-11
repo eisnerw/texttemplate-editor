@@ -12,7 +12,8 @@ TEXT_NL: '\n' ->type(TEXT);
 mode BRACED;
 BRACED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
-DOT: '.' ->pushMode(DOTTED);
+METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
+DOT: '.';
 ARROW: '=>';
 RBRACE: '}' -> popMode;
 WS: [ \t\r\n]+ ->skip; // allow white space in braced
@@ -42,7 +43,11 @@ PARENED_ILLEGAL: [}(];
 
 mode QUOTED;
 QUOTED_QUOTE: '"' ->type(QUOTE),popMode;
-QUOTED_TEXT: ~["]* ->type(TEXT);
+fragment ESC: '\\' (["\\/bfnrt] | UNICODE);
+fragment UNICODE : 'u' HEX HEX HEX HEX;
+fragment HEX : [0-9a-fA-F];
+QUOTED_TEXT: (ESC | ~["\\])* ->type(TEXT);
+QUOTED_BAD_BACKSLASH: '\\' ~["\\/bfnrt];
 
 mode APOSTROPHED;
 APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
@@ -58,16 +63,11 @@ BRACKETED_SP: ' '+ ->type(TEXT);
 BRACKETED_SLASH: '/' ->type(TEXT);
 BRACKETED_NL: '\n' ->type(TEXT);
 
-mode DOTTED;
-FUNCTION: [a-zA-Z_][a-zA-Z0-9_]*;
-DOTTED_DOT: '.' -> type(DOT), popMode;
-DOTTED_ILLEGAL: [=>}{),:"'!&|] | '[' | ']';
-DOTTED_LP: '(' -> type(LP),mode(PARENED);
-
 mode NESTED;
 NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 NESTED_IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
-NESTED_DOT: '.' ->type(DOT),pushMode(DOTTED);
+NESTED_METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> type(METHODNAME),pushMode(PARENED);
+NESTED_DOT: '.' ->type(DOT);
 NESTED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
 NESTED_LP: '(' -> type(LP),pushMode(NESTED);
 NESTED_RP: ')' ->type(RP),popMode;
