@@ -104,6 +104,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTextedArgument = function(ctx) {
 		return ctx.getText();
 	};
+	visitComment = function(ctx) {
+		return "COMMENT";
+	};
 }
 
 interface TextTemplateVisitor {

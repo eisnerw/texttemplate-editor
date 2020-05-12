@@ -1,6 +1,6 @@
 lexer grammar TextTemplateLexer;
 
-COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF)	;
+COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF)	 [ \t\r]*;
 TEXT: ~[{}/ \n]+ ;
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
@@ -54,7 +54,7 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
-BRACKETED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
+BRACKETED_COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF) [ \t\r]* ->type(COMMENT);
 RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
 BRACKETED_LBRACE: 	'{' -> type(LBRACE),pushMode(BRACED);

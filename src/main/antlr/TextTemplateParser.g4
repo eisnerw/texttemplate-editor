@@ -7,9 +7,11 @@ compilationUnit:
     EOF
     ;
 
-texttemplate: text* templatetoken text* | templatecontexttoken | text+;
+texttemplate: ((templatetoken | templatecontexttoken | text+) comment*) | comment;
 
-text: (texts+=TEXT) COMMENT*;
+comment: COMMENT+;
+
+text: (texts+=TEXT);
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
