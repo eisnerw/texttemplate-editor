@@ -38,7 +38,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// compute the value of the token and return it as a string.
 		return ctx.children[1].accept(this).join("");
 	};
-	visitTexttemplate = function(ctx) {
+	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
 		return value != null ? value.join("") :  "";
 	};
@@ -105,7 +105,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.getText();
 	};
 	visitComment = function(ctx) {
-		return "COMMENT";
+		return " ";
 	};
 }
 

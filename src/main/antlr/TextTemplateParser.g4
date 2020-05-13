@@ -3,11 +3,11 @@ parser grammar TextTemplateParser;
 options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
-    (texttemplates+=texttemplate)+
+    (texttemplates+=templatecontents)+
     EOF
     ;
 
-texttemplate: ((templatetoken | templatecontexttoken | text+) comment*) | comment;
+templatecontents: comment* (templatetoken | templatecontexttoken | text+);
 
 comment: COMMENT+;
 
@@ -23,7 +23,7 @@ templatecontexttoken: LBRACE (identifier methodInvocation* COLON | COLON) templa
 
 templatespec: identifier | bracketedtemplatespec;
 
-bracketedtemplatespec: LBRACKET texttemplate* RBRACKET;
+bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET;
 
 bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 
