@@ -42,19 +42,19 @@ class TemplateData {
 	}
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
-		let value = dictionary[keySplit[0]);
-		if (keySplit.Length == 1 || value === undefined){
+		let value = this.dictionary[keySplit[0]];
+		if (keySplit.length == 1 || value === undefined){
 			return value;
 		}
-		if (typeof value == "object" && <TemplateData>value.type == "dictionary"){
-			return <TemplateData>value.[keySplit.slice(1).join('.')];
+		if (value instanceof TemplateData){
+			return <TemplateData>value.getValue(keySplit.slice(1).join('.'));
 		}
 	}
 }
 
 
 class TextTemplateVisitor extends TextTemplateParserVisitor {
-	context : any;
+	context : TemplateData;
 	visitText = function(ctx){
 		return ctx.getText();
 	};
@@ -63,16 +63,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!this.context){
 			return "ERROR: No Context";
 		}
-		var keys = key.split('.');
-		
-		var Document = this.context.Document;
-		if (!Document){
-			return "ERROR: No Document";
-		}
-		if (!Document[key]){
-			return null;
-		}
-		return Document[key];
+		return this.context.getValue(key);
 	};
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
@@ -84,21 +75,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return value != null ? value.join("") :  "";
 	};
 	visitTemplatecontexttoken = function(ctx) {
-		var oldContext = this.context;
-		this.context = ctx.children[1].accept(this);
-		if (typeof this.context === "string"){
+		let oldContext : TemplateData = this.context;
+		let context : any = ctx.children[1].accept(this);
+		if (typeof context === "string"){
 			try{
-				let test : TemplateData = new TemplateData(this.context);
-				this.context = JSON.parse(this.context);
+				this.context = new TemplateData(context);
 			} catch(e){
 				this.context = oldContext;
-				return "bad JSON";
+				return "bad JSON for template context";
 			}
-			var result = ctx.children[3].accept(this)[0];
-			this.context = oldContext;
-			return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
+		} else {
+			this.context = context;
 		}
-		return this.visitChildren(ctx);
+		var result = ctx.children[3].accept(this)[0];
+		this.context = oldContext;
+		return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
 	};
 	visitCompilationUnit = function(ctx) {
 		return this.visitChildren(ctx).join("");
