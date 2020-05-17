@@ -11,6 +11,47 @@ class ConsoleErrorListener extends error.ErrorListener {
         console.log("ERROR " + msg);
     }
 }
+class TemplateData {
+	private dictionary = {};
+	private list: [TemplateData];
+	type: string;
+	constructor(jsonData: string | {} | []) {
+		let json: {};
+		if (typeof jsonData == "string") {
+			json = JSON.parse(jsonData.toString());
+		} else if (Array.isArray(jsonData)) {
+			this.type = "list";
+			let array: [] = jsonData;
+			array.forEach(() => {
+				array.forEach((item) => {
+					this.list.push(new TemplateData(item));
+				});				
+			});
+		} else {
+			json = jsonData;
+		}
+		this.type = "dictionary";
+		Object.keys(json).forEach((keyname) => {
+			let value: any = json[keyname];
+			if (typeof value == "object") {
+				this.dictionary[keyname] = new TemplateData(value);
+			} else {
+				this.dictionary[keyname] = value;
+            }
+		});
+	}
+	getValue(key : string) : any {
+		let keySplit = key.split('.');
+		let value = dictionary[keySplit[0]);
+		if (keySplit.Length == 1 || value === undefined){
+			return value;
+		}
+		if (typeof value == "object" && <TemplateData>value.type == "dictionary"){
+			return <TemplateData>value.[keySplit.slice(1).join('.')];
+		}
+	}
+}
+
 
 class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : any;
@@ -47,6 +88,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.context = ctx.children[1].accept(this);
 		if (typeof this.context === "string"){
 			try{
+				let test : TemplateData = new TemplateData(this.context);
 				this.context = JSON.parse(this.context);
 			} catch(e){
 				this.context = oldContext;
