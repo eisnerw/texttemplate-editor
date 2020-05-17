@@ -29,9 +29,9 @@ bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 
 bracedarrowtemplatespec: templatespec COMMA templatespec | templatespec;
 
-identifier: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | IDENTIFIER (DOT IDENTIFIER)* #identifierValue;
+identifier: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #identifierValue;
 
-methodInvocation: method arguments* RP;
+methodInvocation: method (conditionalexpression | arguments*) RP;
 
 method: METHODNAME;
 
