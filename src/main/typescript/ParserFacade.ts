@@ -35,6 +35,7 @@ class TemplateData {
 			let value: any = json[keyname];
 			if (typeof value == "object") {
 				this.dictionary[keyname] = new TemplateData(value);
+				this.dictionary[keyname]['^'] = this; // allows ^.^.variable name
 			} else {
 				this.dictionary[keyname] = value;
             }
@@ -67,8 +68,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
-		// compute the value of the token and return it as a string.
-		return ctx.children[1].accept(this).join("");
+		return ctx.children[1].accept(this);
 	};
 	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
@@ -87,19 +87,38 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			this.context = context;
 		}
-		var result = ctx.children[3].accept(this)[0];
+		if (!ctx.children[3].getText()){
+			// protect code against illegal bracketted expression while editing
+			return null;
+		}
+		var result = ctx.children[3].accept(this);
+		if (result) {
+			result = result[0];
+		}
 		this.context = oldContext;
-		return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
+		if (result){
+			return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
+		} else {
+			return null; // invalid template during editing
+		}
 	};
 	visitCompilationUnit = function(ctx) {
 		return this.visitChildren(ctx).join("");
 	};
 	visitMethod = function(ctx) {
-		return ctx.getText();
+		let methodName : string = ctx.getText();
+		return methodName.substr(1, methodName.length - 2);
 	};
 	visitBraceIdentifier = function(ctx) {
 		var children = this.visitChildren(ctx);
-		return [children[0] + (children[1] ? ('-'+children[1].join('-')) : "")];
+		let value : any = children[0];
+		if (children.length > 1){
+			let method : string = children[1][0];
+			let args : [any] = children[1][1];
+			return value + '[.' + method + '(' + args.join(', ') + ')]';
+		} else {
+			return value;
+		}
 	};
 	visitQuoteLiteral = function(ctx) {
 		//return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\"/g,'"').replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus "\/bfnrt
@@ -112,15 +131,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitMethodInvocation = function(ctx) {
 		let children : any = this.visitChildren(ctx);
-		let methodArguments: string[] = children[3]
-		let methodSpec: string[] = [];
-		methodSpec.push(children[1]); // method name
-		if (methodArguments){
-			for (let i = 0; i < methodArguments.length; i += 2){
-				methodSpec.push(methodArguments[i]);
+		let methodName : string = children[0]
+		let methodArgResult: string[] = children[1]
+		let methodArgs: string[] = [];
+		if (methodArgResult){
+			for (let i = 0; i < methodArgResult.length; i += 2){
+				methodArgs.push(methodArgResult[i]);
 			}
 		}
-		return methodSpec;
+		return [methodName, methodArgs];
 	};
 	visitQuotedArgument = function(ctx) {
 		return ctx.children[1].getText();
