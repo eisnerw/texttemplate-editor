@@ -23,7 +23,7 @@ templatecontexttoken: LBRACE (identifier methodInvocation* COLON | COLON) templa
 
 templatespec: identifier | bracketedtemplatespec;
 
-bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET;
+bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET methodInvocation*;
 
 bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 

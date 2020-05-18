@@ -22,11 +22,9 @@ class TemplateData {
 		} else if (Array.isArray(jsonData)) {
 			this.type = "list";
 			let array: [] = jsonData;
-			array.forEach(() => {
-				array.forEach((item) => {
-					this.list.push(new TemplateData(item));
-				});				
-			});
+			array.forEach((item) => {
+				this.list.push(new TemplateData(item));
+			});				
 		} else {
 			json = jsonData;
 		}
@@ -113,12 +111,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		var children = this.visitChildren(ctx);
 		let value : any = children[0];
 		if (children.length > 1){
-			let method : string = children[1][0];
-			let args : [any] = children[1][1];
-			return value + '[.' + method + '(' + args.join(', ') + ')]';
-		} else {
-			return value;
+			children.slice(1).forEach((child) => {
+				let method : string = child[0];
+				let args : [any] = child[1];
+				value = value + '[.' + method + '(' + args.join(', ') + ')]';
+			});
 		}
+		return value;
 	};
 	visitQuoteLiteral = function(ctx) {
 		//return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\"/g,'"').replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus "\/bfnrt
