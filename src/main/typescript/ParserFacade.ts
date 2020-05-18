@@ -113,8 +113,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (children.length > 1){
 			children.slice(1).forEach((child) => {
 				let method : string = child[0];
-				let args : [any] = child[1];
-				value = value + '[.' + method + '(' + args.join(', ') + ')]';
+				var args = child[1];
+				if (args.length == 0 && (method == 'ToUpper' || method == 'ToLower')){
+					switch (method){
+						case "ToUpper":
+							value = <string>value.toUpperCase();
+							break;
+						case "ToLower":
+							value = <string>value.toLowerCase();
+							break;
+					}
+				} else {
+					value = value + '[.' + method + '(' + args.join(', ') + ')]';
+				}
 			});
 		}
 		return value;
