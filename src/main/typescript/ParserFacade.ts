@@ -29,11 +29,12 @@ class TemplateData {
 			json = jsonData;
 		}
 		this.type = "dictionary";
+		this.dictionary['^'] = this; // make sure that the top level points to itself
 		Object.keys(json).forEach((keyname) => {
 			let value: any = json[keyname];
 			if (typeof value == "object") {
 				this.dictionary[keyname] = new TemplateData(value);
-				this.dictionary[keyname]['^'] = this; // allows ^.^.variable name
+				this.dictionary[keyname].dictionary['^'] = this; // allows ^.^.variable name
 			} else {
 				this.dictionary[keyname] = value;
             }
@@ -107,14 +108,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let methodName : string = ctx.getText();
 		return methodName.substr(1, methodName.length - 2);
 	};
-	visitBraceIdentifier = function(ctx) {
+	visitEvaluatedValue = function(ctx) {
 		var children = this.visitChildren(ctx);
 		let value : any = children[0];
 		if (children.length > 1){
 			children.slice(1).forEach((child) => {
 				let method : string = child[0];
 				var args = child[1];
-				if (args.length == 0 && (method == 'ToUpper' || method == 'ToLower')){
+				//if (args.length == 0 && (method == 'ToUpper' || method == 'ToLower')){
 					switch (method){
 						case "ToUpper":
 							value = <string>value.toUpperCase();
@@ -122,10 +123,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						case "ToLower":
 							value = <string>value.toLowerCase();
 							break;
+						case "Matches":
+							let matches : boolean = false;
+							args.forEach((arg)=>{
+								if (arg == value){
+									matches = true;
+								}
+							});
+							value = matches;
+							break;
+						default:
+							value = value + '[.' + method + '(' + args.join(', ') + ')]';
+							break;
 					}
-				} else {
-					value = value + '[.' + method + '(' + args.join(', ') + ')]';
-				}
+				//} else {
+				//	value = value + '[.' + method + '(' + args.join(', ') + ')]';
+				//}
 			});
 		}
 		return value;
@@ -169,6 +182,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitComment = function(ctx) {
 		return " ";
 	};
+	visitBracedarrow = function(ctx) {
+		return this.visitChildren(ctx);
+	};
+	visitLogicalOperator = function(ctx) {
+		let operator : string = ctx.children[1].getText() 
+		let leftCondition : boolean = this.visitChildren(ctx.children[0]);
+		if (!leftCondition && operator == '&'){
+			return false;
+		}
+		if (leftCondition && operator == '|') {
+			return true;
+		}
+		return this.visitChildren(ctx.children[2]);
+	};	
 }
 
 interface TextTemplateVisitor {

@@ -15,11 +15,13 @@ text: (texts+=TEXT);
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
-bracedoptions: bracedarrow #braceArrow | identifier methodInvocation* #braceIdentifier | conditionalexpression #braceConditional;
+bracedoptions: bracedarrow #braceArrow | (evaluatedValue | identifier) #braceIdentifier | conditionalexpression #braceConditional;
 
-conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | identifier methodInvocation+ #condition;
-	
-templatecontexttoken: LBRACE (identifier methodInvocation* COLON | COLON) templatespec RBRACE;
+evaluatedValue: identifier methodInvocation+;
+
+conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | evaluatedValue #condition;
+
+templatecontexttoken: LBRACE ((evaluatedValue | identifier) COLON | COLON) templatespec RBRACE;
 
 templatespec: identifier | bracketedtemplatespec;
 

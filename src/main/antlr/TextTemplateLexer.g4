@@ -11,7 +11,7 @@ TEXT_NL: '\n' ->type(TEXT);
 
 mode BRACED;
 BRACED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
-IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ;
+IDENTIFIER: [^a-zA-Z_][a-zA-Z0-9_]* ;
 METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';
@@ -27,7 +27,7 @@ BRACED_APOSTROPHE: '\'' ->type(APOSTROPHE),pushMode(APOSTROPHED);
 AND: '&';
 OR: '|';
 NOT: '!';
-BRACED_ILLEGAL: ([@#$%^*-={;<>?/\\+] | ']')+;
+BRACED_ILLEGAL: ([@#$%*-={;<>?/\\+] | ']')+;
 
 mode PARENED;
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;

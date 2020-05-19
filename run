@@ -1,8 +1,14 @@
 #!/bin/bash
-./gradlew generateParser
-echo "compiling typescript..."
-tsc --sourceMap
-echo "running webpack..."
+if ./gradlew generateParser; then
+	echo "compiling typescript..."
+else
+	exit 1
+fi
+if tsc --sourceMap; then
+	echo "running webpack..."
+else
+	exit 1
+fi
 webpack
 echo "starting server ... (http://localhost:8888)"
 cd server

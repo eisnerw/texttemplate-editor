@@ -3,6 +3,6 @@
 node_modules
 dist
 .vs/slnx.sqlite
-.vs/slnx.sqlite
 .vs/texttemplate-editor/v16/.suo
+*.sqlite
 .vs/VSWorkspaceState.json

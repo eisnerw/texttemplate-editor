@@ -5,6 +5,6 @@
     "\\src\\main",
     "\\src\\main\\typescript"
   ],
-  "SelectedNode": "\\reference",
+  "SelectedNode": "\\src\\main\\typescript\\ParserFacade.ts",
   "PreviewInSolutionExplorer": false
 }
