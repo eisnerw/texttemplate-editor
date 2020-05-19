@@ -102,7 +102,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitMethod = function(ctx) {
 		let methodName : string = ctx.getText();
-		return methodName.substr(1, methodName.length - 2);
+		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
 		var children = this.visitChildren(ctx);
@@ -180,19 +180,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return " ";
 	};
 	visitBracedarrow = function(ctx) {
-		let condition : boolean = this.visitChildren(ctx.children[0])[0];
-		return this.visitChildren(ctx);
+		let result : boolean = ctx.children[0].accept(this);
+		if (result){
+			return this.visitChildren(ctx.children[2].children[0]); // true
+		}
+		if (ctx.children[2].children.length < 3){
+			return null; // only true condition specified
+		}
+		return this.visitChildren(ctx.children[2].children[2]) // false
 	};
 	visitLogicalOperator = function(ctx) {
 		let operator : string = ctx.children[1].getText() 
-		let leftCondition : boolean = this.visitChildren(ctx.children[0]);
+		let leftCondition : boolean = this.visitChildren(ctx.children[0])[0];
 		if (!leftCondition && operator == '&'){
 			return false;
 		}
 		if (leftCondition && operator == '|') {
 			return true;
 		}
-		return this.visitChildren(ctx.children[2]);
+		return this.visitChildren(ctx.children[2])[0];
 	};	
 	visitBracketedtemplatespec = function(ctx) {
 		let result : [] = this.visitChildren(ctx);
