@@ -27,7 +27,8 @@ BRACED_APOSTROPHE: '\'' ->type(APOSTROPHE),pushMode(APOSTROPHED);
 AND: '&';
 OR: '|';
 NOT: '!';
-BRACED_ILLEGAL: ([@#$%*-={;<>?/\\+] | ']')+;
+POUND: '#';
+BRACED_ILLEGAL: ([@$%*-={;<>?/\\+] | ']')+;
 
 mode PARENED;
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;

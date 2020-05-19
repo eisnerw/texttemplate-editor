@@ -58,7 +58,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitText = function(ctx){
 		return ctx.getText();
 	};
-	visitIdentifierValue = function(ctx) {
+	visitMethodableIdentifer = function(ctx) {
 		var key = ctx.getText();
 		if (!this.context){
 			return "ERROR: No Context";
@@ -75,7 +75,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplatecontexttoken = function(ctx) {
 		let oldContext : TemplateData = this.context;
-		let context : any = ctx.children[1].accept(this);
+		let context : any = ctx.children[1].children[0].accept(this);
 		if (typeof context === "string"){
 			try{
 				this.context = new TemplateData(context);
@@ -95,11 +95,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			result = result[0];
 		}
 		this.context = oldContext;
-		if (result){
-			return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
-		} else {
-			return null; // invalid template during editing
-		}
+		return result;
 	};
 	visitCompilationUnit = function(ctx) {
 		return this.visitChildren(ctx).join("");
@@ -108,9 +104,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let methodName : string = ctx.getText();
 		return methodName.substr(1, methodName.length - 2);
 	};
-	visitEvaluatedValue = function(ctx) {
+	visitMethodInvoked = function(ctx) {
 		var children = this.visitChildren(ctx);
 		let value : any = children[0];
+		// for now, convert all values into strings
+		if (Array.isArray(value)){
+			value = value.join(', ');
+		}
 		if (children.length > 1){
 			children.slice(1).forEach((child) => {
 				let method : string = child[0];
@@ -173,9 +173,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTokenedArgument = function(ctx) {
 		return this.visitChildren(ctx)[0];
 	};
-	visitBracketedArgument = function(ctx) {
-		return this.visitChildren(ctx);
-	};
 	visitTextedArgument = function(ctx) {
 		return ctx.getText();
 	};
@@ -183,6 +180,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return " ";
 	};
 	visitBracedarrow = function(ctx) {
+		let condition : boolean = this.visitChildren(ctx.children[0])[0];
 		return this.visitChildren(ctx);
 	};
 	visitLogicalOperator = function(ctx) {
@@ -196,6 +194,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return this.visitChildren(ctx.children[2]);
 	};	
+	visitBracketedtemplatespec = function(ctx) {
+		let result : [] = this.visitChildren(ctx);
+		return [result.slice(1, result.length).join("")]; // ignore the brackets
+	};
 }
 
 interface TextTemplateVisitor {
