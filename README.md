@@ -26,7 +26,9 @@ cd ..
 ```
 
 The  commands following the two npm commands have been packaged in the "run" bash shell script.
-Once the npm commands have been run, navigate to the project and launch the git bash shell.  run the command ./run
+Once the npm commands have been run, navigate to the project and launch the git bash shell.  
+Make the run command executable: chmod u+x run
+run the command ./run
 The server can be stopped by typing CTRL-c
 
 
