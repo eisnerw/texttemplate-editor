@@ -16,6 +16,7 @@ It shows how to integrate ANTLR with monaco.
 ```
 npm install
 npm i -g webpack webpack-cli
+
 ./gradlew generateParser
 tsc
 webpack
@@ -24,4 +25,9 @@ cd server
 cd .. 
 ```
 
-Now visit http://localhost:8888
+The  commands following the two npm commands have been packaged in the "run" bash shell script.
+Once the npm commands have been run, navigate to the project and launch the git bash shell.  run the command ./run
+The server can be stopped by typing CTRL-c
+
+
+when the server starts, visit http://localhost:8888

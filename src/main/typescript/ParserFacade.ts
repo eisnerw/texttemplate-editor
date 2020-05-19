@@ -1,14 +1,178 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
 
-import {CommonTokenStream, InputStream, Token, error, Parser} from '../../../node_modules/antlr4/index.js'
+import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
 import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
 import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
+import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
         console.log("ERROR " + msg);
     }
+}
+class TemplateData {
+	private dictionary = {};
+	private list: [TemplateData];
+	type: string;
+	constructor(jsonData: string | {} | []) {
+		let json: {};
+		if (typeof jsonData == "string") {
+			json = JSON.parse(jsonData.toString());
+		} else if (Array.isArray(jsonData)) {
+			this.type = "list";
+			let array: [] = jsonData;
+			array.forEach((item) => {
+				this.list.push(new TemplateData(item));
+			});				
+		} else {
+			json = jsonData;
+		}
+		this.type = "dictionary";
+		Object.keys(json).forEach((keyname) => {
+			let value: any = json[keyname];
+			if (typeof value == "object") {
+				this.dictionary[keyname] = new TemplateData(value);
+				this.dictionary[keyname]['^'] = this; // allows ^.^.variable name
+			} else {
+				this.dictionary[keyname] = value;
+            }
+		});
+	}
+	getValue(key : string) : any {
+		let keySplit = key.split('.');
+		let value = this.dictionary[keySplit[0]];
+		if (keySplit.length == 1 || value === undefined){
+			return value;
+		}
+		if (value instanceof TemplateData){
+			return <TemplateData>value.getValue(keySplit.slice(1).join('.'));
+		}
+	}
+}
+
+
+class TextTemplateVisitor extends TextTemplateParserVisitor {
+	context : TemplateData;
+	visitText = function(ctx){
+		return ctx.getText();
+	};
+	visitIdentifierValue = function(ctx) {
+		var key = ctx.getText();
+		if (!this.context){
+			return "ERROR: No Context";
+		}
+		return this.context.getValue(key);
+	};
+	visitTemplatetoken = function(ctx) {
+		// there are three children, the left brace, the token, and the right brace
+		return ctx.children[1].accept(this);
+	};
+	visitTemplatecontents = function(ctx) {
+		var value = this.visitChildren(ctx);
+		return value != null ? value.join("") :  "";
+	};
+	visitTemplatecontexttoken = function(ctx) {
+		let oldContext : TemplateData = this.context;
+		let context : any = ctx.children[1].accept(this);
+		if (typeof context === "string"){
+			try{
+				this.context = new TemplateData(context);
+			} catch(e){
+				this.context = oldContext;
+				return "bad JSON for template context";
+			}
+		} else {
+			this.context = context;
+		}
+		if (!ctx.children[3].getText()){
+			// protect code against illegal bracketted expression while editing
+			return null;
+		}
+		var result = ctx.children[3].accept(this);
+		if (result) {
+			result = result[0];
+		}
+		this.context = oldContext;
+		if (result){
+			return result.slice(1, result.length).join(""); // remove the (undefined) results from the brackets
+		} else {
+			return null; // invalid template during editing
+		}
+	};
+	visitCompilationUnit = function(ctx) {
+		return this.visitChildren(ctx).join("");
+	};
+	visitMethod = function(ctx) {
+		let methodName : string = ctx.getText();
+		return methodName.substr(1, methodName.length - 2);
+	};
+	visitBraceIdentifier = function(ctx) {
+		var children = this.visitChildren(ctx);
+		let value : any = children[0];
+		if (children.length > 1){
+			children.slice(1).forEach((child) => {
+				let method : string = child[0];
+				var args = child[1];
+				if (args.length == 0 && (method == 'ToUpper' || method == 'ToLower')){
+					switch (method){
+						case "ToUpper":
+							value = <string>value.toUpperCase();
+							break;
+						case "ToLower":
+							value = <string>value.toLowerCase();
+							break;
+					}
+				} else {
+					value = value + '[.' + method + '(' + args.join(', ') + ')]';
+				}
+			});
+		}
+		return value;
+	};
+	visitQuoteLiteral = function(ctx) {
+		//return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\"/g,'"').replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus "\/bfnrt
+		// using the JSON parser to unescape the string
+		var tempJson = JSON.parse('{"data":"' + ctx.children[1].getText() + '"}');
+		return tempJson.data;
+	};
+	visitApostropheLiteral = function(ctx) {
+		return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\'/g,"'").replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus '\/bfnrt
+	};
+	visitMethodInvocation = function(ctx) {
+		let children : any = this.visitChildren(ctx);
+		let methodName : string = children[0]
+		let methodArgResult: string[] = children[1]
+		let methodArgs: string[] = [];
+		if (methodArgResult){
+			for (let i = 0; i < methodArgResult.length; i += 2){
+				methodArgs.push(methodArgResult[i]);
+			}
+		}
+		return [methodName, methodArgs];
+	};
+	visitQuotedArgument = function(ctx) {
+		return ctx.children[1].getText();
+	};
+	visitApostrophedArgument = function(ctx) {
+		return ctx.children[1].getText();
+	};
+	visitTokenedArgument = function(ctx) {
+		return this.visitChildren(ctx)[0];
+	};
+	visitBracketedArgument = function(ctx) {
+		return this.visitChildren(ctx);
+	};
+	visitTextedArgument = function(ctx) {
+		return ctx.getText();
+	};
+	visitComment = function(ctx) {
+		return " ";
+	};
+}
+
+interface TextTemplateVisitor {
+    (source: string, subString: string): boolean;
 }
 
 export class Error {
@@ -142,5 +306,35 @@ export function validate(input) : Error[] {
     parser._errHandler = new TextTemplateErrorStrategy();
 
     const tree = parser.compilationUnit();
+	const getCircularReplacer = () => {
+	  const seen = new WeakSet();
+	  return (key, value) => {
+		if (typeof value === "object" && value !== null) {
+		  if (seen.has(value)) {
+			return;
+		  }
+		  seen.add(value);
+		}
+		return value;
+	  };
+	};
+	let treeJson : string = JSON.stringify(tree, getCircularReplacer());
+	let parsed : string = "";
+	try{
+		let treeTokens : CommonToken[] = parser._interp._input.tokens;
+		let symbolicNames : string[] = parser.symbolicNames;
+		
+		for (let e of treeTokens){
+			if (e.type != -1) {
+				parsed += symbolicNames[e.type] + "(" + input.substring(e.start, e.stop + 1) + ") ";
+			}
+		}
+	} catch(err) {
+		parsed = '*****ERROR*****';
+	}
+	var visitor = new TextTemplateVisitor();
+	var result = visitor.visitCompilationUnit(tree);
+    document.getElementById("parsed").innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+	document.getElementById("interpolated").innerHTML = result;
     return errors;
 }

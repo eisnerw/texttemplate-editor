@@ -1,0 +1,10 @@
+#!/bin/bash
+./gradlew generateParser
+echo "compiling typescript..."
+tsc --sourceMap
+echo "running webpack..."
+webpack
+echo "starting server ... (http://localhost:8888)"
+cd server
+../gradlew runServer
+cd .. 
