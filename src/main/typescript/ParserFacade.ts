@@ -86,22 +86,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplatecontexttoken = function(ctx) {
 		let oldContext : TemplateData = this.context;
-		let context : any = ctx.children[1].children[0].accept(this);
-		if (typeof context === "string"){
-			try{
-				this.context = new TemplateData(context);
-			} catch(e){
-				this.context = oldContext;
-				return "bad JSON for template context";
+		let bHasContext : boolean = ctx.children[1].getText() != ":";
+		if (bHasContext){ // don't change context if format {:[template]}
+			let context : any = ctx.children[1].children[0].accept(this);
+			if (typeof context === "string"){
+				try{
+					this.context = new TemplateData(context);
+				} catch(e){
+					this.context = oldContext;
+					return "bad JSON for template context";
+				}
+			} else if (context) { // context may not be specified
+				this.context = context;
 			}
-		} else {
-			this.context = context;
 		}
 		if (!ctx.children[3].getText()){
 			// protect code against illegal bracketted expression while editing
 			return null;
 		}
-		var result = ctx.children[3].accept(this);
+		var result = ctx.children[bHasContext ?  3 : 2].accept(this);
 		if (result) {
 			result = result[0];
 		}
@@ -261,6 +264,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value.join(', ');
 	}
+	visitSubtemplate = function(ctx) {
+		const lexer = createLexer('{pets:[a {type} named {name}].Anded()}');
+		const parser = createParserFromLexer(lexer);
+		const tree = parser.compilationUnit();
+		return this.visitCompilationUnit(tree);
+	};
 }
 
 interface TextTemplateVisitor {
