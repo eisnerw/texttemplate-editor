@@ -1,10 +1,13 @@
+[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/eisnerw/texttemplate-editor) 
+
 # texttemplate-monaco-editor
 
-This project is explained in the article [Writing a browser based editor using Monaco and ANTLR](https://tomassetti.me/writing-a-browser-based-editor-using-monaco-and-antlr/).
+This project is based on the article [Writing a browser based editor using Monaco and ANTLR](https://tomassetti.me/writing-a-browser-based-editor-using-monaco-and-antlr/), which shows how to integrate ANTLR with monaco.
 
-A browser based editor for the TextTemplate language. 
+The language supported here is TextTemplate, which has been designed with several goals:
 
-It shows how to integrate ANTLR with monaco.
+   ...
+
 
 ## Generating the lexer and the parser
 ```
@@ -16,6 +19,7 @@ It shows how to integrate ANTLR with monaco.
 ```
 npm install
 npm i -g webpack webpack-cli
+chmod u+x run
 
 ./gradlew generateParser
 tsc
@@ -25,11 +29,12 @@ cd server
 cd .. 
 ```
 
-The  commands following the two npm commands have been packaged in the "run" bash shell script.
-Once the npm commands have been run, navigate to the project and launch the git bash shell.  
-Make the run command executable: chmod u+x run
-run the command ./run
-The server can be stopped by typing CTRL-c
+The  commands following the first three commands have been packaged in the "run" bash shell script.
+Once the first three commands have been run, navigate to the project and launch the git bash shell.  
 
+Compile and run using the command ./run
 
 when the server starts, visit http://localhost:8888
+
+The server can be stopped by typing CTRL-c
+
