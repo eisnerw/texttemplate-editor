@@ -13,18 +13,20 @@ class ConsoleErrorListener extends error.ErrorListener {
 }
 class TemplateData {
 	private dictionary = {};
-	private list: [TemplateData];
+	private list: TemplateData[] = [];
 	type: string;
 	constructor(jsonData: string | {} | []) {
 		let json: {};
 		if (typeof jsonData == "string") {
 			json = JSON.parse(jsonData.toString());
-		} else if (Array.isArray(jsonData)) {
-			this.type = "list";
+		}
+		else if (Array.isArray(jsonData)) {
+			this.type = 'list';
 			let array: [] = jsonData;
 			array.forEach((item) => {
 				this.list.push(new TemplateData(item));
-			});				
+			});
+			return;
 		} else {
 			json = jsonData;
 		}
@@ -33,8 +35,10 @@ class TemplateData {
 		Object.keys(json).forEach((keyname) => {
 			let value: any = json[keyname];
 			if (typeof value == "object") {
-				this.dictionary[keyname] = new TemplateData(value);
-				this.dictionary[keyname].dictionary['^'] = this; // allows ^.^.variable name
+				if (!Array.isArray(value) || value.length > 0){ // don't add empty arrays
+					this.dictionary[keyname] = new TemplateData(value);
+					this.dictionary[keyname].dictionary['^'] = this; // allows ^.^.variable name TODO: should only do this for a dictionary
+				}
 			} else {
 				this.dictionary[keyname] = value;
             }
@@ -50,8 +54,15 @@ class TemplateData {
 			return <TemplateData>value.getValue(keySplit.slice(1).join('.'));
 		}
 	}
+	iterateList(fn: () => any) {
+		this.type = "dictionary"; // temporarily change to each iterated dictionary
+		this.list.forEach((item : TemplateData)=>{
+			this.dictionary = item.dictionary;
+			fn();
+		});
+		this.type = 'list';
+	}
 }
-
 
 class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
@@ -94,7 +105,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (result) {
 			result = result[0];
 		}
-		this.context = oldContext;
+		if (oldContext) {
+			// protect agaist error when the parse tree is invalid
+			this.context = oldContext;
+		}
 		return result;
 	};
 	visitCompilationUnit = function(ctx) {
@@ -105,41 +119,70 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
-		var children = this.visitChildren(ctx);
-		let value : any = children[0];
+		var children = this.visitChildren(ctx); // TODO: call the methods separately
+		let value : any = [];
+		if (this.context.type == 'list'){
+			this.context.iterateList(()=>{
+				value.push(this.visitChildren(ctx.children[0]));
+			});
+		} else {
+			value.push(ctx.children[0].accept(this));
+		}
 		// for now, convert all values into strings
-		if (Array.isArray(value)){
-			value = value.join(', ');
+		if (value.length == 1){
+			value = value[0];
 		}
 		if (children.length > 1){
 			children.slice(1).forEach((child) => {
 				let method : string = child[0];
-				var args = child[1];
-				//if (args.length == 0 && (method == 'ToUpper' || method == 'ToLower')){
-					switch (method){
-						case "ToUpper":
-							value = <string>value.toUpperCase();
-							break;
-						case "ToLower":
-							value = <string>value.toLowerCase();
-							break;
-						case "Matches":
-							let matches : boolean = false;
-							args.forEach((arg)=>{
-								if (arg == value){
-									matches = true;
+				var args = child[1]
+				if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
+					value = value.join(', ');
+				}
+				switch (method){
+					case "ToUpper":
+						value = <string>value.toUpperCase();
+						break;
+					case "ToLower":
+						value = <string>value.toLowerCase();
+						break;
+					case "Matches":
+						let matches : boolean = false;
+						args.forEach((arg)=>{
+							if (arg == value){
+								matches = true;
+							}
+						});
+						value = matches;
+						break;
+					case "Anded":
+						if (Array.isArray(value)){
+							for (let i : number = 0; i < value.length - 1; i++){
+								if (i == (value.length - 2)){
+									value[i] += ' and ';
+								} else {
+									value[i] += ', ';
 								}
-							});
-							value = matches;
-							break;
-						default:
-							value = value + '[.' + method + '(' + args.join(', ') + ')]';
-							break;
-					}
-				//} else {
-				//	value = value + '[.' + method + '(' + args.join(', ') + ')]';
-				//}
+							}
+							value = value.join('');
+						}
+						break;
+					case "Exists":
+						if (value == undefined){
+							value = false;
+						} else {
+							value = true;
+						}
+						break;
+						
+					default:
+						value = value + '[.' + method + '(' + args.join(', ') + ')]';
+						break;
+				}
 			});
+		}
+		if (Array.isArray(value)){
+			value = value.join(', ');
 		}
 		return value;
 	};
@@ -181,6 +224,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitBracedarrow = function(ctx) {
 		let result : boolean = ctx.children[0].accept(this);
+		if (Array.isArray(result)){
+			result = result[0]; // TODO:why is this one level deep????
+		}
 		if (result){
 			return this.visitChildren(ctx.children[2].children[0]); // true
 		}
@@ -204,6 +250,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let result : [] = this.visitChildren(ctx);
 		return [result.slice(1, result.length).join("")]; // ignore the brackets
 	};
+	visitMethodableTemplatespec = function(ctx) {
+		let value : any = [];
+		if (this.context.type == 'list'){
+			this.context.iterateList(()=>{
+				value.push(this.visitChildren(ctx));
+			});
+		} else {
+			value.push(this.visitChildren(ctx));
+		}
+		return value.join(', ');
+	}
 }
 
 interface TextTemplateVisitor {

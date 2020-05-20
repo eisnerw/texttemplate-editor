@@ -68,8 +68,15 @@
 
 		let editor = monaco.editor.create(document.getElementById('container'), {
 			value: [
-				'{\'{"firstName": "John", "lastName": "Smith", "pet":{"type":"dog", "name": "Toto"}}\': // Document context',
-				'[{"Hello"} {lastName}, {firstName} {pet:[with a {type} named {name}]}!!]}',
+				'{\'{"firstName": "John", "lastName": "Smith", "pets":[',
+				'{"type":"dog", "name": "Toto"}',
+				',{"type":"cat", "name": "Dolly"}',
+				',{"type":"zebra", "name": "Stripes"}',
+				']}\': // Document context',
+				'[{"Hello"} {lastName}, {firstName} with {pets.Exists()=>',
+				'   [{pets:[a {type} named {name}].Anded()}]',
+				'   ,[no pets]',
+				'}!!]}',
 				''
 			].join('\n'),
 			language: 'texttemplate',
