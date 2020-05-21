@@ -121,6 +121,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result;
 	};
 	visitCompilationUnit = function(ctx) {
+		if (ctx.children.length > 2){
+			// the next to the last node may be the subtemplates, so visit it to get the subtemplate dictionary
+			this.visitChildren(ctx.children[ctx.children.length - 2])
+		}
 		return this.visitChildren(ctx).join("");
 	};
 	visitMethod = function(ctx) {
@@ -271,13 +275,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return value.join(', ');
 	}
 	visitNamedSubtemplate = function(ctx) {
-		const lexer = createLexer('{pets:[a {type} named {name}].Anded()}');
+		let subtemplateName : string = ctx.getText();
+		if (!this.subtemplates || !this.subtemplates[subtemplateName]){
+			return "Error: subtemplate '" + subtemplateName + "' not found";
+		}
+		const lexer = createLexer(this.subtemplates[subtemplateName]);
 		const parser = createParserFromLexer(lexer);
 		const tree = parser.compilationUnit();
 		return this.visitCompilationUnit(tree);
 	}
 	visitSubtemplateSpecs = function(ctx) {
-		return null; // prevent subtemplates from executing	
+		let subtemplates : any = {};
+		ctx.children.forEach((child)=>{
+			if (child.children[0].children[1].constructor.name == "NamedSubtemplateContext"){
+				let templateString : string = child.children[0].children[3].getText();
+				subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
+			}
+		});
+		this.subtemplates = subtemplates;
+		return null;
 	}
 }
 
