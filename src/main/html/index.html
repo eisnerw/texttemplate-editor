@@ -106,6 +106,9 @@
 		});
 		editor.onDidChangeModelContent(function (e) {
 			let code = editor.getValue()
+			if (!ParserFacade){
+				return; // protect against an unknown error that can occur during editing if keystrokes are frequent
+			}
 			let syntaxErrors = ParserFacade.validate(code);
 			let monacoErrors = [];
 			for (let e of syntaxErrors) {

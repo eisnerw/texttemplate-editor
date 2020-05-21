@@ -82,8 +82,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
-		if (ctx.children[0].constructor.name == "SubtemplateSectionContext"){
-			return ""; //prevent displaying the Subtemplate section.
+		if (!ctx.children || ctx.children[0].constructor.name == "SubtemplateSectionContext"){
+			return ""; //prevent displaying the Subtemplate section and avoid error for invalid brace 
 		}
 		return value != null ? value.join("") :  "";
 	};
@@ -270,11 +270,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value.join(', ');
 	}
-	visitSubtemplate = function(ctx) {
+	visitNamedSubtemplate = function(ctx) {
 		const lexer = createLexer('{pets:[a {type} named {name}].Anded()}');
 		const parser = createParserFromLexer(lexer);
 		const tree = parser.compilationUnit();
 		return this.visitCompilationUnit(tree);
+	}
+	visitSubtemplateSpecs = function(ctx) {
+		return null; // prevent subtemplates from executing	
 	}
 }
 
