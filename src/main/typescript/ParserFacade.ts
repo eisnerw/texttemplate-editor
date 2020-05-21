@@ -121,6 +121,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result;
 	};
 	visitCompilationUnit = function(ctx) {
+		if (!ctx.children){
+			return ""; // no data
+		}
 		if (ctx.children.length > 2){
 			// the next to the last node may be the subtemplates, so visit it to get the subtemplate dictionary
 			this.visitChildren(ctx.children[ctx.children.length - 2])
@@ -134,7 +137,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitMethodInvoked = function(ctx) {
 		var children = this.visitChildren(ctx); // TODO: call the methods separately
 		let value : any = [];
-		if (this.context.type == 'list'){
+		if (this.context && this.context.type == 'list'){
 			this.context.iterateList(()=>{
 				value.push(this.visitChildren(ctx.children[0]));
 			});
@@ -233,6 +236,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.getText();
 	};
 	visitComment = function(ctx) {
+		if (ctx.start.start == 0){
+			return ""; // special case for a comment at the beginning of the fileCreatedDate{
+		}
 		return " ";
 	};
 	visitBracedarrow = function(ctx) {
@@ -265,7 +271,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitMethodableTemplatespec = function(ctx) {
 		let value : any = [];
-		if (this.context.type == 'list'){
+		if (this.context && this.context.type == 'list'){
 			this.context.iterateList(()=>{
 				value.push(this.visitChildren(ctx));
 			});
@@ -285,16 +291,23 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitCompilationUnit(tree);
 	}
 	visitSubtemplateSpecs = function(ctx) {
-		let subtemplates : any = {};
-		ctx.children.forEach((child)=>{
-			if (child.children[0].children[1].constructor.name == "NamedSubtemplateContext"){
-				let templateString : string = child.children[0].children[3].getText();
-				subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
-			}
-		});
-		this.subtemplates = subtemplates;
+		if (ctx.children){
+			let subtemplates : any = {};
+			ctx.children.forEach((child)=>{
+				if (child.children[0].children[1].constructor.name == "NamedSubtemplateContext"){
+					let templateString : string = child.children[0].children[3].getText();
+					subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
+				}
+			});
+			this.subtemplates = subtemplates;
+		}
 		return null;
 	}
+	visitSubtemplateSection = function(ctx) {
+		// visit the children to load the subtemplates dictionary, but don't output anything
+		this.visitChildren(ctx);
+		return "";
+	};
 }
 
 interface TextTemplateVisitor {
