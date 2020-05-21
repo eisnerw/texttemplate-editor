@@ -3,11 +3,17 @@ parser grammar TextTemplateParser;
 options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
-    (texttemplates+=templatecontents)+
+    templatecontents+ 
     EOF
     ;
 
-templatecontents: comment* (templatetoken | templatecontexttoken | text+);
+subtemplateSection: SUBTEMPLATES TEXT* subtemplateSpecs;
+
+subtemplateSpecs: subtemplatespec*;
+
+subtemplatespec: templatecontexttoken TEXT*;
+
+templatecontents: comment* (subtemplateSection | templatetoken | templatecontexttoken | text+);
 
 comment: COMMENT+;
 
@@ -21,9 +27,9 @@ methodInvoked: methodable methodInvocation+;
 
 conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | methodInvoked #condition;
 
-templatecontexttoken: LBRACE (optionallyInvokedMethodable COLON | COLON) (subtemplate | optionallyInvokedMethodable) RBRACE;
+templatecontexttoken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) COLON | COLON) (namedSubtemplate | optionallyInvokedMethodable) RBRACE;
 
-templatespec: subtemplate | bracketedtemplatespec;
+templatespec: namedSubtemplate | bracketedtemplatespec;
 
 bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET;
 
@@ -43,4 +49,4 @@ optionallyInvokedMethodable: (methodInvoked | methodable);
 
 argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templatetoken #tokenedArgument | bracketedtemplatespec #bracketedArgument | TEXT #textedArgument;
 
-subtemplate: POUND IDENTIFIER;
+namedSubtemplate: POUND IDENTIFIER;

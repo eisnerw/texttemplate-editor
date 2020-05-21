@@ -7,6 +7,7 @@ E_RBRACE: '}' -> type(RBRACE);
 TEXT_SP: ' '+ ->type(TEXT);
 TEXT_SLASH: '/' ->type(TEXT);
 TEXT_NL: '\n' ->type(TEXT);
+SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+;
 
 
 mode BRACED;

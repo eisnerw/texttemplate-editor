@@ -82,9 +82,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
+		if (ctx.children[0].constructor.name == "SubtemplateSectionContext"){
+			return ""; //prevent displaying the Subtemplate section.
+		}
 		return value != null ? value.join("") :  "";
 	};
 	visitTemplatecontexttoken = function(ctx) {
+		if (ctx.children.length < 3){
+			return null; // invalid
+		}
 		let oldContext : TemplateData = this.context;
 		let bHasContext : boolean = ctx.children[1].getText() != ":";
 		if (bHasContext){ // don't change context if format {:[template]}
@@ -269,7 +275,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		const parser = createParserFromLexer(lexer);
 		const tree = parser.compilationUnit();
 		return this.visitCompilationUnit(tree);
-	};
+	}
 }
 
 interface TextTemplateVisitor {
