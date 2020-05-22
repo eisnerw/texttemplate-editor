@@ -92,8 +92,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return null; // invalid
 		}
 		let oldContext : TemplateData = this.context;
-		let bHasContext : boolean = ctx.children[1].getText() != ":";
-		if (bHasContext){ // don't change context if format {:[template]}
+		let bHasContext : boolean = ctx.children[1].getText() != ":"; // won't change context if format {:[template]}
+		if (bHasContext){ 
 			let context : any = ctx.children[1].children[0].accept(this);
 			if (typeof context === "string"){
 				try{
@@ -110,10 +110,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			// protect code against illegal bracketted expression while editing
 			return null;
 		}
-		var result = ctx.children[bHasContext ?  3 : 2].accept(this);
-		if (result) {
-			result = result[0];
-		}
+		var result = [];
+		result = ctx.children[bHasContext ?  3 : 2].accept(this);
 		if (oldContext) {
 			// protect agaist error when the parse tree is invalid
 			this.context = oldContext;
@@ -128,78 +126,38 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			// the next to the last node may be the subtemplates, so visit it to get the subtemplate dictionary
 			this.visitChildren(ctx.children[ctx.children.length - 2])
 		}
-		return this.visitChildren(ctx).join("");
+		let result : string[] = this.visitChildren(ctx);
+		return result.splice(0, result.length - 1).join(""); // remove the result of the <EOF> token
 	};
 	visitMethod = function(ctx) {
 		let methodName : string = ctx.getText();
 		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
-		var children = this.visitChildren(ctx); // TODO: call the methods separately
 		let value : any = [];
 		if (this.context && this.context.type == 'list'){
+			// create an arry of results and then run the method on the array
 			this.context.iterateList(()=>{
-				value.push(this.visitChildren(ctx.children[0]));
+				value.push(ctx.children[0].accept(this));
 			});
 		} else {
-			value.push(ctx.children[0].accept(this));
+			value = ctx.children[0].accept(this);
 		}
-		// for now, convert all values into strings
-		if (value.length == 1){
-			value = value[0];
-		}
-		if (children.length > 1){
-			children.slice(1).forEach((child) => {
-				let method : string = child[0];
-				var args = child[1]
-				if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
-					value = value.join(', ');
-				}
-				switch (method){
-					case "ToUpper":
-						value = <string>value.toUpperCase();
-						break;
-					case "ToLower":
-						value = <string>value.toLowerCase();
-						break;
-					case "Matches":
-						let matches : boolean = false;
-						args.forEach((arg)=>{
-							if (arg == value){
-								matches = true;
-							}
-						});
-						value = matches;
-						break;
-					case "Anded":
-						if (Array.isArray(value)){
-							for (let i : number = 0; i < value.length - 1; i++){
-								if (i == (value.length - 2)){
-									value[i] += ' and ';
-								} else {
-									value[i] += ', ';
-								}
-							}
-							value = value.join('');
-						}
-						break;
-					case "Exists":
-						if (value == undefined){
-							value = false;
-						} else {
-							value = true;
-						}
-						break;
-						
-					default:
-						value = value + '[.' + method + '(' + args.join(', ') + ')]';
-						break;
-				}
-			});
-		}
-		if (Array.isArray(value)){
-			value = value.join(', ');
-		}
+		var children = this.visitChildren(ctx);
+		// call each method, which follow the identifier value
+		children.slice(1).forEach((child) => {
+			let method : string = child[0];
+			var args = child[1]
+			if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
+				let computedValue : string[] = [];
+				value.forEach((val) =>{
+					computedValue.push(this.callMethod(method, val, args));
+				});
+				value = computedValue;
+			} else {
+				value = this.callMethod(method, value, args);
+			}
+		});
 		return value;
 	};
 	visitQuoteLiteral = function(ctx) {
@@ -276,19 +234,28 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				value.push(this.visitChildren(ctx));
 			});
 		} else {
-			value.push(this.visitChildren(ctx));
+			value.push(this.visitChildren(ctx))[0];
 		}
-		return value.join(', ');
+		return value;
 	}
 	visitNamedSubtemplate = function(ctx) {
-		let subtemplateName : string = ctx.getText();
-		if (!this.subtemplates || !this.subtemplates[subtemplateName]){
-			return "Error: subtemplate '" + subtemplateName + "' not found";
+		if (this.context && this.context.type == "list"){
+			// compute a result for each dictionary in the list
+			let result : any = [];
+			this.context.iterateList(()=>{
+				result.push(this.visitNamedSubtemplate(ctx)); // recurse with each dictionary in the list
+			});
+			return result;
+		} else {
+			let subtemplateName : string = ctx.getText();
+			if (!this.subtemplates || !this.subtemplates[subtemplateName]){
+				return "Error: subtemplate '" + subtemplateName + "' not found";
+			}
+			const lexer = createLexer(this.subtemplates[subtemplateName]);
+			const parser = createParserFromLexer(lexer);
+			const tree = parser.compilationUnit();
+			return this.visitCompilationUnit(tree);
 		}
-		const lexer = createLexer(this.subtemplates[subtemplateName]);
-		const parser = createParserFromLexer(lexer);
-		const tree = parser.compilationUnit();
-		return this.visitCompilationUnit(tree);
 	}
 	visitSubtemplateSpecs = function(ctx) {
 		if (ctx.children){
@@ -308,6 +275,55 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.visitChildren(ctx);
 		return "";
 	};
+	callMethod = function(method : string, value : any, args: any){
+		if (typeof value != "string" && (method == "ToUpper" || method == "Matches" || method == "ToLower")){
+			if (method == "Matches"){
+				return false;
+			}
+			return value;
+		}
+		switch (method){
+			case "ToUpper":
+				value = <string>value.toUpperCase();
+				break;
+			case "ToLower":
+				value = <string>value.toLowerCase();
+				break;
+			case "Matches":
+				let matches : boolean = false;
+				args.forEach((arg)=>{
+					if (arg == value){
+						matches = true;
+					}
+				});
+				value = matches;
+				break;
+			case "Anded":
+				if (Array.isArray(value)){
+					for (let i : number = 0; i < value.length - 1; i++){
+						if (i == (value.length - 2)){
+							value[i] += ' and ';
+						} else {
+							value[i] += ', ';
+						}
+					}
+					value = value.join('');
+				}
+				break;
+			case "Exists":
+				if (value == undefined){
+					value = false;
+				} else {
+					value = true;
+				}
+				break;
+				
+			default:
+				value = value + '[.' + method + '(' + args.join(', ') + ')]';
+				break;
+		}
+		return value;
+	}
 }
 
 interface TextTemplateVisitor {
