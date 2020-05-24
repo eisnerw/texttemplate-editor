@@ -61,6 +61,10 @@ class TemplateData {
 			fn();
 		});
 		this.type = 'list';
+		this.dictionary = {};
+	}
+	count(){
+		return this.list.length;
 	}
 }
 
@@ -89,11 +93,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (Array.isArray(value) && Array.isArray(value[0]) && value[0].length > 1){
 			let newValue : string[] = [];
 			value[0].forEach((val)=>{
-				val.split('\n').forEach((subval)=>{
-					newValue.push(subval);
-				});
+				if (typeof val == 'string'){
+					val.split('\n').forEach((subval)=>{
+						newValue.push(subval);
+					});
+				}
 			});
-			value[0] = '\n    ' + newValue.join('\n    ');
+			value[0] = '\n    ' + newValue.join('\n    ') + '\n';
 		}
 		if (!ctx.children || ctx.children[0].constructor.name == 'SubtemplateSectionContext'){
 			return ''; //prevent displaying the Subtemplate section and avoid error for invalid brace 
@@ -301,12 +307,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitOptionallyInvokedMethodable = function(ctx) {
 		return this.visitChildren(ctx)[0];
 	};
+	visitNotConditional = function(ctx) {
+		let result : any = this.visitChildren(ctx)[1];
+		return !result;
+	};
+	visitCondition = function(ctx) {
+		return this.visitChildren(ctx)[0];
+	};
+
 	callMethod = function(method : string, value : any, args: any){
 		if (typeof value != 'string' && (method == 'ToUpper' || method == 'Matches' || method == 'ToLower')){
-			if (method == 'Matches'){
-				return false;
+ 			if (method != 'Matches') {
+				return value;
 			}
-			return value;
+			value = value.toString();
 		}
 		switch (method){
 			case 'ToUpper':
@@ -341,6 +355,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = false;
 				} else {
 					value = true;
+				}
+				break;
+				
+			case 'Count':
+				if (value == undefined){
+					value = 0;
+				} else if (value instanceof TemplateData && value.type == 'list'){
+					value = value.count();
+				} else {
+					value = 1;
 				}
 				break;
 				
