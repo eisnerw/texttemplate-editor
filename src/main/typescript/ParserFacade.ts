@@ -8,7 +8,7 @@ import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTem
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
-        console.log("ERROR " + msg);
+        console.log('ERROR ' + msg);
     }
 }
 class TemplateData {
@@ -17,7 +17,7 @@ class TemplateData {
 	type: string;
 	constructor(jsonData: string | {} | []) {
 		let json: {};
-		if (typeof jsonData == "string") {
+		if (typeof jsonData == 'string') {
 			json = JSON.parse(jsonData.toString());
 		}
 		else if (Array.isArray(jsonData)) {
@@ -30,11 +30,11 @@ class TemplateData {
 		} else {
 			json = jsonData;
 		}
-		this.type = "dictionary";
+		this.type = 'dictionary';
 		this.dictionary['^'] = this; // make sure that the top level points to itself
 		Object.keys(json).forEach((keyname) => {
 			let value: any = json[keyname];
-			if (typeof value == "object") {
+			if (typeof value == 'object') {
 				if (!Array.isArray(value) || value.length > 0){ // don't add empty arrays
 					this.dictionary[keyname] = new TemplateData(value);
 					this.dictionary[keyname].dictionary['^'] = this; // allows ^.^.variable name TODO: should only do this for a dictionary
@@ -55,7 +55,7 @@ class TemplateData {
 		}
 	}
 	iterateList(fn: () => any) {
-		this.type = "dictionary"; // temporarily change to each iterated dictionary
+		this.type = 'dictionary'; // temporarily change to each iterated dictionary
 		this.list.forEach((item : TemplateData)=>{
 			this.dictionary = item.dictionary;
 			fn();
@@ -72,38 +72,55 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitMethodableIdentifer = function(ctx) {
 		var key = ctx.getText();
 		if (!this.context){
-			return "ERROR: No Context";
+			return 'ERROR: No Context';
 		}
 		return this.context.getValue(key);
 	};
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
-		return ctx.children[1].accept(this);
+		let result : any = ctx.children[1].accept(this);
+		if (Array.isArray(result)){
+			return result[0];
+		}
+		return result;
 	};
 	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
-		if (!ctx.children || ctx.children[0].constructor.name == "SubtemplateSectionContext"){
-			return ""; //prevent displaying the Subtemplate section and avoid error for invalid brace 
+		if (Array.isArray(value) && Array.isArray(value[0]) && value[0].length > 1){
+			let newValue : string[] = [];
+			value[0].forEach((val)=>{
+				val.split('\n').forEach((subval)=>{
+					newValue.push(subval);
+				});
+			});
+			value[0] = '\n    ' + newValue.join('\n    ');
 		}
-		return value != null ? value.join("") :  "";
+		if (!ctx.children || ctx.children[0].constructor.name == 'SubtemplateSectionContext'){
+			return ''; //prevent displaying the Subtemplate section and avoid error for invalid brace 
+		}
+		return value != null ? value.join('') :  '';
 	};
 	visitTemplatecontexttoken = function(ctx) {
 		if (ctx.children.length < 3){
 			return null; // invalid
 		}
 		let oldContext : TemplateData = this.context;
-		let bHasContext : boolean = ctx.children[1].getText() != ":"; // won't change context if format {:[template]}
+		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
 		if (bHasContext){ 
 			let context : any = ctx.children[1].children[0].accept(this);
-			if (typeof context === "string"){
+			if (typeof context === 'string'){
 				try{
 					this.context = new TemplateData(context);
 				} catch(e){
 					this.context = oldContext;
-					return "bad JSON for template context";
+					return 'bad JSON for template context';
 				}
-			} else if (context) { // context may not be specified
-				this.context = context;
+			} else if (bHasContext) { // context may not be specified
+				if (context){
+					this.context = context;
+				} else {
+					this.context = new TemplateData({}); // provide an empty context for lookups
+				}
 			}
 		}
 		if (!ctx.children[3].getText()){
@@ -120,14 +137,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitCompilationUnit = function(ctx) {
 		if (!ctx.children){
-			return ""; // no data
+			return ''; // no data
 		}
 		if (ctx.children.length > 2){
 			// the next to the last node may be the subtemplates, so visit it to get the subtemplate dictionary
 			this.visitChildren(ctx.children[ctx.children.length - 2])
 		}
 		let result : string[] = this.visitChildren(ctx);
-		return result.splice(0, result.length - 1).join(""); // remove the result of the <EOF> token
+		return result.splice(0, result.length - 1).join(''); // remove the result of the <EOF> token
 	};
 	visitMethod = function(ctx) {
 		let methodName : string = ctx.getText();
@@ -167,7 +184,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return tempJson.data;
 	};
 	visitApostropheLiteral = function(ctx) {
-		return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\'/g,"'").replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus '\/bfnrt
+		return ctx.children[1].getText().replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\b/g,'\b').replace(/\\f/g,'\f').replace(/\\r/g,'\r').replace(/\\t/g,'\t').replace(/\\\//g,'\/'); // handle backslash plus '\/bfnrt
 	};
 	visitMethodInvocation = function(ctx) {
 		let children : any = this.visitChildren(ctx);
@@ -195,9 +212,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitComment = function(ctx) {
 		if (ctx.start.start == 0){
-			return ""; // special case for a comment at the beginning of the fileCreatedDate{
+			return ''; // special case for a comment at the beginning of the fileCreatedDate{
 		}
-		return " ";
+		return ' ';
 	};
 	visitBracedarrow = function(ctx) {
 		let result : boolean = ctx.children[0].accept(this);
@@ -225,21 +242,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};	
 	visitBracketedtemplatespec = function(ctx) {
 		let result : [] = this.visitChildren(ctx);
-		return [result.slice(1, result.length).join("")]; // ignore the brackets
+		return result.slice(1, result.length).join(''); // ignore the brackets
 	};
 	visitMethodableTemplatespec = function(ctx) {
 		let value : any = [];
 		if (this.context && this.context.type == 'list'){
 			this.context.iterateList(()=>{
-				value.push(this.visitChildren(ctx));
+				value.push(this.visitChildren(ctx)[0]);
 			});
 		} else {
-			value.push(this.visitChildren(ctx))[0];
+			value.push(this.visitChildren(ctx)[0]);
 		}
 		return value;
 	}
 	visitNamedSubtemplate = function(ctx) {
-		if (this.context && this.context.type == "list"){
+		if (this.context && this.context.type == 'list'){
 			// compute a result for each dictionary in the list
 			let result : any = [];
 			this.context.iterateList(()=>{
@@ -249,7 +266,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			let subtemplateName : string = ctx.getText();
 			if (!this.subtemplates || !this.subtemplates[subtemplateName]){
-				return "Error: subtemplate '" + subtemplateName + "' not found";
+				return 'Error: subtemplate "' + subtemplateName + '" not found';
 			}
 			const lexer = createLexer(this.subtemplates[subtemplateName]);
 			const parser = createParserFromLexer(lexer);
@@ -261,7 +278,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (ctx.children){
 			let subtemplates : any = {};
 			ctx.children.forEach((child)=>{
-				if (child.children[0].children[1].constructor.name == "NamedSubtemplateContext"){
+				if (child.children[0].children[1].constructor.name == 'NamedSubtemplateContext'){
 					let templateString : string = child.children[0].children[3].getText();
 					subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
 				}
@@ -270,26 +287,35 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return null;
 	}
+	visitBraceArrow = function(ctx) {
+		return this.visitChildren(ctx)[0]; // remove a level of arrays
+	};
+	visitTemplatespec = function(ctx) {
+		return this.visitChildren(ctx)[0]; // remove a level of arrays
+	};
 	visitSubtemplateSection = function(ctx) {
 		// visit the children to load the subtemplates dictionary, but don't output anything
 		this.visitChildren(ctx);
-		return "";
+		return '';
+	};
+	visitOptionallyInvokedMethodable = function(ctx) {
+		return this.visitChildren(ctx)[0];
 	};
 	callMethod = function(method : string, value : any, args: any){
-		if (typeof value != "string" && (method == "ToUpper" || method == "Matches" || method == "ToLower")){
-			if (method == "Matches"){
+		if (typeof value != 'string' && (method == 'ToUpper' || method == 'Matches' || method == 'ToLower')){
+			if (method == 'Matches'){
 				return false;
 			}
 			return value;
 		}
 		switch (method){
-			case "ToUpper":
+			case 'ToUpper':
 				value = <string>value.toUpperCase();
 				break;
-			case "ToLower":
+			case 'ToLower':
 				value = <string>value.toLowerCase();
 				break;
-			case "Matches":
+			case 'Matches':
 				let matches : boolean = false;
 				args.forEach((arg)=>{
 					if (arg == value){
@@ -298,7 +324,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				});
 				value = matches;
 				break;
-			case "Anded":
+			case 'Anded':
 				if (Array.isArray(value)){
 					for (let i : number = 0; i < value.length - 1; i++){
 						if (i == (value.length - 2)){
@@ -310,7 +336,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = value.join('');
 				}
 				break;
-			case "Exists":
+			case 'Exists':
 				if (value == undefined){
 					value = false;
 				} else {
@@ -464,7 +490,7 @@ export function validate(input) : Error[] {
 	const getCircularReplacer = () => {
 	  const seen = new WeakSet();
 	  return (key, value) => {
-		if (typeof value === "object" && value !== null) {
+		if (typeof value === 'object' && value !== null) {
 		  if (seen.has(value)) {
 			return;
 		  }
@@ -474,14 +500,14 @@ export function validate(input) : Error[] {
 	  };
 	};
 	let treeJson : string = JSON.stringify(tree, getCircularReplacer());
-	let parsed : string = "";
+	let parsed : string = '';
 	try{
 		let treeTokens : CommonToken[] = parser._interp._input.tokens;
 		let symbolicNames : string[] = parser.symbolicNames;
 		
 		for (let e of treeTokens){
 			if (e.type != -1) {
-				parsed += symbolicNames[e.type] + "(" + input.substring(e.start, e.stop + 1) + ") ";
+				parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
 			}
 		}
 	} catch(err) {
@@ -489,7 +515,7 @@ export function validate(input) : Error[] {
 	}
 	var visitor = new TextTemplateVisitor();
 	var result = visitor.visitCompilationUnit(tree);
-    document.getElementById("parsed").innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
-	document.getElementById("interpolated").innerHTML = result;
+    document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+	document.getElementById('interpolated').innerHTML = result;
     return errors;
 }
