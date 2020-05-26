@@ -10,7 +10,5 @@ else
 	exit 1
 fi
 webpack
-echo "starting server ... (http://localhost:8888)"
-cd server
-../gradlew runServer
-cd .. 
+echo "starting server ... (http://localhost:3000)"
+npm start

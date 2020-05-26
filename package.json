@@ -1,20 +1,27 @@
 {
   "name": "texttemplate-monaco-editor",
-  "version": "0.0.1",
-  "author": "Strumenta",
+  "author": "Eisnerw",
+  "version": "1.0.0",
+  "main": "index.js",
+  "description": "Software to perform generalized string interpolation",
   "license": "Apache-2.0",
   "repository": "https://github.com/Strumenta/calc-monaco-editor",
   "dependencies": {
+    "express": "^4.17.1",
+    "morgan": "^1.9.0",
     "@webpack-cli/init": "^0.3.0",
     "antlr4": "^4.7.2",
     "webpack": "^4.39.2"
   },
   "devDependencies": {
+    "nodemon": "^1.17.2",
     "mocha": "^6.2.0",
     "monaco-editor": "^0.20.0",
     "webpack-cli": "^3.3.11"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "dev": "nodemon ./nodeserver/index.js",
+    "start": "node ./nodeserver/index.js"
   }
 }
