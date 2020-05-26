@@ -1,0 +1,3 @@
+tasks:
+  - init: yarn install && ./gradlew build
+    command: yarn run start
