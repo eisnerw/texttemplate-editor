@@ -53,8 +53,13 @@
 		monaco.languages.register({ id: 'texttemplate' });
 
 		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());
-		let config = { "surroundingPairs": [{ "open": "{", "close": "}" }], "autoClosingPairs": [{ "open": "{", "close": "}" }], "brackets": [["{", "}"]] };
+		let config = {"surroundingPairs": [{ "open": "{", "close": "}" }], "autoClosingPairs": [{ "open": "{", "close": "}" }], "brackets": [["{", "}"]] };
 		monaco.languages.setLanguageConfiguration("texttemplate", config);
+		monaco.languages.registerFoldingRangeProvider("texttemplate", {
+			provideFoldingRanges: function(model, context, token) {
+				return ParserFacade.provideFoldingRanges(model, context, token);
+			}
+		});
 
 		let literalFg = '3b8737';
 		let idFg = '344482';

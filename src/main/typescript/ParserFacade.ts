@@ -300,6 +300,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0]; // remove a level of arrays
 	};
 	visitSubtemplateSection = function(ctx) {
+		// report any subtemplates that take more than one line for folding
+		folds = [];
+		ctx.children[1].children.forEach((child)=>{
+			if (child.start.line != child.stop.line){
+				folds.push({
+					start: child.start.line,
+					end: child.stop.line,
+					kind: monaco.languages.FoldingRangeKind.Region
+				});
+			}
+		});
 		// visit the children to load the subtemplates dictionary, but don't output anything
 		this.visitChildren(ctx);
 		return '';
@@ -497,6 +508,11 @@ class TextTemplateErrorStrategy extends DefaultErrorStrategy {
     };
 
 }
+export function provideFoldingRanges(model, context, token) {
+	return folds;
+}
+
+export let folds = [];
 
 export function validate(input) : Error[] {
     let errors : Error[] = [];
@@ -538,6 +554,7 @@ export function validate(input) : Error[] {
 		parsed = '*****ERROR*****';
 	}
 	var visitor = new TextTemplateVisitor();
+	folds = []; // folds will be computed while visiting
 	var result = visitor.visitCompilationUnit(tree);
     document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 	document.getElementById('interpolated').innerHTML = result;
