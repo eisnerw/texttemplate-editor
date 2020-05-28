@@ -29,7 +29,7 @@ AND: '&';
 OR: '|';
 NOT: '!';
 POUND: '#';
-BRACED_ILLEGAL: ([@$%*-={;<>?\\+] | ']')+;
+BRACED_ILLEGAL: ([$%*-={;<>?\\+] | ']')+;
 
 mode PARENED;
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
@@ -63,6 +63,7 @@ APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
 BRACKETED_COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF) [ \t\r]* ->type(COMMENT);
+RBRACKETLP: '](' ->mode(PARENED);
 RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
 BRACKETED_LBRACE: 	'{' -> type(LBRACE),pushMode(BRACED);

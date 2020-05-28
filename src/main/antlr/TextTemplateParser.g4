@@ -33,13 +33,15 @@ templatespec: namedSubtemplate | bracketedtemplatespec;
 
 bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET;
 
+methodabletemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKETLP;
+
 bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 
 bracedarrowtemplatespec: optionallyInvokedMethodable COMMA optionallyInvokedMethodable | optionallyInvokedMethodable;
 
 methodable: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | templatespec #methodableTemplatespec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #methodableIdentifer;
 
-methodInvocation: method (conditionalexpression | arguments*) RP;
+methodInvocation: (method|DOT methodabletemplatespec) (conditionalexpression | arguments*) RP;
 
 method: METHODNAME;
 
