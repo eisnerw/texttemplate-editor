@@ -21,7 +21,7 @@ text: TEXT;
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
-bracedoptions: bracedarrow #braceArrow | optionallyInvokedMethodable #bracedMethodable | conditionalexpression #bracedConditional;
+bracedoptions: bracedarrow #braceArrow | bracedthinarrow #braceThinArrow | optionallyInvokedMethodable #bracedMethodable | conditionalexpression #bracedConditional;
 
 methodInvoked: methodable methodInvocation+;
 
@@ -36,6 +36,8 @@ bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET;
 methodabletemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKETLP;
 
 bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
+
+bracedthinarrow: conditionalexpression THINARROW optionallyInvokedMethodable;
 
 bracedarrowtemplatespec: optionallyInvokedMethodable COMMA optionallyInvokedMethodable | optionallyInvokedMethodable;
 

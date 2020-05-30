@@ -18,7 +18,10 @@ class TemplateData {
 	constructor(jsonData: string | {} | []) {
 		let json: {};
 		if (typeof jsonData == 'string') {
-			json = JSON.parse(jsonData.toString());
+			if (jsonData.toLowerCase().startsWith("http")){
+			} else {
+				json = JSON.parse(jsonData.toString());
+			}
 		}
 		else if (Array.isArray(jsonData)) {
 			this.type = 'list';
@@ -114,6 +117,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
 		if (bHasContext){ 
 			let context : any = ctx.children[1].children[0].accept(this);
+			if (Array.isArray(context) && context.length == 1){
+				context = context[0]; // support templates as contexts
+			}
 			if (typeof context === 'string'){
 				try{
 					this.context = new TemplateData(context);
@@ -129,7 +135,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 		}
-		if (!ctx.children[3].getText()){
+		if (!ctx.children[3] || !ctx.children[3].getText() || ctx.children[3].exception){
 			// protect code against illegal bracketted expression while editing
 			return null;
 		}
@@ -221,6 +227,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return ''; // special case for a comment at the beginning of the fileCreatedDate{
 		}
 		return ' ';
+	};
+	visitBracedthinarrow = function(ctx) {
+		let result : boolean = ctx.children[0].accept(this);
+		if (Array.isArray(result)){
+			result = result[0]; // TODO:why is this one level deep????
+		}
+		if (result){
+			return this.visitChildren(ctx.children[2].children[0]); // true
+		}
+		return ''; // false means ignore this token
 	};
 	visitBracedarrow = function(ctx) {
 		let result : boolean = ctx.children[0].accept(this);

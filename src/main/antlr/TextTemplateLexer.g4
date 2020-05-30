@@ -16,6 +16,7 @@ IDENTIFIER: [^a-zA-Z_][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';
+THINARROW: '->';
 RBRACE: '}' -> popMode;
 WS: [ \t\r\n]+ ->skip; // allow white space in braced
 LP: '(' ->pushMode(NESTED);
