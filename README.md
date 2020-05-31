@@ -21,6 +21,7 @@ The language supported here is TextTemplate, which has been designed with severa
 ```
 npm install
 npm i -g webpack webpack-cli
+npm install --save-dev @types/jquery
 chmod u+x run
 
 ./gradlew generateParser

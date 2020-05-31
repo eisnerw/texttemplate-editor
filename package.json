@@ -14,9 +14,10 @@
     "webpack": "^4.39.2"
   },
   "devDependencies": {
-    "nodemon": "^1.17.2",
+    "@types/jquery": "^3.3.38",
     "mocha": "^6.2.0",
     "monaco-editor": "^0.20.0",
+    "nodemon": "^1.17.2",
     "webpack-cli": "^3.3.11"
   },
   "scripts": {

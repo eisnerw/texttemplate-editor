@@ -18,10 +18,7 @@ class TemplateData {
 	constructor(jsonData: string | {} | []) {
 		let json: {};
 		if (typeof jsonData == 'string') {
-			if (jsonData.toLowerCase().startsWith("http")){
-			} else {
-				json = JSON.parse(jsonData.toString());
-			}
+			json = JSON.parse(jsonData);
 		}
 		else if (Array.isArray(jsonData)) {
 			this.type = 'list';
@@ -122,7 +119,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			if (typeof context === 'string'){
 				try{
-					this.context = new TemplateData(context);
+					if (context.toLowerCase().startsWith('http')){
+						if (urls[context] && urls[context].data){
+							if (urls[context].data.startsWith('[')){
+								// text templates requires that the top level be a dictionary
+								// create a container for the array under 'data'
+								this.context = new TemplateData('{"data":' + urls[context].data + '}');
+							} else {
+								this.context = new TemplateData(urls[context].data);
+							}
+						} else {
+							bHasContext = false;
+							if (!urls[context]){
+								urls[context] = {};
+							}
+						}
+					} else {
+						this.context = new TemplateData(context);
+					}
 				} catch(e){
 					this.context = oldContext;
 					return 'bad JSON for template context';
@@ -529,6 +543,7 @@ export function provideFoldingRanges(model, context, token) {
 }
 
 export let folds = [];
+let urls = {};
 
 export function validate(input) : Error[] {
     let errors : Error[] = [];
@@ -574,5 +589,23 @@ export function validate(input) : Error[] {
 	var result = visitor.visitCompilationUnit(tree);
     document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 	document.getElementById('interpolated').innerHTML = result;
+	Object.keys(urls).forEach((key : string) =>{
+		if (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1){
+			delete urls[key] // clean up incomplete urls
+		} else {
+			if (!urls[key].data && !urls[key].loading){
+				urls[key].loading = true;
+				$.ajax({
+					url: key,
+					success: function (data) {
+						if (typeof data != 'string'){
+							data = JSON.stringify(data);
+						}							
+						urls[key].data = data;
+					}
+				});
+			}
+		}
+	});
     return errors;
 }
