@@ -1,7 +1,5 @@
 [![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/eisnerw/texttemplate-editor) 
 
-[![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/eisnerw/texttemplate-editor) 
-
 # texttemplate-monaco-editor
 
 This project is based on the article [Writing a browser based editor using Monaco and ANTLR](https://tomassetti.me/writing-a-browser-based-editor-using-monaco-and-antlr/), which shows how to integrate ANTLR with monaco.
@@ -21,7 +19,6 @@ The language supported here is TextTemplate, which has been designed with severa
 ```
 npm install
 npm i -g webpack webpack-cli
-npm install --save-dev @types/jquery
 chmod u+x run
 
 ./gradlew generateParser

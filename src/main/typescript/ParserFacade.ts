@@ -119,7 +119,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			if (typeof context === 'string'){
 				try{
-					if (context.toLowerCase().startsWith('http')){
+					if (context.toLowerCase().startsWith('http') || context.startsWith('/')){
 						if (urls[context] && urls[context].data){
 							if (urls[context].data.startsWith('[')){
 								// text templates requires that the top level be a dictionary
@@ -590,7 +590,7 @@ export function validate(input) : Error[] {
     document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 	document.getElementById('interpolated').innerHTML = result;
 	Object.keys(urls).forEach((key : string) =>{
-		if (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1){
+		if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
 			delete urls[key] // clean up incomplete urls
 		} else {
 			if (!urls[key].data && !urls[key].loading){
