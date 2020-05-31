@@ -138,10 +138,11 @@
 		});
 		editor.onDidChangeModelContent(function (e) {
 			let code = editor.getValue()
+			let model = monaco.editor.getModels()[0];
 			if (!ParserFacade){
 				return; // protect against an unknown error that can occur during editing if keystrokes are frequent
 			}
-			let syntaxErrors = ParserFacade.validate(code);
+			let syntaxErrors = ParserFacade.validate(code, model);
 			let monacoErrors = [];
 			for (let e of syntaxErrors) {
 				monacoErrors.push({
@@ -154,7 +155,6 @@
 				});
 			};
 			window.syntaxErrors = syntaxErrors;
-			let model = monaco.editor.getModels()[0];
 			monaco.editor.setModelMarkers(model, "owner", monacoErrors);
 		});
 		monaco.languages.registerDefinitionProvider('texttemplate', {

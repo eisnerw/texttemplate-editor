@@ -1,17 +1,22 @@
 const express = require('express');
 const router = express.Router();
 
-const products = require('../data.json');
+const subtemplates = require('../data.json');
 
-router.get('/', (req, res) => {
-  res.json(products);
+router.get('/:name', (req, res) => {
+	const { name } = req.params 
+	if (subtemplates[name]){
+		res.send(subtemplates[name]);
+	} else {
+		res.send('Subtemplate ' + name + ' not found')
+	}
 });
 
 router.post('/', (req, res) => {
   console.log(req.body);
   const { name } = req.body;
-  products.push({
-    id: products.length + 1,
+  subtemplates.push({
+    id: subtemplates.length + 1,
     name
   });
   res.json('Successfully created');
@@ -22,9 +27,9 @@ router.put('/:id', (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
 
-  products.forEach((product, i) => {
+  subtemplates.forEach((product, i) => {
     if (product.id == id) {
-      product.name = name;
+      subtemplates.name = name;
     }
   });
   res.json('Successfully updated');
@@ -34,9 +39,9 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const { id } = req.params;
 
-  products.forEach((product, i) => {
-    if(product.id == id) {
-      products.splice(i, 1);
+  subtemplates.forEach((product, i) => {
+    if(subtemplates.id == id) {
+      subtemplates.splice(i, 1);
     }
   });
   res.json('Successfully deleted');

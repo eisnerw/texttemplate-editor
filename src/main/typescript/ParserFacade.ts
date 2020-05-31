@@ -302,7 +302,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			let subtemplateName : string = ctx.getText();
 			if (!this.subtemplates || !this.subtemplates[subtemplateName]){
-				return 'Error: subtemplate "' + subtemplateName + '" not found';
+				let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
+				if (!urls[subtemplateUrl]){
+					urls[subtemplateUrl] = {};
+				}
+				if (!urls[subtemplateUrl].data){
+					return 'loading subtemplate "' + subtemplateName + '"';
+				}
+				this.subtemplates[subtemplateName] = urls[subtemplateUrl].data;
 			}
 			const lexer = createLexer(this.subtemplates[subtemplateName]);
 			const parser = createParserFromLexer(lexer);
@@ -544,10 +551,10 @@ export function provideFoldingRanges(model, context, token) {
 
 export let folds = [];
 let urls = {};
+let model;
 
-export function validate(input) : Error[] {
+export function validate(input, model) : Error[] {
     let errors : Error[] = [];
-
     const lexer = createLexer(input);
     lexer.removeErrorListeners();
     lexer.addErrorListener(new ConsoleErrorListener());
@@ -602,6 +609,8 @@ export function validate(input) : Error[] {
 							data = JSON.stringify(data);
 						}							
 						urls[key].data = data;
+						model.undo(); // strange way of getting the model to revalidate
+						model.redo();
 					}
 				});
 			}

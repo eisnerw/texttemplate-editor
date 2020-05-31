@@ -12,7 +12,7 @@ app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
 // routes
-app.use('/api/products', require('./routes/index'));
+app.use('/subtemplate', require('./routes/index'));
 
 // static files
 app.use(express.static(path.join(__dirname, '../src/main')));

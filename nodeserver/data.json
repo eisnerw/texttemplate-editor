@@ -1,10 +1,4 @@
-[
-  {
-    "id": 1,
-    "name": "laptop"
-  },
-  {
-    "id": 2,
-    "name": "microphone"
-  }
-]
+{
+	"xformatPet": "a {type} named {name}"
+	,"xformatPets": "{pets:[a big {type} named {name}].Anded()}"
+}
