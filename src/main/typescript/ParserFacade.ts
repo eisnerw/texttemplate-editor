@@ -31,7 +31,6 @@ class TemplateData {
 			json = jsonData;
 		}
 		this.type = 'dictionary';
-		this.dictionary['^'] = this; // make sure that the top level points to itself
 		if (Array.isArray(json)){
 			// the json string resulted in an error.  Convert it into a dictionary
 			json = {data: json};
@@ -51,6 +50,9 @@ class TemplateData {
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
 		let value = this.dictionary[keySplit[0]];
+		if (value == undefined && keySplit[0] == '^'){
+			return this; // allows ^.^... to get to the top
+		}
 		if (keySplit.length == 1 || value === undefined){
 			return value;
 		}
@@ -69,6 +71,44 @@ class TemplateData {
 	}
 	count(){
 		return this.list.length;
+	}
+	toJson(indentLevel? : number) : string {
+		let result : string = '';
+		let bComma = false;
+		if (this.type == 'list'){
+			result += '[\n';
+			this.list.forEach((dict) =>{
+				result += ((bComma ? ',' : this.indent(indentLevel + 1)) + dict.toJson(indentLevel + 1)); 
+				bComma = true;
+			});
+			result += ('\n' + this.indent(indentLevel) + ']');
+		} else {
+			result += '{\n';
+			Object.keys(this.dictionary).forEach((keyname) => {
+				if (keyname != '^'){
+					let value : any = this.dictionary[keyname];
+					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
+					if (value instanceof TemplateData){
+						result += (<TemplateData>value).toJson(indentLevel + 1);
+					} else if (typeof value == 'string') {
+						result += ('"' + value.replace(/\n/g,'\\n') + '"');
+					} else {
+						result += value.toString();
+					}
+					result += '\n';
+					bComma = true;
+				}
+			});
+			result += (this.indent(indentLevel) + '}');
+		}
+		return result;
+	}
+	private indent(indentLevel : number) : string {
+		let result : string = '';
+		for (let i = 0; i < indentLevel; i++){
+			result += '   ';
+		}
+		return result;
 	}
 }
 
@@ -416,6 +456,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = value.count();
 				} else {
 					value = 1;
+				}
+				break;
+				
+			case 'ToJson':
+				if (value instanceof TemplateData){
+					value = value.toJson(0);
+				} else {
+					value = value.toString();
 				}
 				break;
 				
