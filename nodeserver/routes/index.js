@@ -8,7 +8,7 @@ router.get('/:name', (req, res) => {
 	if (subtemplates[name]){
 		res.send(subtemplates[name]);
 	} else {
-		res.send('Subtemplate ' + name + ' not found')
+		res.json({"error": 'Subtemplate ' + name + ' not found'})
 	}
 });
 

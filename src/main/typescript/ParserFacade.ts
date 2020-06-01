@@ -32,10 +32,14 @@ class TemplateData {
 		}
 		this.type = 'dictionary';
 		this.dictionary['^'] = this; // make sure that the top level points to itself
+		if (Array.isArray(json)){
+			// the json string resulted in an error.  Convert it into a dictionary
+			json = {data: json};
+		}
 		Object.keys(json).forEach((keyname) => {
 			let value: any = json[keyname];
 			if (typeof value == 'object') {
-				if (!Array.isArray(value) || value.length > 0){ // don't add empty arrays
+				if (value != null && (!Array.isArray(value) || value.length > 0)){ // don't add null values or empty arrays
 					this.dictionary[keyname] = new TemplateData(value);
 					this.dictionary[keyname].dictionary['^'] = this; // allows ^.^.variable name TODO: should only do this for a dictionary
 				}
@@ -70,6 +74,7 @@ class TemplateData {
 
 class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
+	subtemplates : any = {};
 	visitText = function(ctx){
 		return ctx.getText();
 	};
@@ -301,7 +306,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return result;
 		} else {
 			let subtemplateName : string = ctx.getText();
-			if (!this.subtemplates || !this.subtemplates[subtemplateName]){
+			if (!this.subtemplates[subtemplateName]){
 				let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
 				if (!urls[subtemplateUrl]){
 					urls[subtemplateUrl] = {};
@@ -319,14 +324,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	visitSubtemplateSpecs = function(ctx) {
 		if (ctx.children){
-			let subtemplates : any = {};
 			ctx.children.forEach((child)=>{
 				if (child.children[0].children[1].constructor.name == 'NamedSubtemplateContext'){
 					let templateString : string = child.children[0].children[3].getText();
-					subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
+					this.subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
 				}
 			});
-			this.subtemplates = subtemplates;
 		}
 		return null;
 	}
@@ -605,12 +608,16 @@ export function validate(input, model) : Error[] {
 				$.ajax({
 					url: key,
 					success: function (data) {
-						if (typeof data != 'string'){
-							data = JSON.stringify(data);
-						}							
-						urls[key].data = data;
-						model.undo(); // strange way of getting the model to revalidate
-						model.redo();
+						if (data.error){
+							urls[key].data = data.error;
+						} else {
+							if (typeof data != 'string'){
+								data = JSON.stringify(data);
+							}
+							urls[key].data = data;
+							model.undo(); // strange way of getting the model to revalidate
+							model.redo();
+						}
 					}
 				});
 			}

@@ -20,29 +20,9 @@
 
 <h2>TextTemplate Editor</h2>
 <div id="container" style="width:800px;height:600px;border:1px solid grey; float:left"></div>
+<div id="collapser">-</div>
 <div><pre id="parsed">this is where the parsed stuff should go</pre></div>
 <div><pre id="interpolated"></pre></div>
-   <h1>Ajax Tutorial</h1>
-
-    <button id="getProducts">
-      Get Products
-    </button>
-
-    <form id="productForm">
-      <input type="text" id="newProduct">
-      <button type="submit">Create Product</button>
-    </form>
-
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
 <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
 <script src="js/main.js"></script>
 
@@ -104,6 +84,9 @@
 				'   [{pets:#formatPet.Anded()}]',
 				'   ,[no pets]',
 				'}!!]}',
+				'',
+				' // external json data and an external subtemplate',
+				'// {\'https://api.github.com/users/eisnerw/repos\': #formatGitRepos}', 
  				'',
  				'Subtemplates:',
  				'',
@@ -166,7 +149,16 @@
 </script>
 <!--jQuery-->
 <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-<!--App -->
-<script src="javascript/app.js"></script>
+<script>
+	$("#collapser").click(function() {
+		if (document.getElementById('collapser').innerText == '+'){
+			$("#parsed").show()
+			document.getElementById('collapser').innerText = '-';
+		} else {
+			$("#parsed").hide()
+			document.getElementById('collapser').innerText = '+';
+		}
+	});
+</script>
 </body>
 </html>
