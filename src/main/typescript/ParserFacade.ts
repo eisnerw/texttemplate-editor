@@ -231,11 +231,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			value = ctx.children[0].accept(this);
 		}
-		var children = this.visitChildren(ctx);
 		// call each method, which follow the identifier value
-		children.slice(1).forEach((child) => {
-			let method : string = child[0];
-			var args = child[1]
+		ctx.children.slice(1).forEach((child) => {
+			let method : string = child.children[0].accept(this);
+			var args = child.children[1].accept(this)
 			if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
 				let computedValue : string[] = [];
 				value.forEach((val) =>{
@@ -382,6 +381,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitSubtemplateSection = function(ctx) {
 		// report any subtemplates that take more than one line for folding
 		folds = [];
+		if (ctx.children[1].children == null){
+			// protect against invalid section
+			return '';
+		}
 		ctx.children[1].children.forEach((child)=>{
 			if (child.start.line != child.stop.line){
 				folds.push({
@@ -407,11 +410,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 
 	callMethod = function(method : string, value : any, args: any){
+		// TODO: table driven argmument handling
 		if (typeof value != 'string' && (method == 'ToUpper' || method == 'Matches' || method == 'ToLower')){
  			if (method != 'Matches') {
 				return value;
 			}
-			value = value.toString();
+			if (value){
+				value = value.toString(); // allow string matching of numbers TODO: probably makes more sense to compare types TODO: null = null?
+			}
 		}
 		switch (method){
 			case 'ToUpper':
@@ -422,6 +428,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 			case 'Matches':
 				let matches : boolean = false;
+				if (!args){
+					if (!value){
+						return true; //TODO: is it appropriate to match nulls?
+					}
+					return false;
+				}
 				args.forEach((arg)=>{
 					if (arg == value){
 						matches = true;
@@ -450,6 +462,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 				
 			case 'Count':
+			case 'Where':
 				if (value == undefined){
 					value = 0;
 				} else if (value instanceof TemplateData && value.type == 'list'){
@@ -663,8 +676,8 @@ export function validate(input, model) : Error[] {
 								data = JSON.stringify(data);
 							}
 							urls[key].data = data;
-							model.undo(); // strange way of getting the model to revalidate
-							model.redo();
+							//model.undo(); // strange way of getting the model to revalidate
+							//model.redo();
 						}
 					}
 				});
