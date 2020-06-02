@@ -1,6 +1,18 @@
 {
-	"xformatPet": "a {type} named {name}"
-	,"xformatPets": "{pets:[a big {type} named {name}].Anded()}"
-	,"formatGitRepos": "{data:[{name}{description.Exists()->[ ({description})]}]}"
-	,"formatGitReposAnded": "{data:[{name}{description.Exists()->[ ({description})]}].Anded()}"
+	"simple":{
+	   "firstName": "John"
+	   ,"lastName": "Smith"
+	   ,"pets": [
+		  {
+			 "type": "dog"
+			 ,"name": "Toto"
+		  },{
+			 "type": "cat"
+			 ,"name": "Molly"
+		  },{
+			 "type": "zebra"
+			 ,"name": "Stripes"
+		  }
+	   ]
+	}
 }

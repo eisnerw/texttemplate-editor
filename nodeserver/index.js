@@ -12,7 +12,8 @@ app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
 // routes
-app.use('/subtemplate', require('./routes/index'));
+app.use('/subtemplate', require('./routes/subtemplate'));
+app.use('/data', require('./routes/data'));
 
 // static files
 app.use(express.static(path.join(__dirname, '../src/main')));

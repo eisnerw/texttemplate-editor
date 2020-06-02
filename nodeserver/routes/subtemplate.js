@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const subtemplates = require('../data.json');
+const subtemplates = require('../subtemplates.json');
 
 router.get('/:name', (req, res) => {
 	const { name } = req.params 
