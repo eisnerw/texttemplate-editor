@@ -19,14 +19,23 @@ class TemplateData {
 		let json: {};
 		if (typeof jsonData == 'string') {
 			json = JSON.parse(jsonData);
-		}
-		else if (Array.isArray(jsonData)) {
+		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
 			let array: [] = jsonData;
 			array.forEach((item) => {
 				this.list.push(new TemplateData(item));
 			});
 			return;
+		} else if (jsonData instanceof TemplateData){ // filter or clone
+			if ((<TemplateData>jsonData).type == 'list'){
+				this.type = 'list';
+				(<TemplateData>jsonData).list.forEach((item)=>{
+					this.list.push(new TemplateData(item));
+				});
+				return;
+			} else {
+				json = JSON.parse((<TemplateData>jsonData).toJson()); // clone by converting to Json and back
+			}
 		} else {
 			json = jsonData;
 		}
@@ -120,7 +129,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitMethodableIdentifer = function(ctx) {
 		var key = ctx.getText();
-		if (!this.context){
+		if (!this.context || !(this.context instanceof TemplateData)){
 			return 'ERROR: No Context';
 		}
 		return this.context.getValue(key);
@@ -234,7 +243,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// call each method, which follow the identifier value
 		ctx.children.slice(1).forEach((child) => {
 			let method : string = child.children[0].accept(this);
-			var args = child.children[1].accept(this)
+			var args = child.children[1];
 			if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
 				let computedValue : string[] = [];
 				value.forEach((val) =>{
@@ -410,6 +419,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 
 	callMethod = function(method : string, value : any, args: any){
+		let stringArgs : string[] = [];
+		let argValues = args.accept(this);
+		if (argValues){
+			argValues.forEach((arg) =>{
+				if (arg !== undefined){ // remove result of commas
+					stringArgs.push(arg);
+				}
+			});
+		}
 		// TODO: table driven argmument handling
 		if (typeof value != 'string' && (method == 'ToUpper' || method == 'Matches' || method == 'ToLower')){
  			if (method != 'Matches') {
@@ -428,13 +446,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 			case 'Matches':
 				let matches : boolean = false;
-				if (!args){
+				if (stringArgs.length == 0){
 					if (!value){
 						return true; //TODO: is it appropriate to match nulls?
 					}
 					return false;
 				}
-				args.forEach((arg)=>{
+				stringArgs.forEach((arg)=>{
 					if (arg == value){
 						matches = true;
 					}
@@ -463,12 +481,43 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				
 			case 'Count':
 			case 'Where':
-				if (value == undefined){
-					value = 0;
-				} else if (value instanceof TemplateData && value.type == 'list'){
-					value = value.count();
-				} else {
-					value = 1;
+				if (value instanceof TemplateData){
+					let oldContext : TemplateData = this.context;
+					// temporarily set the context to the value being evaluated
+					this.context = <TemplateData>value;
+					let result = [];
+					if (this.context.type = 'list'){
+						this.context.iterateList(()=>{
+							if (args.accept(this)){
+								// this iteration passed the condition
+								// add a clone of the iteration 
+								result.push(new TemplateData(this.context)); 
+							}
+						});
+					} else if (args.accept(this)){
+						result.push(this.context); // no filtering (or cloning) necessary 
+					}
+					this.context = oldContext; // restore old context
+					switch (result.length){
+						case 0:
+							value = undefined; // indication of missing value
+							break;
+						case 1:
+							value = result[0];
+							break;
+						default:
+							value = new TemplateData(result);
+							break;
+					}
+				}
+				if (method == 'Count'){
+					if (value == undefined){
+						value = 0;
+					} else if (value instanceof TemplateData && value.type == 'list'){
+						value = value.count();
+					} else {
+						value = 1;
+					}
 				}
 				break;
 				
@@ -481,7 +530,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 				
 			default:
-				value = value + '[.' + method + '(' + args.join(', ') + ')]';
+				value = value + '[.' + method + '(' + stringArgs.join(', ') + ')]';
 				break;
 		}
 		return value;
