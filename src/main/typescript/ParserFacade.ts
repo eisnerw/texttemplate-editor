@@ -41,7 +41,7 @@ class TemplateData {
 		}
 		this.type = 'dictionary';
 		if (Array.isArray(json)){
-			// the json string resulted in an error.  Convert it into a dictionary
+			// the json string is an array.  Convert it into a dictionary with the arbitrary key "data"
 			json = {data: json};
 		}
 		Object.keys(json).forEach((keyname) => {
@@ -124,13 +124,14 @@ class TemplateData {
 class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
 	subtemplates : any = {};
+	errors = [];
 	visitText = function(ctx){
 		return ctx.getText();
 	};
 	visitMethodableIdentifer = function(ctx) {
 		var key = ctx.getText();
 		if (!this.context || !(this.context instanceof TemplateData)){
-			return 'ERROR: No Context';
+			return undefined; // attempt to look up a variable without a context returns undefined
 		}
 		return this.context.getValue(key);
 	};
@@ -420,13 +421,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 	callMethod = function(method : string, value : any, args: any){
 		let stringArgs : string[] = [];
-		let argValues = args.accept(this);
-		if (argValues){
-			argValues.forEach((arg) =>{
-				if (arg !== undefined){ // remove result of commas
-					stringArgs.push(arg);
-				}
-			});
+		if (args.constructor.name == 'ArgumentsContext'){
+			let argValues = args.accept(this);
+			if (argValues){
+				argValues.forEach((arg) =>{
+					if (arg !== undefined){ // remove result of commas
+						stringArgs.push(arg);
+					}
+				});
+			}
 		}
 		// TODO: table driven argmument handling
 		if (typeof value != 'string' && (method == 'ToUpper' || method == 'Matches' || method == 'ToLower')){
@@ -471,52 +474,79 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = value.join('');
 				}
 				break;
+
 			case 'Exists':
-				if (value == undefined){
-					value = false;
-				} else {
-					value = true;
-				}
-				break;
-				
 			case 'Count':
 			case 'Where':
-				if (value instanceof TemplateData){
-					let oldContext : TemplateData = this.context;
-					// temporarily set the context to the value being evaluated
-					this.context = <TemplateData>value;
-					let result = [];
-					if (this.context.type = 'list'){
-						this.context.iterateList(()=>{
-							if (args.accept(this)){
-								// this iteration passed the condition
-								// add a clone of the iteration 
-								result.push(new TemplateData(this.context)); 
-							}
-						});
-					} else if (args.accept(this)){
-						result.push(this.context); // no filtering (or cloning) necessary 
+				if (!args.children){
+					// no arguments
+					if (method == 'Where'){
+						let msg : string = 'ERROR: no condition specified for .Where()';
+						let parentCtx : any = args.parentCtx;
+						this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+						value = msg;
+					} else if (method == 'Count'){
+						if (value == undefined){
+							value = 0;
+						} else if (value instanceof TemplateData && value.type == 'list'){
+							value = value.count();
+						} else {
+							value = 1;
+						}
+					} else { // Exists
+						if (value == undefined){
+							value = false;
+						} else {
+							value = true;
+						}
 					}
-					this.context = oldContext; // restore old context
-					switch (result.length){
-						case 0:
-							value = undefined; // indication of missing value
-							break;
-						case 1:
-							value = result[0];
-							break;
-						default:
-							value = new TemplateData(result);
-							break;
+				} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotConditionalContext')){
+					let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
+					this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
+					value = msg;
+				} else {
+					if (value instanceof TemplateData){
+						let oldContext : TemplateData = this.context;
+						// temporarily set the context to the value being evaluated
+						this.context = <TemplateData>value;
+						let result = [];
+						if (this.context.type = 'list'){
+							this.context.iterateList(()=>{
+								if (args.accept(this)){
+									// the condition returned true; add a clone of the iteration 
+									result.push(new TemplateData(this.context)); 
+								}
+							});
+						} else if (args.accept(this)){
+							result.push(this.context); // no filtering (or cloning) necessary 
+						}
+						this.context = oldContext; // restore old context
+						switch (result.length){
+							case 0:
+								value = undefined; // indication of missing value
+								break;
+							case 1:
+								value = result[0]; // single value is a dictionary
+								break;
+							default:
+								value = new TemplateData(result); // multivalues is a list
+								break;
+						}
 					}
-				}
-				if (method == 'Count'){
-					if (value == undefined){
-						value = 0;
-					} else if (value instanceof TemplateData && value.type == 'list'){
-						value = value.count();
-					} else {
-						value = 1;
+					if (method == 'Count'){
+						if (value == undefined){
+							value = 0;
+						} else if (value instanceof TemplateData && value.type == 'list'){
+							value = value.count();
+						} else {
+							value = 1;
+						}
+					} else if (method == 'Exists'){
+						if (value){
+							value = true;
+						} else {
+							value = false;
+						}
 					}
 				}
 				break;
@@ -705,6 +735,7 @@ export function validate(input, model) : Error[] {
 		parsed = '*****ERROR*****';
 	}
 	var visitor = new TextTemplateVisitor();
+	visitor.errors = errors;
 	folds = []; // folds will be computed while visiting
 	var result = visitor.visitCompilationUnit(tree);
     document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
