@@ -420,25 +420,31 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 
 	callMethod = function(method : string, value : any, args: any){
-		let stringArgs : string[] = [];
+		let argValues = [];
 		if (args.constructor.name == 'ArgumentsContext'){
-			let argValues = args.accept(this);
-			if (argValues){
-				argValues.forEach((arg) =>{
+			let argResults = args.accept(this);
+			if (argResults){
+				argResults.forEach((arg) =>{
 					if (arg !== undefined){ // remove result of commas
-						stringArgs.push(arg);
+						argValues.push(arg);
 					}
 				});
 			}
 		}
 		// TODO: table driven argmument handling
-		if (typeof value != 'string' && (method == 'ToUpper' || method == 'Matches' || method == 'ToLower')){
- 			if (method != 'Matches') {
-				return value;
-			}
-			if (value){
-				value = value.toString(); // allow string matching of numbers TODO: probably makes more sense to compare types TODO: null = null?
-			}
+		if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where')){
+			return value;
+		}
+		if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
+			let parentCtx : any = args.parentCtx;
+			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
+			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+			value = msg;
+		}
+		if (args.children && (method == 'ToUpper' || method == 'ToLower')){
+			let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
+			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
+			value = msg;
 		}
 		switch (method){
 			case 'ToUpper':
@@ -449,18 +455,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 			case 'Matches':
 				let matches : boolean = false;
-				if (stringArgs.length == 0){
+				if (argValues.length == 0){
 					if (!value){
-						return true; //TODO: is it appropriate to match nulls?
+						value = true; //TODO: is it appropriate to match nulls?
 					}
-					return false;
+					value = false;
+				} else {
+					argValues.forEach((arg)=>{
+						if (arg === value){
+							matches = true;
+						} else if (!isNaN(arg) && !isNaN(value) && parseInt(arg) === parseInt(value)){
+							matches = true;
+						}
+					});
+					value = matches;
 				}
-				stringArgs.forEach((arg)=>{
-					if (arg == value){
-						matches = true;
-					}
-				});
-				value = matches;
 				break;
 			case 'Anded':
 				if (Array.isArray(value)){
@@ -560,7 +569,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 				
 			default:
-				value = value + '[.' + method + '(' + stringArgs.join(', ') + ')]';
+				value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
 				break;
 		}
 		return value;
