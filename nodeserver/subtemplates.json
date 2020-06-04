@@ -1,6 +1,6 @@
 {
 	"xformatPet": "a {type} named {name}"
-	,"xformatPets": "{pets:[a big {type} named {name}].Anded()}"
+	,"xformatPets": "{pets:[a big {type} named \"{name}\"].Anded()}"
 	,"formatGitRepos": "{data:[{name}{description.Exists()->[ ({description})]}]}"
 	,"formatGitReposAnded": "{data:[{name}{description.Exists()->[ ({description})]}].Anded()}"
 }

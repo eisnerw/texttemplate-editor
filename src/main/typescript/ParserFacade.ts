@@ -432,145 +432,158 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		// TODO: table driven argmument handling
-		if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where')){
-			return value;
-		}
-		if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
+		if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson')){
+			value = value; // null with most methods returns null
+		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
 			let parentCtx : any = args.parentCtx;
 			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
 			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
 			value = msg;
-		}
-		if (args.children && (method == 'ToUpper' || method == 'ToLower')){
+		} else if (args.children && (method == 'ToUpper' || method == 'ToLower')){
 			let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 			value = msg;
-		}
-		switch (method){
-			case 'ToUpper':
-				value = <string>value.toUpperCase();
-				break;
-			case 'ToLower':
-				value = <string>value.toLowerCase();
-				break;
-			case 'Matches':
-				let matches : boolean = false;
-				if (argValues.length == 0){
-					if (!value){
-						value = true; //TODO: is it appropriate to match nulls?
-					}
-					value = false;
-				} else {
-					argValues.forEach((arg)=>{
-						if (arg === value){
-							matches = true;
-						} else if (!isNaN(arg) && !isNaN(value) && parseInt(arg) === parseInt(value)){
-							matches = true;
+		} else {
+			switch (method){
+				case 'ToUpper':
+					value = <string>value.toUpperCase();
+					break;
+				case 'ToLower':
+					value = <string>value.toLowerCase();
+					break;
+				case 'Matches':
+					let matches : boolean = false;
+					if (argValues.length == 0){
+						if (!value){
+							value = true; //TODO: is it appropriate to match nulls?
 						}
-					});
-					value = matches;
-				}
-				break;
-			case 'Anded':
-				if (Array.isArray(value)){
-					for (let i : number = 0; i < value.length - 1; i++){
-						if (i == (value.length - 2)){
-							value[i] += ' and ';
-						} else {
-							value[i] += ', ';
-						}
+						value = false;
+					} else {
+						argValues.forEach((arg)=>{
+							if (arg === value){
+								matches = true;
+							} else if (!isNaN(arg) && !isNaN(value) && parseInt(arg) === parseInt(value)){
+								matches = true;
+							}
+						});
+						value = matches;
 					}
-					value = value.join('');
-				}
-				break;
+					break;
+				case 'Anded':
+					if (Array.isArray(value)){
+						for (let i : number = 0; i < value.length - 1; i++){
+							if (i == (value.length - 2)){
+								value[i] += ' and ';
+							} else {
+								value[i] += ', ';
+							}
+						}
+						value = value.join('');
+					}
+					break;
 
-			case 'Exists':
-			case 'Count':
-			case 'Where':
-				if (!args.children){
-					// no arguments
-					if (method == 'Where'){
-						let msg : string = 'ERROR: no condition specified for .Where()';
-						let parentCtx : any = args.parentCtx;
-						this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+				case 'Exists':
+				case 'Count':
+				case 'Where':
+					if (!args.children){
+						// no arguments
+						if (method == 'Where'){
+							let msg : string = 'ERROR: no condition specified for .Where()';
+							let parentCtx : any = args.parentCtx;
+							this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+							value = msg;
+						} else if (method == 'Count'){
+							if (value == undefined){
+								value = 0;
+							} else if (value instanceof TemplateData && value.type == 'list'){
+								value = value.count();
+							} else {
+								value = 1;
+							}
+						} else { // Exists
+							if (value == undefined){
+								value = false;
+							} else {
+								value = true;
+							}
+						}
+					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotConditionalContext')){
+						let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
+						this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 						value = msg;
-					} else if (method == 'Count'){
-						if (value == undefined){
-							value = 0;
-						} else if (value instanceof TemplateData && value.type == 'list'){
-							value = value.count();
-						} else {
-							value = 1;
+					} else {
+						if (value instanceof TemplateData){
+							let oldContext : TemplateData = this.context;
+							// temporarily set the context to the value being evaluated
+							this.context = <TemplateData>value;
+							let result = [];
+							if (this.context.type = 'list'){
+								this.context.iterateList(()=>{
+									if (args.accept(this)){
+										// the condition returned true; add a clone of the iteration 
+										result.push(new TemplateData(this.context)); 
+									}
+								});
+							} else if (args.accept(this)){
+								result.push(this.context); // no filtering (or cloning) necessary 
+							}
+							this.context = oldContext; // restore old context
+							switch (result.length){
+								case 0:
+									value = undefined; // indication of missing value
+									break;
+								case 1:
+									value = result[0]; // single value is a dictionary
+									break;
+								default:
+									value = new TemplateData(result); // multivalues is a list
+									break;
+							}
 						}
-					} else { // Exists
-						if (value == undefined){
-							value = false;
-						} else {
-							value = true;
+						if (method == 'Count'){
+							if (value == undefined){
+								value = 0;
+							} else if (value instanceof TemplateData && value.type == 'list'){
+								value = value.count();
+							} else {
+								value = 1;
+							}
+						} else if (method == 'Exists'){
+							if (value){
+								value = true;
+							} else {
+								value = false;
+							}
 						}
 					}
-				} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotConditionalContext')){
-					let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
-					this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
-					value = msg;
-				} else {
+					break;
+					
+				case 'ToJson':
 					if (value instanceof TemplateData){
-						let oldContext : TemplateData = this.context;
-						// temporarily set the context to the value being evaluated
-						this.context = <TemplateData>value;
-						let result = [];
-						if (this.context.type = 'list'){
-							this.context.iterateList(()=>{
-								if (args.accept(this)){
-									// the condition returned true; add a clone of the iteration 
-									result.push(new TemplateData(this.context)); 
-								}
-							});
-						} else if (args.accept(this)){
-							result.push(this.context); // no filtering (or cloning) necessary 
-						}
-						this.context = oldContext; // restore old context
-						switch (result.length){
-							case 0:
-								value = undefined; // indication of missing value
-								break;
-							case 1:
-								value = result[0]; // single value is a dictionary
-								break;
-							default:
-								value = new TemplateData(result); // multivalues is a list
-								break;
-						}
-					}
-					if (method == 'Count'){
-						if (value == undefined){
-							value = 0;
-						} else if (value instanceof TemplateData && value.type == 'list'){
-							value = value.count();
+						value = value.toJson(0);
+					} else if (args.parentCtx.parentCtx && args.parentCtx.parentCtx.children[0]){
+						let obj = {};
+						let templateText : string = args.parentCtx.parentCtx.children[0].getText();
+						if (templateText.startsWith('#')){
+							obj[templateText] = this.subtemplates[templateText];
+						} else if (templateText.startsWith('[')){
+							obj['template'] = templateText.substr(1, templateText.length - 2);
 						} else {
-							value = 1;
+							obj[templateText] = value == null ? null : value;
 						}
-					} else if (method == 'Exists'){
-						if (value){
-							value = true;
-						} else {
-							value = false;
-						}
+						value = JSON.stringify(obj);
+					} else {
+						value = value.toString();
 					}
-				}
-				break;
-				
-			case 'ToJson':
-				if (value instanceof TemplateData){
-					value = value.toJson(0);
-				} else {
-					value = value.toString();
-				}
-				break;
-				
-			default:
-				value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
-				break;
+					break;
+					
+				default:
+					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
+					let parentCtx : any = args.parentCtx;
+					let msg = 'ERROR: unknown function: .' + method + '(' + argValues.join(', ') + ')';
+					this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+					break;
+			}
 		}
 		return value;
 	}
