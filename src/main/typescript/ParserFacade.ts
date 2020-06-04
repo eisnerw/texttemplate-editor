@@ -321,14 +321,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitLogicalOperator = function(ctx) {
 		let operator : string = ctx.children[1].getText() 
-		let leftCondition : boolean = this.visitChildren(ctx.children[0])[0];
+		let leftCondition : boolean = ctx.children[0].accept(this);
 		if (!leftCondition && operator == '&'){
 			return false;
 		}
 		if (leftCondition && operator == '|') {
 			return true;
 		}
-		return this.visitChildren(ctx.children[2])[0];
+		return ctx.children[2].accept(this);
 	};	
 	visitBracketedtemplatespec = function(ctx) {
 		let result : [] = this.visitChildren(ctx);
@@ -425,6 +425,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBracketedArgument = function(ctx) {
 		// remove extraneous array
 		return this.visitChildren(ctx)[0];
+	};
+	visitNestedConditional = function(ctx) {
+		return this.visitChildren(ctx)[1];  // return second of three children (left paren, the conditional, right paren)
 	};
 
 	callMethod = function(method : string, value : any, args: any){
@@ -538,7 +541,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = true;
 							}
 						}
-					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotConditionalContext')){
+					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotConditionalContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedConditionalContext')){
 						let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 						this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 						value = msg;
