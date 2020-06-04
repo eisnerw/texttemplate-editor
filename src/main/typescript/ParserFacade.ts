@@ -432,10 +432,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		// TODO: table driven argmument handling
+		let parentCtx : any = args.parentCtx;
 		if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
-			let parentCtx : any = args.parentCtx;
 			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
 			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
 			value = msg;
@@ -443,14 +443,37 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 			value = msg;
+		} else if (!args.children && (method == 'GreaterThan' || method == 'LessThan')){
+			let msg = 'ERROR: missing argument for ' + method + ': ' + args.getText();
+			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+			value = msg;
+		} else if (args.children && args.children.length > 1 && (method == 'GreaterThan' || method == 'LessThan')){
+			let msg = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
+			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
+			value = msg;
 		} else {
 			switch (method){
 				case 'ToUpper':
 					value = <string>value.toUpperCase();
 					break;
+
 				case 'ToLower':
 					value = <string>value.toLowerCase();
 					break;
+
+				case 'GreaterThan':
+				case 'LessThan':
+					let arg = argValues[0];
+					if (!isNaN(arg) && !isNaN(arg)){
+						arg = parseInt(arg);
+						value = parseInt(value)
+					} else {
+						arg = arg.toString();
+						value = value.toString();
+					}
+					value = method == 'GreaterThan' ? (value > arg) : (value < arg);
+					break;
+
 				case 'Matches':
 					let matches : boolean = false;
 					if (argValues.length == 0){
@@ -481,7 +504,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value = value.join('');
 					}
 					break;
-
+					
 				case 'Exists':
 				case 'Count':
 				case 'Where':
