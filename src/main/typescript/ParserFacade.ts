@@ -138,9 +138,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
 		let result : any = ctx.children[1].accept(this);
-		if (Array.isArray(result)){
-			return result[0];
-		}
+		//if (Array.isArray(result)){  // should no longer be necessary
+		//	return result[0];
+		//}
 		return result;
 	};
 	visitTemplatecontents = function(ctx) {
@@ -167,7 +167,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		let oldContext : TemplateData = this.context;
 		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
-		if (bHasContext){ 
+		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
 			let context : any = ctx.children[1].children[0].accept(this);
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
@@ -416,6 +416,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return !result;
 	};
 	visitCondition = function(ctx) {
+		return this.visitChildren(ctx)[0];
+	};
+	visitBracedMethodable = function(ctx) {
+		// remove extraneous array
+		return this.visitChildren(ctx)[0];
+	};
+	visitBracketedArgument = function(ctx) {
+		// remove extraneous array
 		return this.visitChildren(ctx)[0];
 	};
 
