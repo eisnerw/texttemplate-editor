@@ -112,6 +112,9 @@ class TemplateData {
 		}
 		return result;
 	}
+	add(name : string, value : any){
+		this.dictionary[name] = value;
+	}
 	private indent(indentLevel : number) : string {
 		let result : string = '';
 		for (let i = 0; i < indentLevel; i++){
@@ -158,6 +161,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		if (!ctx.children || ctx.children[0].constructor.name == 'SubtemplateSectionContext'){
 			return ''; //prevent displaying the Subtemplate section and avoid error for invalid brace 
+		}
+		if (Array.isArray(value) && value.length == 1){
+			return value[0];
 		}
 		return value != null ? value.join('') :  '';
 	};
@@ -224,8 +230,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			// the next to the last node may be the subtemplates, so visit it to get the subtemplate dictionary
 			this.visitChildren(ctx.children[ctx.children.length - 2])
 		}
-		let result : string[] = this.visitChildren(ctx);
-		return result.splice(0, result.length - 1).join(''); // remove the result of the <EOF> token
+		let result : [] = this.visitChildren(ctx);
+		let spliced = result.splice(0, result.length - 1); // remove the result of the <EOF> token
+		if (spliced.length == 1){
+			return spliced[0];
+		}
+		return spliced.join(''); 
 	};
 	visitMethod = function(ctx) {
 		let methodName : string = ctx.getText();
@@ -298,10 +308,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitBracedthinarrow = function(ctx) {
 		let result : boolean = ctx.children[0].accept(this);
-		if (Array.isArray(result)){
-			result = result[0]; // TODO:why is this one level deep????
-		}
-		if (result){
+		//if (Array.isArray(result)){
+		//	result = result[0]; // TODO:why is this one level deep????
+		//}
+		if (result && ctx.children[2].children){ // protect against invalid syntax
 			return this.visitChildren(ctx.children[2].children[0]); // true
 		}
 		return ''; // false means ignore this token
@@ -354,7 +364,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			});
 			return result;
 		} else {
-			let subtemplateName : string = ctx.getText();
+			let subtemplateName : string = typeof ctx == 'string' ? ctx : ctx.getText();
 			if (!this.subtemplates[subtemplateName]){
 				let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
 				if (!urls[subtemplateUrl]){
@@ -432,7 +442,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 	callMethod = function(method : string, value : any, args: any){
 		let argValues = [];
-		if (args.constructor.name == 'ArgumentsContext'){
+		if (args.constructor.name == 'ConditionContext'){
+			// the argument is a boolean
+			argValues[0] = args.accept(this);
+		} else if (args.constructor.name == 'ArgumentsContext'){
 			let argResults = args.accept(this);
 			if (argResults){
 				argResults.forEach((arg) =>{
@@ -442,9 +455,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				});
 			}
 		}
-		// TODO: table driven argmument handling
 		let parentCtx : any = args.parentCtx;
-		if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson')){
+		// TODO: table driven argmument handling
+		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "MethodabletemplatespecContext";
+		if (bTemplate || method.startsWith('#')){
+			let oldContext : TemplateData = this.context;
+			// TODO: consider a clean context as a child of the context
+			this.context = new TemplateData(this.context);
+			this.context.add('_0', value);
+			for (let i = 0; i < argValues.length; i++){
+				this.context.add('_' + (i + 1), argValues[i]);
+			}
+			if (!bTemplate){
+				value = this.visitNamedSubtemplate(method);
+			} else {
+				value = parentCtx.children[1].accept(this)[1]; // ignore the brackets when callling a bracketed template
+			}
+			this.context = oldContext;
+		} else if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
 			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
@@ -490,8 +518,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (argValues.length == 0){
 						if (!value){
 							value = true; //TODO: is it appropriate to match nulls?
+						} else {
+							value = false;
 						}
-						value = false;
 					} else {
 						argValues.forEach((arg)=>{
 							if (arg === value){
