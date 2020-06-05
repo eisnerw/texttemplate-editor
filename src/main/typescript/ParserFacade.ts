@@ -242,9 +242,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
-		let value : any = [];
+		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
 			// create an arry of results and then run the method on the array
+			value = [];
 			this.context.iterateList(()=>{
 				value.push(ctx.children[0].accept(this));
 			});
@@ -307,12 +308,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ' ';
 	};
 	visitBracedthinarrow = function(ctx) {
-		let result : boolean = ctx.children[0].accept(this);
+		let result : any = ctx.children[0].accept(this);
 		//if (Array.isArray(result)){
 		//	result = result[0]; // TODO:why is this one level deep????
 		//}
-		if (result && ctx.children[2].children){ // protect against invalid syntax
+		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
 			return this.visitChildren(ctx.children[2].children[0]); // true
+		}
+		if (typeof result == 'string' && result.startsWith('ERROR:')){
+			return result;
 		}
 		return ''; // false means ignore this token
 	};
@@ -341,52 +345,48 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.children[2].accept(this);
 	};	
 	visitBracketedtemplatespec = function(ctx) {
-		let result : [] = this.visitChildren(ctx);
-		return result.slice(1, result.length).join(''); // ignore the brackets
+		let result : any = this.visitChildren(ctx);
+		result = result.slice(1, result.length - 1);  // ignore the results from brackets
+		if (result.length == 1){
+			return result[0];
+		}
+		return result.join('');
 	};
 	visitMethodableTemplatespec = function(ctx) {
-		let value : any = [];
+		let value : any;
 		if (this.context && this.context.type == 'list'){
+			value = [];
 			this.context.iterateList(()=>{
 				value.push(this.visitChildren(ctx)[0]);
 			});
 		} else {
-			value.push(this.visitChildren(ctx)[0]);
+			value = this.visitChildren(ctx)[0];
 		}
 		return value;
 	}
 	visitNamedSubtemplate = function(ctx) {
-		if (this.context && this.context.type == 'list'){
-			// compute a result for each dictionary in the list
-			let result : any = [];
-			this.context.iterateList(()=>{
-				result.push(this.visitNamedSubtemplate(ctx)); // recurse with each dictionary in the list
-			});
-			return result;
-		} else {
-			let subtemplateName : string = typeof ctx == 'string' ? ctx : ctx.getText();
-			if (!this.subtemplates[subtemplateName]){
-				let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
-				if (!urls[subtemplateUrl]){
-					urls[subtemplateUrl] = {};
-				}
-				if (!urls[subtemplateUrl].data){
-					return 'loading subtemplate "' + subtemplateName + '"';
-				}
-				this.subtemplates[subtemplateName] = urls[subtemplateUrl].data;
+		let subtemplateName : string = typeof ctx == 'string' ? ctx : ctx.getText();
+		if (!this.subtemplates[subtemplateName]){
+			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
+			if (!urls[subtemplateUrl]){
+				urls[subtemplateUrl] = {};
 			}
-			const lexer = createLexer(this.subtemplates[subtemplateName]);
-			const parser = createParserFromLexer(lexer);
-			const tree = parser.compilationUnit();
-			return this.visitCompilationUnit(tree);
+			if (!urls[subtemplateUrl].data){
+				return 'loading subtemplate "' + subtemplateName + '"';
+			}
+			this.subtemplates[subtemplateName] = urls[subtemplateUrl].data;
 		}
+		const lexer = createLexer('{:' + this.subtemplates[subtemplateName] + '}');
+		const parser = createParserFromLexer(lexer);
+		const tree = parser.compilationUnit();
+		return this.visitCompilationUnit(tree);
 	}
 	visitSubtemplateSpecs = function(ctx) {
 		if (ctx.children){
 			ctx.children.forEach((child)=>{
 				if (child.children[0].children[1].constructor.name == 'NamedSubtemplateContext'){
 					let templateString : string = child.children[0].children[3].getText();
-					this.subtemplates[child.children[0].children[1].getText()] = templateString.substr(1, templateString.length - 2);
+					this.subtemplates[child.children[0].children[1].getText()] = templateString;
 				}
 			});
 		}
@@ -439,7 +439,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitNestedConditional = function(ctx) {
 		return this.visitChildren(ctx)[1];  // return second of three children (left paren, the conditional, right paren)
 	};
-
+	visitBraceThinArrow = function(ctx) {
+		return this.visitChildren(ctx)[0];
+	};
+	
 	callMethod = function(method : string, value : any, args: any){
 		let argValues = [];
 		if (args.constructor.name == 'ConditionContext'){
@@ -469,7 +472,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (!bTemplate){
 				value = this.visitNamedSubtemplate(method);
 			} else {
-				value = parentCtx.children[1].accept(this)[1]; // ignore the brackets when callling a bracketed template
+				let result = parentCtx.children[1].accept(this);
+				value = ''; 
+				if (result){ // needed to protect against bad syntax
+					value = result[1]; // ignore the brackets when callling a bracketed template
+				}
 			}
 			this.context = oldContext;
 		} else if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches')){
@@ -793,6 +800,7 @@ export function validate(input, model) : Error[] {
     parser._errHandler = new TextTemplateErrorStrategy();
 
     const tree = parser.compilationUnit();
+	/* used to get json representation of tree for debugging
 	const getCircularReplacer = () => {
 	  const seen = new WeakSet();
 	  return (key, value) => {
@@ -805,19 +813,21 @@ export function validate(input, model) : Error[] {
 		return value;
 	  };
 	};
-	let treeJson : string = JSON.stringify(tree, getCircularReplacer());
+	let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
 	let parsed : string = '';
-	try{
-		let treeTokens : CommonToken[] = parser._interp._input.tokens;
-		let symbolicNames : string[] = parser.symbolicNames;
-		
-		for (let e of treeTokens){
-			if (e.type != -1) {
-				parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
+	if (input){
+		try{
+			let treeTokens : CommonToken[] = parser._interp._input.tokens;
+			let symbolicNames : string[] = parser.symbolicNames;
+			
+			for (let e of treeTokens){
+				if (e.type != -1) {
+					parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
+				}
 			}
+		} catch(err) {
+			parsed = '*****ERROR*****';
 		}
-	} catch(err) {
-		parsed = '*****ERROR*****';
 	}
 	var visitor = new TextTemplateVisitor();
 	visitor.errors = errors;
