@@ -15,4 +15,38 @@
 		  }
 	   ]
 	}
+	,"people":[
+		{
+		   "firstName": "John"
+		   ,"lastName": "Smith"
+		   ,"pets": [
+			  {
+				 "type": "dog"
+				 ,"name": "Toto"
+			  },{
+				 "type": "cat"
+				 ,"name": "Molly"
+			  },{
+				 "type": "zebra"
+				 ,"name": "Stripes"
+			  }
+		   ]
+		},
+		{
+		   "firstName": "John"
+		   ,"lastName": "Smith"
+		   ,"pets": [
+			  {
+				 "type": "dog"
+				 ,"name": "Toto"
+			  },{
+				 "type": "cat"
+				 ,"name": "Molly"
+			  },{
+				 "type": "zebra"
+				 ,"name": "Stripes"
+			  }
+		   ]
+		}
+	]
 }

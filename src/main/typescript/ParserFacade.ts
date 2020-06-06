@@ -128,6 +128,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
 	subtemplates : any = {};
 	errors = [];
+	recursionLevel = 0;
 	visitText = function(ctx){
 		return ctx.getText();
 	};
@@ -200,7 +201,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 				} catch(e){
 					this.context = oldContext;
-					return 'bad JSON for template context';
+					return 'Error loading context: ' + e.message;
 				}
 			} else if (bHasContext) { // context may not be specified
 				if (context){
@@ -379,7 +380,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		const lexer = createLexer('{:' + this.subtemplates[subtemplateName] + '}');
 		const parser = createParserFromLexer(lexer);
 		const tree = parser.compilationUnit();
-		return this.visitCompilationUnit(tree);
+		if (this.recursionLevel > 20){
+			return 'ERROR: too many levels of recursion when invoking ' + subtemplateName;
+		}
+		++this.recursionLevel;
+		let result : any = this.visitCompilationUnit(tree);
+		--this.recursionLevel;
+		return result;
 	}
 	visitSubtemplateSpecs = function(ctx) {
 		if (ctx.children){
@@ -464,7 +471,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (bTemplate || method.startsWith('#')){
 			let oldContext : TemplateData = this.context;
 			// TODO: consider a clean context as a child of the context
-			this.context = new TemplateData(this.context);
+			this.context = new TemplateData({});
 			this.context.add('_0', value);
 			for (let i = 0; i < argValues.length; i++){
 				this.context.add('_' + (i + 1), argValues[i]);
