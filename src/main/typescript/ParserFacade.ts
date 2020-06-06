@@ -504,6 +504,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let msg = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 			value = msg;
+		} else if (args.children && args.children.length < 3 && method == 'Case'){
+			let msg = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
+			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
+			value = msg;
 		} else {
 			switch (method){
 				case 'ToUpper':
@@ -517,7 +521,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				case 'GreaterThan':
 				case 'LessThan':
 					let arg = argValues[0];
-					if (!isNaN(arg) && !isNaN(arg)){
+					if (!isNaN(arg) && !isNaN(value)){
 						arg = parseInt(arg);
 						value = parseInt(value)
 					} else {
@@ -527,19 +531,28 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = method == 'GreaterThan' ? (value > arg) : (value < arg);
 					break;
 
+				case 'Case':
+					for (let i = 0; i < argValues.length; i+=2){
+						if ((!isNaN(argValues[i]) && !isNaN(value) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
+							value = argValues[i + 1];
+							break;
+						} else if ((i + 3) == argValues.length){
+							value = argValues[i + 2]; // default
+						}
+					}
+					break;
+
 				case 'Matches':
 					let matches : boolean = false;
-					if (argValues.length == 0){
-						if (!value){
+					if (argValues.length == 0 || value == null){
+						if (argValues.length == 0 && value == null){
 							value = true; //TODO: is it appropriate to match nulls?
 						} else {
 							value = false;
 						}
 					} else {
 						argValues.forEach((arg)=>{
-							if (arg === value){
-								matches = true;
-							} else if (!isNaN(arg) && !isNaN(value) && parseInt(arg) === parseInt(value)){
+							if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
 								matches = true;
 							}
 						});
