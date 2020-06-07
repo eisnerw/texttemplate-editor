@@ -11,6 +11,69 @@ class ConsoleErrorListener extends error.ErrorListener {
         console.log('ERROR ' + msg);
     }
 }
+class Indent {
+	public parentIndent : Indent;
+	public bNewline : boolean; // indent followed new line
+	public indentText : string;
+	public length : number;
+	public beforeBullet : string;
+	public afterBullet : string;
+	public bulletWidth : number;
+	public level : number;
+	public index : number;
+	public bullet;
+	public error : string; 
+	constructor(indentText : string, current : Indent){
+		this.bNewline = indentText.startsWith('\n');
+		this.indentText = indentText.replace('\n', '');
+		this.length = this.indentText.length;
+		let splitIndent = this.indentText.split('{.}');
+		this.beforeBullet = splitIndent[0];
+		this.afterBullet = splitIndent.length == 2 ? splitIndent[1] : '';
+		this.bullet = 'o ';
+		if (current){
+			if (this.indentText.length == current.indentText.length){ // TODO: handle case where the length is the same, but not the text
+				// another line at the same level
+				this.index = current.index + 1;
+				this.parentIndent = current.parentIndent; // replacing current
+				this.level = current.level;
+				// TODO: compute the bullet
+			} else if (this.indentText.length > current.indentText.length){
+				// indenting from the current line
+				this.index = 0;
+				this.parentIndent = current;
+				this.level = current.level + 1;
+			} else {
+				let parentIndent = current.parentIndent;
+				while (parentIndent !== null){
+					// find the matching level
+					if (parentIndent.indentText.length != this.indentText.length){
+						parentIndent = parentIndent.parentIndent;
+					} else {
+						break; // found it
+					}
+				}
+				if (!parentIndent){
+					this.error = 'ERROR: improper indenting because indent levels don\'t match';
+					this.beforeBullet = 'ERROR';
+					this.level = current.level;
+					this.parentIndent = current.parentIndent;
+					this.index = current.index + 1;
+				} else {
+					this.index = parentIndent.index + 1;
+					this.parentIndent = parentIndent.parentIndent;
+					this.level = parentIndent.level;
+				}
+			}	
+		} else {
+			this.index = 0;
+			this.level = 0;
+			this.parentIndent = null;
+		}
+		this.bullet = '(' + this.level + '-' + this.index + ')';
+	}
+}
+
 class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
@@ -129,6 +192,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	subtemplates : any = {};
 	errors = [];
 	recursionLevel = 0;
+	indent : Indent = null;
 	visitText = function(ctx){
 		return ctx.getText();
 	};
@@ -158,7 +222,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					});
 				}
 			});
-			value[0] = '\n    ' + newValue.join('\n    ') + '\n';
+			
+			value[0] = newValue.join('\n    ') + '\n';
 		}
 		if (!ctx.children || ctx.children[0].constructor.name == 'SubtemplateSectionContext'){
 			return ''; //prevent displaying the Subtemplate section and avoid error for invalid brace 
@@ -449,7 +514,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBraceThinArrow = function(ctx) {
 		return this.visitChildren(ctx)[0];
 	};
-	
+	visitIndent = function(ctx) {
+		this.indent = new Indent(ctx.getText(), this.indent);
+	};
+	visitBeginningIndent = function(ctx) {
+		return this.visitIndent(ctx);
+	};
 	callMethod = function(method : string, value : any, args: any){
 		let argValues = [];
 		if (args.constructor.name == 'ConditionContext'){
@@ -538,6 +608,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							break;
 						} else if ((i + 3) == argValues.length){
 							value = argValues[i + 2]; // default
+							break;
 						}
 					}
 					break;

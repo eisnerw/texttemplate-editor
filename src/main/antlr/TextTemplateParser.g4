@@ -3,21 +3,26 @@ parser grammar TextTemplateParser;
 options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
+	beginningIndent?
     templatecontents+ 
     EOF
     ;
 
-subtemplateSection: SUBTEMPLATES TEXT* subtemplateSpecs;
+subtemplateSection: SUBTEMPLATES text* subtemplateSpecs;
 
 subtemplateSpecs: subtemplatespec*;
 
-subtemplatespec: templatecontexttoken TEXT*;
+subtemplatespec: templatecontexttoken text*;
 
-templatecontents: comment* (subtemplateSection | templatetoken | templatecontexttoken | text+);
+templatecontents: comment? (subtemplateSection | indent | templatetoken | templatecontexttoken | text+);
+
+indent: (NL SPACES? LBRACE DOT RBRACE SPACES? | NL SPACES);
+
+beginningIndent: (SPACES? LBRACE DOT RBRACE SPACES? | SPACES);
 
 comment: COMMENT+;
 
-text: TEXT;
+text: TEXT | NL | SPACES;
 
 templatetoken: LBRACE bracedoptions RBRACE;
 
@@ -31,9 +36,9 @@ templatecontexttoken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) C
 
 templatespec: namedSubtemplate | bracketedtemplatespec;
 
-bracketedtemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKET;
+bracketedtemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* RBRACKET;
 
-methodabletemplatespec: LBRACKET COMMENT* templatecontents* COMMENT* RBRACKETLP;
+methodabletemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* RBRACKETLP;
 
 bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
 

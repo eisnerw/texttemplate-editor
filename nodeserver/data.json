@@ -8,7 +8,7 @@
 			 ,"name": "Toto"
 		  },{
 			 "type": "cat"
-			 ,"name": "Molly"
+			 ,"name": "Dolly"
 		  },{
 			 "type": "zebra"
 			 ,"name": "Stripes"
@@ -17,17 +17,17 @@
 	}
 	,"people":[
 		{
-		   "firstName": "John"
-		   ,"lastName": "Smith"
-		   ,"pets": [
-			  {
+		   "firstName": "Doris"
+		   ,"lastName": "Johnson"
+			   ,"pets": [
+				  {
 				 "type": "dog"
-				 ,"name": "Toto"
+				 ,"name": "Buddy"
 			  },{
-				 "type": "cat"
-				 ,"name": "Molly"
+				 "type": "lion"
+				 ,"name": "Ralph"
 			  },{
-				 "type": "zebra"
+				 "type": "tiger"
 				 ,"name": "Stripes"
 			  }
 		   ]
@@ -41,7 +41,7 @@
 				 ,"name": "Toto"
 			  },{
 				 "type": "cat"
-				 ,"name": "Molly"
+				 ,"name": "Dolly"
 			  },{
 				 "type": "zebra"
 				 ,"name": "Stripes"

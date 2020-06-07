@@ -4,9 +4,9 @@ COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF)	 [ \t\r]*;
 TEXT: ~[{}/ \n]+ ;
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
-TEXT_SP: ' '+ ->type(TEXT);
+SPACES: ' '+;
 TEXT_SLASH: '/' ->type(TEXT);
-TEXT_NL: '\n' ->type(TEXT);
+NL: '\n';
 SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+;
 
 
@@ -69,9 +69,9 @@ RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
 BRACKETED_LBRACE: 	'{' -> type(LBRACE),pushMode(BRACED);
 BRACKETED_RBRACE: '}' -> type(RBRACE);
-BRACKETED_SP: ' '+ ->type(TEXT);
+BRACKETED_SP: ' '+ ->type(SPACES);
 BRACKETED_SLASH: '/' ->type(TEXT);
-BRACKETED_NL: '\n' ->type(TEXT);
+BRACKETED_NL: '\n' ->type(NL);
 
 mode NESTED;
 NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
