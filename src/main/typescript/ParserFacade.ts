@@ -516,6 +516,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitIndent = function(ctx) {
 		this.indent = new Indent(ctx.getText(), this.indent);
+		return (ctx.getText().startsWith('\n') ? '\n' : '') + this.indent.beforeBullet + this.indent.bullet + this.indent.afterBullet;
 	};
 	visitBeginningIndent = function(ctx) {
 		return this.visitIndent(ctx);
