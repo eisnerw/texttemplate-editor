@@ -16,9 +16,15 @@ subtemplatespec: templatecontexttoken text*;
 
 templatecontents: comment? (subtemplateSection | indent | templatetoken | templatecontexttoken | text+);
 
-indent: (NL SPACES? LBRACE DOT RBRACE SPACES? | NL SPACES);
+indent: bulletHolder indented;
 
-beginningIndent: (SPACES? LBRACE DOT RBRACE SPACES? | SPACES);
+bulletHolder: (NL SPACES? LBRACE DOT RBRACE SPACES? | NL SPACES);
+
+indented: (comment? (templatetoken | templatecontexttoken | text+))+;
+
+beginningIndent: beginningBulletHolder indented;
+
+beginningBulletHolder: (SPACES? LBRACE DOT RBRACE SPACES? | SPACES);
 
 comment: COMMENT+;
 

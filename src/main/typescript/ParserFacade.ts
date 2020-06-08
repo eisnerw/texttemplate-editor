@@ -206,13 +206,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
 		let result : any = ctx.children[1].accept(this);
-		//if (Array.isArray(result)){  // should no longer be necessary
-		//	return result[0];
-		//}
+		if (Array.isArray(result)){
+			return result[0];
+		}
 		return result;
 	};
 	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
+		if (value){
+			for (let i = 0; i < value.length; i++){
+				if (Array.isArray(value[i])){ 
+					value[i] = value[i].join(''); // TODO: does this break anything?
+				}
+			}
+		}		
+		/*
 		if (Array.isArray(value) && Array.isArray(value[0]) && value[0].length > 1){
 			let newValue : string[] = [];
 			value[0].forEach((val)=>{
@@ -225,6 +233,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			
 			value[0] = newValue.join('\n    ') + '\n';
 		}
+		*/
 		if (!ctx.children || ctx.children[0].constructor.name == 'SubtemplateSectionContext'){
 			return ''; //prevent displaying the Subtemplate section and avoid error for invalid brace 
 		}
@@ -515,8 +524,31 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0];
 	};
 	visitIndent = function(ctx) {
-		this.indent = new Indent(ctx.getText(), this.indent);
-		return (ctx.getText().startsWith('\n') ? '\n' : '') + this.indent.beforeBullet + this.indent.bullet + this.indent.afterBullet;
+		let bulletText : string = ctx.children[0].getText();
+		let indent : Indent = new Indent(bulletText, this.indent);
+		this.indent = indent;
+		let bulletNewLine = ctx.children[0].getText().startsWith('\n') ? '\n' : ''
+		let bullet : string = bulletNewLine + indent.beforeBullet + indent.bullet + indent.afterBullet;
+		let result = ctx.children[1].accept(this);
+		this.indent = indent; // restore the current level of indent which may have been changed by the children
+		let multilineResult = '';
+		for (let i = 0; i < result.length; i++){
+			// arrays within the results are values that need to be bulleted
+			if (Array.isArray(result[i])){
+				// apply the indent to each result
+				let multilines = result[i];
+				for (let j = 0; j < multilines.length; j++){
+					result[i] = multilines[j];
+					multilineResult += ((bulletNewLine + indent.beforeBullet + this.indent.bullet + indent.afterBullet) + result.join(''));
+					bulletNewLine = '\n'; // the lack of a new line is a special case for a bullet or indent that occurs at the very beginning of input
+					if (j < (multilines.length - 1)){
+						this.indent = new Indent(bulletText, this.indent); // increase the index
+					}
+				}
+				return multilineResult; // note: currently only supports one multiline per indent
+			}
+		}
+		return bullet + result.join('');
 	};
 	visitBeginningIndent = function(ctx) {
 		return this.visitIndent(ctx);
