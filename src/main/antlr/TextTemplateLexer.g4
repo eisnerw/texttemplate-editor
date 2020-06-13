@@ -12,7 +12,7 @@ SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+;
 
 mode BRACED;
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->skip;
-IDENTIFIER: [^a-zA-Z_][a-zA-Z0-9_]* ;
+IDENTIFIER: [$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';
@@ -30,7 +30,7 @@ AND: '&';
 OR: '|';
 NOT: '!';
 POUND: '#';
-BRACED_ILLEGAL: ([$%*-={;<>?\\+] | ']')+;
+BRACED_ILLEGAL: ([%*-={;<>?\\+] | ']')+;
 
 mode PARENED;
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
@@ -75,7 +75,7 @@ BRACKETED_NL: '\n' ->type(NL);
 
 mode NESTED;
 NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
-NESTED_IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
+NESTED_IDENTIFIER: [$a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> type(METHODNAME),pushMode(PARENED);
 NESTED_DOT: '.' ->type(DOT);
 NESTED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
@@ -84,5 +84,5 @@ NESTED_RP: ')' ->type(RP),popMode;
 NESTED_AND: '&' ->type(AND);
 NESTED_OR: '|' ->type(OR);
 NESTED_NOT: '!' ->type(NOT);
-NESTED_ILLEGAL: ([@#$%^*-={;<>?/\\+] | ']')+;
+NESTED_ILLEGAL: ([@#%^*-={;<>?/\\+] | ']')+;
 

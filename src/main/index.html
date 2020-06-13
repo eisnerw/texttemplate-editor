@@ -32,12 +32,14 @@
 	require(['vs/editor/editor.main'], function() {
 		monaco.languages.register({ id: 'texttemplate' });
 
+		let parserFacade;
+
 		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());
 		let config = {"surroundingPairs": [{ "open": "{", "close": "}" }], "autoClosingPairs": [{ "open": "{", "close": "}" }], "brackets": [["{", "}"]] };
 		monaco.languages.setLanguageConfiguration("texttemplate", config);
 		monaco.languages.registerFoldingRangeProvider("texttemplate", {
 			provideFoldingRanges: function(model, context, token) {
-				return ParserFacade.provideFoldingRanges(model, context, token);
+				return parserFacade.provideFoldingRanges(model, context, token);
 			}
 		});
 
@@ -122,23 +124,16 @@
 		editor.onDidChangeModelContent(function (e) {
 			let code = editor.getValue()
 			let model = monaco.editor.getModels()[0];
-			if (!ParserFacade){
+			if (!ParserFacade && !parserFacade){
 				return; // protect against an unknown error that can occur during editing if keystrokes are frequent
+			} else {
+				if (ParserFacade && !parserFacade){
+					parserFacade = ParserFacade;
+				}
 			}
-			let syntaxErrors = ParserFacade.validate(code, model);
-			let monacoErrors = [];
-			for (let e of syntaxErrors) {
-				monacoErrors.push({
-					startLineNumber: e.startLine,
-					startColumn: e.startCol,
-					endLineNumber: e.endLine,
-					endColumn: e.endCol,
-					message: e.message,
-					severity: monaco.MarkerSeverity.Error
-				});
-			};
-			window.syntaxErrors = syntaxErrors;
-			monaco.editor.setModelMarkers(model, "owner", monacoErrors);
+			setTimeout(function(){
+				parserFacade.inputChanged(code, model, monaco);
+			},0);
 		});
 		monaco.languages.registerDefinitionProvider('texttemplate', {
 			provideDefinition: function(model,position, token){

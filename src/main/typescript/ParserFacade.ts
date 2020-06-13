@@ -575,9 +575,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let oldContext : TemplateData = this.context;
 			// TODO: consider a clean context as a child of the context
 			this.context = new TemplateData({});
-			this.context.add('_0', value);
+			this.context.add('$0', value);
 			for (let i = 0; i < argValues.length; i++){
-				this.context.add('_' + (i + 1), argValues[i]);
+				this.context.add('$' + (i + 1), argValues[i]);
 			}
 			if (!bTemplate){
 				value = this.visitNamedSubtemplate(method);
@@ -911,77 +911,110 @@ export function provideFoldingRanges(model, context, token) {
 export let folds = [];
 let urls = {};
 let model;
+let concurrency = 0;
 
-export function validate(input, model) : Error[] {
+export function inputChanged(input, model, monaco) : void {
+	let invocation = ++concurrency;
+	setTimeout(()=>{
+		if (invocation == concurrency){
+			validate(input, model, monaco, invocation);
+		}
+	}, 2000);
+}
+function validate(input, model, monaco, invocation) : void {
     let errors : Error[] = [];
     const lexer = createLexer(input);
     lexer.removeErrorListeners();
     lexer.addErrorListener(new ConsoleErrorListener());
 
     const parser = createParserFromLexer(lexer);
-    parser.removeErrorListeners();
-    parser.addErrorListener(new CollectorErrorListener(errors));
-    parser._errHandler = new TextTemplateErrorStrategy();
-
-    const tree = parser.compilationUnit();
-	/* used to get json representation of tree for debugging
-	const getCircularReplacer = () => {
-	  const seen = new WeakSet();
-	  return (key, value) => {
-		if (typeof value === 'object' && value !== null) {
-		  if (seen.has(value)) {
+	setTimeout(()=>{
+		if (invocation != concurrency){
 			return;
-		  }
-		  seen.add(value);
 		}
-		return value;
-	  };
-	};
-	let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
-	let parsed : string = '';
-	if (input){
-		try{
-			let treeTokens : CommonToken[] = parser._interp._input.tokens;
-			let symbolicNames : string[] = parser.symbolicNames;
-			
-			for (let e of treeTokens){
-				if (e.type != -1) {
-					parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
-				}
+		parser.removeErrorListeners();
+		parser.addErrorListener(new CollectorErrorListener(errors));
+		parser._errHandler = new TextTemplateErrorStrategy();
+
+		const tree = parser.compilationUnit();
+		/* used to get json representation of tree for debugging
+		const getCircularReplacer = () => {
+		  const seen = new WeakSet();
+		  return (key, value) => {
+			if (typeof value === 'object' && value !== null) {
+			  if (seen.has(value)) {
+				return;
+			  }
+			  seen.add(value);
 			}
-		} catch(err) {
-			parsed = '*****ERROR*****';
-		}
-	}
-	var visitor = new TextTemplateVisitor();
-	visitor.errors = errors;
-	folds = []; // folds will be computed while visiting
-	var result = visitor.visitCompilationUnit(tree);
-    document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
-	document.getElementById('interpolated').innerHTML = result;
-	Object.keys(urls).forEach((key : string) =>{
-		if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
-			delete urls[key] // clean up incomplete urls
-		} else {
-			if (!urls[key].data && !urls[key].loading){
-				urls[key].loading = true;
-				$.ajax({
-					url: key,
-					success: function (data) {
-						if (data.error){
-							urls[key].data = data.error;
-						} else {
-							if (typeof data != 'string'){
-								data = JSON.stringify(data);
-							}
-							urls[key].data = data;
-							//model.undo(); // strange way of getting the model to revalidate
-							//model.redo();
-						}
+			return value;
+		  };
+		};
+		let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
+		let parsed : string = '';
+		if (input){
+			try{
+				let treeTokens : CommonToken[] = parser._interp._input.tokens;
+				let symbolicNames : string[] = parser.symbolicNames;
+				
+				for (let e of treeTokens){
+					if (e.type != -1) {
+						parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
 					}
-				});
+				}
+			} catch(err) {
+				parsed = '*****ERROR*****';
 			}
 		}
-	});
-    return errors;
+		setTimeout(()=>{
+			if (invocation != concurrency){
+				return;
+			}
+			var visitor = new TextTemplateVisitor();
+			visitor.errors = errors;
+			folds = []; // folds will be computed while visiting
+			var result = visitor.visitCompilationUnit(tree);
+			if (invocation != concurrency){
+				return;
+			}
+			document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+			document.getElementById('interpolated').innerHTML = result;
+			Object.keys(urls).forEach((key : string) =>{
+				if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
+					delete urls[key] // clean up incomplete urls
+				} else {
+					if (!urls[key].data && !urls[key].loading){
+						urls[key].loading = true;
+						$.ajax({
+							url: key,
+							success: function (data) {
+								if (data.error){
+									urls[key].data = data.error;
+								} else {
+									if (typeof data != 'string'){
+										data = JSON.stringify(data);
+									}
+									urls[key].data = data;
+									//model.undo(); // strange way of getting the model to revalidate
+									//model.redo();
+								}
+							}
+						});
+					}
+				}
+			});
+			let monacoErrors = [];
+			for (let e of errors) {
+				monacoErrors.push({
+					startLineNumber: e.startLine,
+					startColumn: e.startCol,
+					endLineNumber: e.endLine,
+					endColumn: e.endCol,
+					message: e.message,
+					severity: monaco.MarkerSeverity.Error
+				});
+			};
+			monaco.editor.setModelMarkers(model, "owner", monacoErrors);
+		}, 0);
+	}, 0);
 }
