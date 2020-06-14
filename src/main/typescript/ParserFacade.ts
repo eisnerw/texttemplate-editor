@@ -193,6 +193,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	errors = [];
 	recursionLevel = 0;
 	indent : Indent = null;
+	annotations = {};
 	visitText = function(ctx){
 		return ctx.getText();
 	};
@@ -200,6 +201,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		var key = ctx.getText();
 		if (!this.context || !(this.context instanceof TemplateData)){
 			return undefined; // attempt to look up a variable without a context returns undefined
+		}
+		let value = this.context.getValue(key);
+		if (value === undefined && this.annotations.MissingValue !== undefined){
+			return this.annotations.MissingValue;
 		}
 		return this.context.getValue(key);
 	};
@@ -317,6 +322,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
+		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#');
+		let oldAnnotations = {};
+		// clone by shallow copy
+		for (let key in this.annotations){
+			oldAnnotations[key] = this.annotations[key];
+		}
+		ctx.children.slice(1).forEach((child) => {
+			let method : string = child.children[0].accept(this);
+			if (method.startsWith('@') && bMethodableIsTemplate){
+				let args : any = child.children[1];
+				this.callMethod(method, this.annotations, args);
+			} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && this.annotations.MissingValue){
+				delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls
+			}
+		});
 		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
 			// create an arry of results and then run the method on the array
@@ -330,17 +350,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// call each method, which follow the identifier value
 		ctx.children.slice(1).forEach((child) => {
 			let method : string = child.children[0].accept(this);
-			var args = child.children[1];
-			if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
-				let computedValue : string[] = [];
-				value.forEach((val) =>{
-					computedValue.push(this.callMethod(method, val, args));
-				});
-				value = computedValue;
-			} else {
-				value = this.callMethod(method, value, args);
+			if (!method.startsWith('@')){
+				let args : any = child.children[1];
+				if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
+					let computedValue : string[] = [];
+					value.forEach((val) =>{
+						computedValue.push(this.callMethod(method, val, args));
+					});
+					value = computedValue;
+				} else {
+					value = this.callMethod(method, value, args);
+				}
 			}
 		});
+		this.annotations = oldAnnotations; // restore the annotations
 		return value;
 	};
 	visitQuoteLiteral = function(ctx) {
@@ -383,10 +406,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ' ';
 	};
 	visitBracedthinarrow = function(ctx) {
+		let oldMissingValue = this.annotations.MissingValue;
+		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
 		let result : any = ctx.children[0].accept(this);
-		//if (Array.isArray(result)){
-		//	result = result[0]; // TODO:why is this one level deep????
-		//}
+		this.annotations.MissingValue = oldMissingValue;
 		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
 			return this.visitChildren(ctx.children[2].children[0]); // true
 		}
@@ -396,8 +419,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ''; // false means ignore this token
 	};
 	visitBracedarrow = function(ctx) {
+		let oldMissingValue = this.annotations.MissingValue;
+		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
 		let result : boolean = ctx.children[0].accept(this);
-		if (Array.isArray(result)){
+		this.annotations.MissingValue = oldMissingValue;
+			if (Array.isArray(result)){
 			result = result[0]; // TODO:why is this one level deep????
 		}
 		if (result){
@@ -589,7 +615,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 			this.context = oldContext;
-		} else if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches')){
+		} else if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
 			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
@@ -663,6 +689,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value = matches;
 					}
 					break;
+
 				case 'Anded':
 					if (Array.isArray(value)){
 						for (let i : number = 0; i < value.length - 1; i++){
@@ -751,6 +778,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 					}
 					break;
+
+				case 'IfMissing':
+					if (!value) {
+						value = argValues[0];
+					}
+					break;
 					
 				case 'ToJson':
 					if (value instanceof TemplateData){
@@ -769,6 +802,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else {
 						value = value.toString();
 					}
+					break;
+
+				case '@MissingValue':
+					value['MissingValue'] = argValues[0];
 					break;
 					
 				default:
