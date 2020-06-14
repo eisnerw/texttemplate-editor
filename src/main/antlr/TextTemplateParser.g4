@@ -62,6 +62,6 @@ arguments: argument (COMMA argument)*;
 
 optionallyInvokedMethodable: (methodInvoked | methodable);
 
-argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templatetoken #tokenedArgument | bracketedtemplatespec #bracketedArgument | TEXT #textedArgument;
+argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templatetoken #tokenedArgument | bracketedtemplatespec #bracketedArgument | TEXT+ #textedArgument;
 
 namedSubtemplate: POUND IDENTIFIER;

@@ -36,7 +36,7 @@ mode PARENED;
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 PARENED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
 PARENED_BRACKET: '[' ->type(LBRACKET),pushMode(BRACKETED);	
-ARGUMENTTEXT: ~[(),{}&|!.'" \t\r\n\u005b]+ ->type(TEXT); // u005b left bracket
+ARGUMENTTEXT: ~[(),{}&|!.'"\t\r\n\u005b]+ ->type(TEXT); // u005b left bracket
 PARENED_METHODNAME: '.' [#a-zA-Z_][a-zA-Z0-9_]* '(' ->type(METHODNAME),pushMode(PARENED);
 RP: ')' -> popMode;
 QUOTE: '"' -> pushMode(QUOTED);
