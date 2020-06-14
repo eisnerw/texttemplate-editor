@@ -12,7 +12,7 @@ SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+;
 
 mode BRACED;
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->skip;
-IDENTIFIER: [$a-zA-Z_^][a-zA-Z0-9_]* ;
+IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';

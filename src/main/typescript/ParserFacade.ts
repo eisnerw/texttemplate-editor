@@ -202,6 +202,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!this.context || !(this.context instanceof TemplateData)){
 			return undefined; // attempt to look up a variable without a context returns undefined
 		}
+		if (key.startsWith('@')){
+			return this.annotations[key.substr(1)];
+		}
 		let value = this.context.getValue(key);
 		if (value === undefined && this.annotations.MissingValue !== undefined){
 			return this.annotations.MissingValue;
