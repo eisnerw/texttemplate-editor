@@ -20,8 +20,6 @@
 
 <h2>TextTemplate Editor</h2>
 <div id="container" style="width:800px;height:600px;border:1px solid grey; float:left"></div>
-<h2 id="collapser">-</h2>
-<div><pre id="parsed">this is where the parsed stuff should go</pre></div>
 <div><pre id="interpolated"></pre></div>
 <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
 <script src="js/main.js"></script>
@@ -72,88 +70,93 @@
 				{ token: 'unrecognized.texttemplate', foreground: errorFg }
 			]
 		});
+		let createEditor = function(input){
+			let editor = monaco.editor.create(document.getElementById('container'), {
+				value: input,
+				language: 'texttemplate',
+				theme: 'myCoolTheme',
+				scrollbar: {
+					// Subtle shadows to the left & top. Defaults to true.
+					useShadows: false,
 
-		let editor = monaco.editor.create(document.getElementById('container'), {
-			value: [
- 				'// data context:',
-				'{\'{"firstName": "John", "lastName": "Smith", "pets":[',
-				'{"type":"dog", "name": "Toto"}',
-				',{"type":"cat", "name": "Dolly"}',
-				',{"type":"zebra", "name": "Stripes"}',
-				']}\':',
- 				'// Template:',
-				'[{"Hello"} {lastName}, {firstName} with {pets.Exists()=>',
-				'   [{pets:#formatPet.Anded()}]',
-				'   ,[no pets]',
-				'}!!]}',
-				'',
-				' // external json data and an external subtemplate',
-				'// {\'https://api.github.com/users/eisnerw/repos\': #formatGitRepos}', 
- 				'',
- 				'Subtemplates:',
- 				'',
- 				'{#formatPet:[a {type} named {name}]}',
- 				'{#formatPets:[{pets:[a big {type} named {name}].Anded()}]}',
-				''
-			].join('\n'),
-			language: 'texttemplate',
-			theme: 'myCoolTheme',
-			scrollbar: {
-				// Subtle shadows to the left & top. Defaults to true.
-				useShadows: false,
+					// Render vertical arrows. Defaults to false.
+					verticalHasArrows: true,
+					// Render horizontal arrows. Defaults to false.
+					horizontalHasArrows: true,
 
-				// Render vertical arrows. Defaults to false.
-				verticalHasArrows: true,
-				// Render horizontal arrows. Defaults to false.
-				horizontalHasArrows: true,
+					// Render vertical scrollbar.
+					// Accepted values: 'auto', 'visible', 'hidden'.
+					// Defaults to 'auto'
+					vertical: 'visible',
+					// Render horizontal scrollbar.
+					// Accepted values: 'auto', 'visible', 'hidden'.
+					// Defaults to 'auto'
+					horizontal: 'visible',
 
-				// Render vertical scrollbar.
-				// Accepted values: 'auto', 'visible', 'hidden'.
-				// Defaults to 'auto'
-				vertical: 'visible',
-				// Render horizontal scrollbar.
-				// Accepted values: 'auto', 'visible', 'hidden'.
-				// Defaults to 'auto'
-				horizontal: 'visible',
-
-				verticalScrollbarSize: 17,
-				horizontalScrollbarSize: 17,
-				arrowSize: 30
-			}			
-		});
-		editor.onDidChangeModelContent(function (e) {
-			let code = editor.getValue()
-			let model = monaco.editor.getModels()[0];
-			if (!ParserFacade && !parserFacade){
-				return; // protect against an unknown error that can occur during editing if keystrokes are frequent
-			} else {
-				if (ParserFacade && !parserFacade){
-					parserFacade = ParserFacade;
+					verticalScrollbarSize: 17,
+					horizontalScrollbarSize: 17,
+					arrowSize: 30
+				}			
+			});
+			editorChanged = function (e) {
+				let code = editor.getValue()
+				let model = monaco.editor.getModels()[0];
+				if (!ParserFacade && !parserFacade){
+					return; // protect against an unknown error that can occur during editing if keystrokes are frequent
+				} else {
+					if (ParserFacade && !parserFacade){
+						parserFacade = ParserFacade;
+					}
 				}
+				setTimeout(function(){
+					parserFacade.inputChanged(code, model, monaco);
+				},0);
 			}
+			editor.onDidChangeModelContent(editorChanged);
+			monaco.languages.registerDefinitionProvider('texttemplate', {
+				provideDefinition: function(model,position, token){
+					console.log("got here");
+				}
+			});
 			setTimeout(function(){
-				parserFacade.inputChanged(code, model, monaco);
-			},0);
-		});
-		monaco.languages.registerDefinitionProvider('texttemplate', {
-			provideDefinition: function(model,position, token){
-				console.log("got here");
-			}
-		});
+				editorChanged();
+			},100);
+		}
+		let urlSplit = window.location.href.split('#');
+		if (urlSplit.length != 2){
+			createEditor([
+					'// data context:',
+					'{\'{"firstName": "John", "lastName": "Smith", "pets":[',
+					'{"type":"dog", "name": "Toto"}',
+					',{"type":"cat", "name": "Dolly"}',
+					',{"type":"zebra", "name": "Stripes"}',
+					']}\':',
+					'// Template:',
+					'[{"Hello"} {lastName}, {firstName} with {pets.Exists()=>',
+					'   [{pets:#formatPet.Anded()}]',
+					'   ,[no pets]',
+					'}!!]}',
+					'',
+					' // external json data and an external subtemplate',
+					'// {\'https://api.github.com/users/eisnerw/repos\': #formatGitRepos}', 
+					'',
+					'Subtemplates:',
+					'',
+					'{#formatPet:[a {type} named {name}]}',
+					'{#formatPets:[{pets:[a big {type} named {name}].Anded()}]}',
+					''
+				].join('\n'));
+		} else {
+			$.ajax({
+				url: '/template/' + urlSplit[1],
+				success: function (data) {
+					createEditor(data.replace(/\\\\n/g,"\0x01").replace(/\\n/g,"\n").replace(/\0x01/g,"\\n"));
+				}
+			});
+		}
 	});
 </script>
 <!--jQuery-->
 <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-<script>
-	$("#collapser").click(function() {
-		if (document.getElementById('collapser').innerText == '+'){
-			$("#parsed").show()
-			document.getElementById('collapser').innerText = '-';
-		} else {
-			$("#parsed").hide()
-			document.getElementById('collapser').innerText = '+';
-		}
-	});
-</script>
 </body>
 </html>

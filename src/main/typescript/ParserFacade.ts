@@ -202,8 +202,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!this.context || !(this.context instanceof TemplateData)){
 			return undefined; // attempt to look up a variable without a context returns undefined
 		}
-		if (key.startsWith('@')){
-			return this.annotations[key.substr(1)];
+		if (key.startsWith('@.')){
+			return this.annotations[key.substr(2)];
 		}
 		let value = this.context.getValue(key);
 		if (value === undefined && this.annotations.MissingValue !== undefined){
@@ -480,15 +480,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			this.subtemplates[subtemplateName] = urls[subtemplateUrl].data;
 		}
-		const lexer = createLexer('{:' + this.subtemplates[subtemplateName] + '}');
+		let parserInput = '{:' + this.subtemplates[subtemplateName] + '}';
+		const lexer = createLexer(parserInput);
 		const parser = createParserFromLexer(lexer);
 		const tree = parser.compilationUnit();
 		if (this.recursionLevel > 20){
 			return 'ERROR: too many levels of recursion when invoking ' + subtemplateName;
 		}
 		++this.recursionLevel;
+		let oldTokenString = this.annotations['Tokens'];
+		this.annotations['Tokens'] = tokensAsString(parser, parserInput);
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
+		this.annotations['Tokens'] = oldTokenString;
 		return result;
 	}
 	visitSubtemplateSpecs = function(ctx) {
@@ -961,6 +965,24 @@ export function inputChanged(input, model, monaco) : void {
 		}
 	}, 2000);
 }
+function tokensAsString(parser, input){
+	let parsed = '';
+	if (input){
+		try{
+			let treeTokens : CommonToken[] = parser._interp._input.tokens;
+			let symbolicNames : string[] = parser.symbolicNames;
+			
+			for (let e of treeTokens){
+				if (e.type != -1) {
+					parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
+				}
+			}
+		} catch(err) {
+			parsed = '*****ERROR*****';
+		}
+	}
+	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+}
 function validate(input, model, monaco, invocation) : void {
     let errors : Error[] = [];
     const lexer = createLexer(input);
@@ -992,32 +1014,20 @@ function validate(input, model, monaco, invocation) : void {
 		};
 		let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
 		let parsed : string = '';
-		if (input){
-			try{
-				let treeTokens : CommonToken[] = parser._interp._input.tokens;
-				let symbolicNames : string[] = parser.symbolicNames;
-				
-				for (let e of treeTokens){
-					if (e.type != -1) {
-						parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
-					}
-				}
-			} catch(err) {
-				parsed = '*****ERROR*****';
-			}
-		}
+		parsed = tokensAsString(parser, input);
 		setTimeout(()=>{
 			if (invocation != concurrency){
 				return;
 			}
 			var visitor = new TextTemplateVisitor();
+			visitor.annotations['Tokens'] = parsed;
 			visitor.errors = errors;
 			folds = []; // folds will be computed while visiting
 			var result = visitor.visitCompilationUnit(tree);
 			if (invocation != concurrency){
 				return;
 			}
-			document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+			//document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 			document.getElementById('interpolated').innerHTML = result;
 			Object.keys(urls).forEach((key : string) =>{
 				if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
