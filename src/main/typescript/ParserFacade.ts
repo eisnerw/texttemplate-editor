@@ -191,6 +191,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
 	subtemplates : any = {};
 	errors = [];
+	model;
 	recursionLevel = 0;
 	indent : Indent = null;
 	annotations = {};
@@ -948,22 +949,23 @@ class TextTemplateErrorStrategy extends DefaultErrorStrategy {
     };
 
 }
-export function provideFoldingRanges(model, context, token) {
+let model;
+export function provideFoldingRanges(monacoModel, context, token) {
+	model = monacoModel; // note: this is a convenient way to capture the model
 	return folds;
 }
 
 export let folds = [];
 let urls = {};
-let model;
-let concurrency = 0;
+let invocations = 0;
 
-export function inputChanged(input, model, monaco) : void {
-	let invocation = ++concurrency;
+export function inputChanged(input) : void {
+	let invocation = ++invocations;
 	setTimeout(()=>{
-		if (invocation == concurrency){
-			validate(input, model, monaco, invocation);
+		if (invocation == invocations){
+			validate(input, invocation);
 		}
-	}, 2000);
+	}, invocation == 1 ? 0 : 2000); // first time is immediate.  Otherwise, wait 2 seconds after last keystroke to allow typing in the editor to continue
 }
 function tokensAsString(parser, input){
 	let parsed = '';
@@ -983,7 +985,7 @@ function tokensAsString(parser, input){
 	}
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
-function validate(input, model, monaco, invocation) : void {
+function validate(input, invocation) : void {
     let errors : Error[] = [];
     const lexer = createLexer(input);
     lexer.removeErrorListeners();
@@ -991,7 +993,7 @@ function validate(input, model, monaco, invocation) : void {
 
     const parser = createParserFromLexer(lexer);
 	setTimeout(()=>{
-		if (invocation != concurrency){
+		if (invocation != invocations){
 			return;
 		}
 		parser.removeErrorListeners();
@@ -1016,18 +1018,18 @@ function validate(input, model, monaco, invocation) : void {
 		let parsed : string = '';
 		parsed = tokensAsString(parser, input);
 		setTimeout(()=>{
-			if (invocation != concurrency){
+			if (invocation != invocations){
 				return;
 			}
 			var visitor = new TextTemplateVisitor();
 			visitor.annotations['Tokens'] = parsed;
 			visitor.errors = errors;
+			visitor.model = model;
 			folds = []; // folds will be computed while visiting
 			var result = visitor.visitCompilationUnit(tree);
-			if (invocation != concurrency){
+			if (invocation != invocations){
 				return;
 			}
-			//document.getElementById('parsed').innerHTML = parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 			document.getElementById('interpolated').innerHTML = result;
 			Object.keys(urls).forEach((key : string) =>{
 				if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
@@ -1045,8 +1047,12 @@ function validate(input, model, monaco, invocation) : void {
 										data = JSON.stringify(data);
 									}
 									urls[key].data = data;
-									//model.undo(); // strange way of getting the model to revalidate
-									//model.redo();
+									let invocation = ++invocations;
+									setTimeout(()=>{
+										if (invocation == invocations){
+											validate(visitor.model.getValue(), invocation);
+										}
+									}, 0);
 								}
 							}
 						});

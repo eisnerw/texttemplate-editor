@@ -1,3 +1,21 @@
 {
-	"simple": "// data context:\\n{'{\"firstName\": \"Robert\", \"lastName\": \"Smith\", \"pets\":[\\n{\"type\":\"dog\", \"name\": \"Toto\"}\\n,{\"type\":\"cat\", \"name\": \"Dolly\"}\\n,{\"type\":\"zebra\", \"name\": \"Stripes\"}\\n]}':\\n// Template:\\n[{\"Hello\"} {lastName}, {firstName} with {pets.Exists()=>\\n   [{pets:#formatPet.Anded()}]\\n   ,[no pets]\\n}!!]}\\n // external json data and an external subtemplate\\n// {'https://api.github.com/users/eisnerw/repos': #formatGitRepos}\\n\\nSubtemplates:\\n\\n{#formatPet:[a {type} named {name}]}\\n{#formatPets:[{pets:[a big {type} named {name}].Anded()}]}\\n"
+	"simple": ["// data context:\\n",
+		"{'{\"firstName\": \"Robert\", \"lastName\": \"Smith\", \"pets\":[\\n",
+		"{\"type\":\"dog\", \"name\": \"Toto\"}\\n",
+		",{\"type\":\"cat\", \"name\": \"Dolly\"}\\n",
+		",{\"type\":\"zebra\", \"name\": \"Stripes\"}\\n",
+		"]}':\\n",
+		"// Template:\\n",
+		"[{\"Hello\"} {lastName}, {firstName} with {pets.Exists()=>\\n",
+		"   [{pets:#formatPet.Anded()}]\\n",
+		"   ,[no pets]\\n",
+		"}!!]}\\n",
+		" // external json data and an external subtemplate\\n",
+		"// {'https://api.github.com/users/eisnerw/repos': #formatGitRepos}\\n",
+		"\\n",
+		"Subtemplates:\\n",
+		"\\n",
+		"{#formatPet:[a {type} named {name}]}\\n",
+		"{#formatPets:[{pets:[a big {type} named {name}].Anded()}]}\\n"
+	]
 }
