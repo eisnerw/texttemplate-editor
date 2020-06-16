@@ -78,7 +78,7 @@ class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
 	type: string;
-	constructor(jsonData: string | {} | []) {
+	constructor(jsonData: string | {} | [], parent?: TemplateData) {
 		let json: {};
 		if (typeof jsonData == 'string') {
 			json = JSON.parse(jsonData);
@@ -86,14 +86,14 @@ class TemplateData {
 			this.type = 'list';
 			let array: [] = jsonData;
 			array.forEach((item) => {
-				this.list.push(new TemplateData(item));
+				this.list.push(new TemplateData(item, parent));
 			});
 			return;
 		} else if (jsonData instanceof TemplateData){ // filter or clone
 			if ((<TemplateData>jsonData).type == 'list'){
 				this.type = 'list';
 				(<TemplateData>jsonData).list.forEach((item)=>{
-					this.list.push(new TemplateData(item));
+					this.list.push(new TemplateData(item, parent));
 				});
 				return;
 			} else {
@@ -111,13 +111,15 @@ class TemplateData {
 			let value: any = json[keyname];
 			if (typeof value == 'object') {
 				if (value != null && (!Array.isArray(value) || value.length > 0)){ // don't add null values or empty arrays
-					this.dictionary[keyname] = new TemplateData(value);
-					this.dictionary[keyname].dictionary['^'] = this; // allows ^.^.variable name TODO: should only do this for a dictionary
+					this.dictionary[keyname] = new TemplateData(value, this);
 				}
 			} else {
 				this.dictionary[keyname] = value;
             }
 		});
+		if (parent){
+			this.dictionary['^'] = parent;
+		}
 	}
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
@@ -192,6 +194,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	subtemplates : any = {};
 	errors = [];
 	model;
+	input;
 	recursionLevel = 0;
 	indent : Indent = null;
 	annotations = {};
@@ -269,9 +272,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (urls[context].data.startsWith('[')){
 								// text templates requires that the top level be a dictionary
 								// create a container for the array under 'data'
-								this.context = new TemplateData('{"data":' + urls[context].data + '}');
+								this.context = new TemplateData('{"data":' + urls[context].data + '}', this.context);
 							} else {
-								this.context = new TemplateData(urls[context].data);
+								this.context = new TemplateData(urls[context].data, this.context);
 							}
 						} else {
 							bHasContext = false;
@@ -280,7 +283,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}
 					} else {
-						this.context = new TemplateData(context);
+						this.context = new TemplateData(context, this.context);
 					}
 				} catch(e){
 					this.context = oldContext;
@@ -450,7 +453,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.children[2].accept(this);
 	};	
 	visitBracketedtemplatespec = function(ctx) {
+		let oldTokens = this.annotations['Tokens'];
+		this.annotations['Tokens'] = tokensAsString(this.input, ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop), ctx.parser.symbolicNames);
 		let result : any = this.visitChildren(ctx);
+		this.annotations['Tokens'] = oldTokens;
 		result = result.slice(1, result.length - 1);  // ignore the results from brackets
 		if (result.length == 1){
 			return result[0];
@@ -490,10 +496,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		++this.recursionLevel;
 		let oldTokenString = this.annotations['Tokens'];
-		this.annotations['Tokens'] = tokensAsString(parser, parserInput);
+		let oldInput = this.input;
+		this.input = parserInput;
+		this.annotations['Tokens'] = tokensAsString(parserInput, parser._interp._input.tokens, parser.symbolicNames);
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
 		this.annotations['Tokens'] = oldTokenString;
+		this.input = oldInput;
 		return result;
 	}
 	visitSubtemplateSpecs = function(ctx) {
@@ -608,7 +617,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (bTemplate || method.startsWith('#')){
 			let oldContext : TemplateData = this.context;
 			// TODO: consider a clean context as a child of the context
-			this.context = new TemplateData({});
+			this.context = new TemplateData({}, this.context);
 			this.context.add('$0', value);
 			for (let i = 0; i < argValues.length; i++){
 				this.context.add('$' + (i + 1), argValues[i]);
@@ -765,7 +774,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									value = result[0]; // single value is a dictionary
 									break;
 								default:
-									value = new TemplateData(result); // multivalues is a list
+									value = new TemplateData(result, this.context); // multivalues is a list
 									break;
 							}
 						}
@@ -967,13 +976,10 @@ export function inputChanged(input) : void {
 		}
 	}, invocation == 1 ? 0 : 2000); // first time is immediate.  Otherwise, wait 2 seconds after last keystroke to allow typing in the editor to continue
 }
-function tokensAsString(parser, input){
+function tokensAsString(input, treeTokens : CommonToken[], symbolicNames : string[]){
 	let parsed = '';
 	if (input){
 		try{
-			let treeTokens : CommonToken[] = parser._interp._input.tokens;
-			let symbolicNames : string[] = parser.symbolicNames;
-			
 			for (let e of treeTokens){
 				if (e.type != -1) {
 					parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
@@ -1015,8 +1021,9 @@ function validate(input, invocation) : void {
 		  };
 		};
 		let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
-		let parsed : string = '';
-		parsed = tokensAsString(parser, input);
+		
+		let parsed = '';
+		parsed = tokensAsString(input, parser._interp._input.tokens, parser.symbolicNames);
 		setTimeout(()=>{
 			if (invocation != invocations){
 				return;
@@ -1025,6 +1032,7 @@ function validate(input, invocation) : void {
 			visitor.annotations['Tokens'] = parsed;
 			visitor.errors = errors;
 			visitor.model = model;
+			visitor.input = input;
 			folds = []; // folds will be computed while visiting
 			var result = visitor.visitCompilationUnit(tree);
 			if (invocation != invocations){
