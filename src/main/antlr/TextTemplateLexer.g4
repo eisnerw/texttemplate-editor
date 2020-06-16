@@ -63,6 +63,7 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
+BRACKETED_LEADING_COMMENT: '\n' [ \t]+ '//' ~[\n]* ->type(COMMENT);
 BRACKETED_COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF) [ \t\r]* ->type(COMMENT);
 RBRACKETLP: '](' ->mode(PARENED);
 RBRACKET: ']' -> popMode;
