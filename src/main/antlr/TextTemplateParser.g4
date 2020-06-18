@@ -18,13 +18,13 @@ templatecontents: comment? (subtemplateSection | indent | templatetoken | templa
 
 indent: bulletHolder indented;
 
-bulletHolder: (NL SPACES? LBRACE DOT RBRACE SPACES? | NL SPACES);
+bulletHolder: NL SPACES? LBRACE DOT RBRACE SPACES? ;
 
 indented: (comment? (templatetoken | templatecontexttoken | text+))+;
 
 beginningIndent: beginningBulletHolder indented;
 
-beginningBulletHolder: (SPACES? LBRACE DOT RBRACE SPACES? | SPACES);
+beginningBulletHolder: SPACES? LBRACE DOT RBRACE SPACES?;
 
 comment: COMMENT+;
 

@@ -470,6 +470,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			this.context.iterateList(()=>{
 				value.push(this.visitChildren(ctx)[0]);
 			});
+			value = '\n' + value.join('\n');  // TODO: handle indented bullets
 		} else {
 			value = this.visitChildren(ctx)[0];
 		}
