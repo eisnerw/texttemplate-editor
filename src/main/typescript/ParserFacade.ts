@@ -13,7 +13,6 @@ class ConsoleErrorListener extends error.ErrorListener {
 }
 class Indent {
 	public parentIndent : Indent;
-	public bNewline : boolean; // indent followed new line
 	public indentText : string;
 	public length : number;
 	public beforeBullet : string;
@@ -24,21 +23,20 @@ class Indent {
 	public bullet;
 	public error : string; 
 	constructor(indentText : string, current : Indent){
-		this.bNewline = indentText.startsWith('\n');
 		this.indentText = indentText.replace('\n', '');
-		this.length = this.indentText.length;
+		let length = this.indentText.length
+		this.length = length;
 		let splitIndent = this.indentText.split('{.}');
 		this.beforeBullet = splitIndent[0];
 		this.afterBullet = splitIndent.length == 2 ? splitIndent[1] : '';
-		this.bullet = 'o ';
 		if (current){
-			if (this.indentText.length == current.indentText.length){ // TODO: handle case where the length is the same, but not the text
+			if (length == current.indentText.length){ // TODO: handle case where the length is the same, but not the text
 				// another line at the same level
 				this.index = current.index + 1;
 				this.parentIndent = current.parentIndent; // replacing current
 				this.level = current.level;
 				// TODO: compute the bullet
-			} else if (this.indentText.length > current.indentText.length){
+			} else if (length > current.indentText.length){
 				// indenting from the current line
 				this.index = 0;
 				this.parentIndent = current;
@@ -47,7 +45,7 @@ class Indent {
 				let parentIndent = current.parentIndent;
 				while (parentIndent !== null){
 					// find the matching level
-					if (parentIndent.indentText.length != this.indentText.length){
+					if (parentIndent.indentText.length != length){
 						parentIndent = parentIndent.parentIndent;
 					} else {
 						break; // found it
@@ -70,13 +68,18 @@ class Indent {
 			this.level = 0;
 			this.parentIndent = null;
 		}
-		this.bullet = '(' + this.level + '-' + this.index + ')';
+		if (splitIndent.length == 1){
+			this.bullet = this.beforeBullet;
+		} else {
+			this.bullet = '(' + this.level + '-' + this.index + ')'; // TODO: compute bullet
+		}
 	}
 }
 
 class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
+	private parent : TemplateData;
 	type: string;
 	constructor(jsonData: string | {} | [], parent?: TemplateData) {
 		let json: {};
@@ -86,8 +89,9 @@ class TemplateData {
 			this.type = 'list';
 			let array: [] = jsonData;
 			array.forEach((item) => {
-				this.list.push(new TemplateData(item, parent));
+				this.list.push(new TemplateData(item, this));
 			});
+			this.parent = parent;
 			return;
 		} else if (jsonData instanceof TemplateData){ // filter or clone
 			if ((<TemplateData>jsonData).type == 'list'){
@@ -118,14 +122,17 @@ class TemplateData {
             }
 		});
 		if (parent){
-			this.dictionary['^'] = parent;
+			this.parent = parent;
 		}
 	}
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
 		let value = this.dictionary[keySplit[0]];
 		if (value == undefined && keySplit[0] == '^'){
-			return this; // allows ^.^... to get to the top
+			value = this.parent; 
+			if (value == undefined){
+				value = this; // allows ^.^... to get to the top
+			}
 		}
 		if (keySplit.length == 1 || value === undefined){
 			return value;
@@ -134,14 +141,10 @@ class TemplateData {
 			return <TemplateData>value.getValue(keySplit.slice(1).join('.'));
 		}
 	}
-	iterateList(fn: () => any) {
-		this.type = 'dictionary'; // temporarily change to each iterated dictionary
+	iterateList(fn: (TemplateData) => any) {
 		this.list.forEach((item : TemplateData)=>{
-			this.dictionary = item.dictionary;
-			fn();
+			fn(item);
 		});
-		this.type = 'list';
-		this.dictionary = {};
 	}
 	count(){
 		return this.list.length;
@@ -159,19 +162,17 @@ class TemplateData {
 		} else {
 			result += '{\n';
 			Object.keys(this.dictionary).forEach((keyname) => {
-				if (keyname != '^'){
-					let value : any = this.dictionary[keyname];
-					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
-					if (value instanceof TemplateData){
-						result += (<TemplateData>value).toJson(indentLevel + 1);
-					} else if (typeof value == 'string') {
-						result += ('"' + value.replace(/\n/g,'\\n') + '"');
-					} else {
-						result += value.toString();
-					}
-					result += '\n';
-					bComma = true;
+				let value : any = this.dictionary[keyname];
+				result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
+				if (value instanceof TemplateData){
+					result += (<TemplateData>value).toJson(indentLevel + 1);
+				} else if (typeof value == 'string') {
+					result += ('"' + value.replace(/\n/g,'\\n') + '"');
+				} else {
+					result += value.toString();
 				}
+				result += '\n';
+				bComma = true;
 			});
 			result += (this.indent(indentLevel) + '}');
 		}
@@ -348,8 +349,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (this.context && this.context.type == 'list'){
 			// create an arry of results and then run the method on the array
 			value = [];
-			this.context.iterateList(()=>{
+			this.context.iterateList((newContext : TemplateData)=>{
+				let oldContext = this.context;
+				this.context = newContext;
 				value.push(ctx.children[0].accept(this));
+				this.context = oldContext;
 			});
 		} else {
 			value = ctx.children[0].accept(this);
@@ -467,10 +471,41 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let value : any;
 		if (this.context && this.context.type == 'list'){
 			value = [];
-			this.context.iterateList(()=>{
-				value.push(this.visitChildren(ctx)[0]);
+			let template : string = this.getTemplateWithoutComments(ctx);
+
+			// The strategy is to extract the beginning sequence of any whitespace, first new line, or bullet indicator from the template.
+			// From that, we can determine if indents are to be handled by the bullet mechanism, calculate the any indent and see if the template has beginning or ending new lines.
+			// If the beginning sequence doesn't contain a bullet indicator "{.}", we'll handle it here by emitting the beginning sequence without the indent once, processing
+			// each line by removing the beginning and ending sequences and adding the indent.  We emit the ending sequence once at the end of hte result.
+			
+			let beginningSequence = template.replace(/^([ \t]*\n?[ \t]*(\{\.\})?)?.*/s,'$1');
+			let endingSequence = template.replace(/.*?((\n)[ \t]*)?$/s, "$1");
+			let bHasBullet = beginningSequence.includes('{.}');
+			let indentText = beginningSequence.replace(/.*?(\n([ \t]+))?$/s, '$2');
+			if (!bHasBullet){
+				// indent from the previous indent.  Default to 4 spaces if no indent (TODO: allow an annotation to change this)
+				this.indent = new Indent(this.indent ? this.indent.bullet : '' + (indentText.length > 0 ? indentText : '    ' ), this.indent); 
+			}
+			let count = this.context.count();
+			this.context.iterateList((newContext : TemplateData)=>{
+				count--;
+				let oldContext : TemplateData = this.context;
+				this.context = newContext;
+				let result = this.visitChildren(ctx)[0];
+				if (bHasBullet){
+					value.push(result);
+				} else {
+					//add the insert, remove beginning and ending sequece, and add a new line if necessary, but not on the last line
+					value.push(this.indent.bullet + result.substr(beginningSequence.length, result.length - beginningSequence.length - endingSequence.length) + (count == 0 || endingSequence.includes('\n') ? '' : '\n'));
+				}
+				this.context = oldContext;
 			});
-			value = '\n' + value.join('\n');  // TODO: handle indented bullets
+			value = value.join('');
+			if (!bHasBullet){
+				this.indent = this.indent.parentIndent;  // done indenting
+				// emit the value between the original beginning and ending sequences
+				value = beginningSequence.substr(0, beginningSequence.length - indentText.length) + value + endingSequence;
+			}
 		} else {
 			value = this.visitChildren(ctx)[0];
 		}
@@ -757,11 +792,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							this.context = <TemplateData>value;
 							let result = [];
 							if (this.context.type = 'list'){
-								this.context.iterateList(()=>{
+								this.context.iterateList((newContext)=>{
+									let oldContext : TemplateData = this.context;
+									this.context = newContext;
 									if (args.accept(this)){
 										// the condition returned true; add a clone of the iteration 
 										result.push(new TemplateData(this.context)); 
 									}
+									this.context = oldContext;
 								});
 							} else if (args.accept(this)){
 								result.push(this.context); // no filtering (or cloning) necessary 
@@ -835,6 +873,64 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		return value;
+	}
+	getTemplateWithoutComments = function(ctx){
+		let templateParts = [];
+		ctx.children.forEach(child=>{
+			let childName = child.constructor.name;
+			switch (childName) {
+				case "TextContext":
+					templateParts.push(ctx.getText());
+					break;
+				case "MethodableIdentiferContext":
+					break;
+				case "TemplatecontentsContext":
+					templateParts.push(child.getText());
+					break;
+				case "TemplatecontexttokenContext":
+					break;
+				case "CompilationUnitContext":
+					break;
+				case "MethodContext":
+					break;
+				case "MethodInvokedContext":
+					break;
+				case "QuoteLiteralContext":
+					break;
+				case "ApostropheLiteralContext":
+					break;
+				case "MethodInvocationContext":
+					break;
+				case "CommentContext":
+					break;
+				case "BracedthinarrowContext":
+					break;
+				case "BracedarrowContext":
+					break;
+				case "LogicalOperatorContext":
+					break;
+				case "MethodableTemplatespecContext":
+					break;
+				case "NamedSubtemplateContext":
+					break;
+				case "SubtemplateSpecsContext":
+					break;
+				case "BracedMethodableContext":
+					break;
+				case "BracketedArgumentContext":
+					break;
+				case "IndentContext":
+					break;
+				case "BeginningIndent":
+					break;
+				default:
+					if (child.getChildCount() > 0){
+						templateParts.push(this.getTemplateWithoutComments(child));
+					}
+					break;
+			}
+		});
+		return templateParts.join('');
 	}
 }
 
