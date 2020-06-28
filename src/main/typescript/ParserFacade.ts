@@ -20,7 +20,7 @@ class Indent {
 	public bulletWidth : number;
 	public level : number;
 	public index : number;
-	public bullet;
+	public computedIndent;
 	public error : string; 
 	constructor(indentText : string, current : Indent){
 		this.indentText = indentText.replace('\n', '');
@@ -29,13 +29,14 @@ class Indent {
 		let splitIndent = this.indentText.split('{.}');
 		this.beforeBullet = splitIndent[0];
 		this.afterBullet = splitIndent.length == 2 ? splitIndent[1] : '';
-		if (current){
+		let bBulleting = indentText.includes('{.}') || (!!current && current.indentText.includes('{.}'));
+		if (current && bBulleting){
 			if (length == current.indentText.length){ // TODO: handle case where the length is the same, but not the text
 				// another line at the same level
 				this.index = current.index + 1;
 				this.parentIndent = current.parentIndent; // replacing current
 				this.level = current.level;
-				// TODO: compute the bullet
+				// TODO: compute the bullet text
 			} else if (length > current.indentText.length){
 				// indenting from the current line
 				this.index = 0;
@@ -63,15 +64,17 @@ class Indent {
 					this.level = parentIndent.level;
 				}
 			}	
-		} else {
+		} else if (bBulleting){
 			this.index = 0;
 			this.level = 0;
 			this.parentIndent = null;
+		} else {
+			this.parentIndent = current;
 		}
 		if (splitIndent.length == 1){
-			this.bullet = this.beforeBullet;
+			this.computedIndent = this.beforeBullet;
 		} else {
-			this.bullet = '(' + this.level + '-' + this.index + ')'; // TODO: compute bullet
+			this.computedIndent = '(' + this.level + '-' + this.index + ')'; // TODO: compute bullet text
 		}
 	}
 }
@@ -199,6 +202,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	recursionLevel = 0;
 	indent : Indent = null;
 	annotations = {};
+	lastLine : string = '';
 	visitText = function(ctx){
 		return ctx.getText();
 	};
@@ -459,9 +463,23 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBracketedtemplatespec = function(ctx) {
 		let oldTokens = this.annotations['Tokens'];
 		this.annotations['Tokens'] = tokensAsString(this.input, ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop), ctx.parser.symbolicNames);
-		let result : any = this.visitChildren(ctx);
+		let result = [];
+		// skip the first and last children because the are the surrounding brackets
+		for (let i : number = 1; i < ctx.children.length - 1; i++){
+			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
+				let childResult = ctx.children[i].accept(this);
+				if (typeof childResult == "string"){
+					if (childResult.includes('\n')){
+						this.lastLine = childResult.replace(/.*(\n.*)$/s, '$1'); 
+					} else {
+						this.lastLine += childResult;
+					}
+				}
+				result.push(childResult);
+			}
+		}
+		//let result : any = this.visitChildren(ctx);
 		this.annotations['Tokens'] = oldTokens;
-		result = result.slice(1, result.length - 1);  // ignore the results from brackets
 		if (result.length == 1){
 			return result[0];
 		}
@@ -471,40 +489,67 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let value : any;
 		if (this.context && this.context.type == 'list'){
 			value = [];
+			console.log('TEMPLATE:'+ctx.getText());
 			let template : string = this.getTemplateWithoutComments(ctx);
-
-			// The strategy is to extract the beginning sequence of any whitespace, first new line, or bullet indicator from the template.
-			// From that, we can determine if indents are to be handled by the bullet mechanism, calculate the any indent and see if the template has beginning or ending new lines.
-			// If the beginning sequence doesn't contain a bullet indicator "{.}", we'll handle it here by emitting the beginning sequence without the indent once, processing
-			// each line by removing the beginning and ending sequences and adding the indent.  We emit the ending sequence once at the end of hte result.
+			template = template.substr(1, template.length - 2);
+			console.log('NOCOMMENTS:'+template);
+			// The strategy starts by extracting from the template a "beginning sequence" of whitespace, if any, followed by the first new line character followed by whitespace with or without a bullet indicator.
+			// From that, we can determine if indents are to be handled by the bullet mechanism, calculate any indent and see if the template has beginning or ending new lines.
+			// If this instance is part of a new line, we will have to determine the current indent and indent 4 spaces (nominally) from that.
+			// If on a new line, we calculate the indent from the white space that follows the new line
+			// If the beginning sequence contains a bullet indicator "{.}", we'll handle it using the bullet mechanism.
+			// Otherwise, we'll emitting the beginning sequence without the indent once, processing
+			// each line by removing the beginning and ending sequences and adding the indent.  
+			// We emit the ending sequence once at the end of the result.
 			
 			let beginningSequence = template.replace(/^([ \t]*\n?[ \t]*(\{\.\})?)?.*/s,'$1');
 			let endingSequence = template.replace(/.*?((\n)[ \t]*)?$/s, "$1");
-			let bHasBullet = beginningSequence.includes('{.}');
-			let indentText = beginningSequence.replace(/.*?(\n([ \t]+))?$/s, '$2');
+			let bHasBullet = beginningSequence.includes('{.}') || !!(this.indent && this.indent.indentText.includes('{.}')); // comment
+			let bOnNewLine = /\n[ \t]*$/.test(this.lastLine + beginningSequence);
+			let lastIndent = bOnNewLine ? this.lastLine.replace(/.*?(\n([ \t]+))?$/s, '$2') : this.lastLine.replace(/^\n?([ \T]*).*$/s, '$1');
+			let indentText = bOnNewLine ? (this.lastLine + beginningSequence).replace(/.*?(\n([ \t]+))?$/s, '$2') : lastIndent;
 			if (!bHasBullet){
 				// indent from the previous indent.  Default to 4 spaces if no indent (TODO: allow an annotation to change this)
-				this.indent = new Indent(this.indent ? this.indent.bullet : '' + (indentText.length > 0 ? indentText : '    ' ), this.indent); 
+				//this.indent = new Indent((!!this.indent && !bOnNewLine ? this.indent.computedIndent : (bOnNewLine ? '' : lastIndent)) + ((indentText.length > 0 || bOnNewLine ? indentText : '    ')), this.indent); 
+				let newIndent = indentText;
+				if (!bOnNewLine){
+					newIndent += '    '; // default of 4 spaces
+				}
+				this.indent = new Indent(newIndent, this.indent);
 			}
-			let count = this.context.count();
+			let count = this.context.count(); // used to determine when we are at the end of the list
+			let oldLastLine = this.lastLine;
 			this.context.iterateList((newContext : TemplateData)=>{
 				count--;
 				let oldContext : TemplateData = this.context;
 				this.context = newContext;
+				if (!bHasBullet && !bOnNewLine){
+					this.lastLine = '\n' + this.indent.computedIndent; // children need to see what the indent will be
+				}
 				let result = this.visitChildren(ctx)[0];
+				this.lastLine = oldLastLine; // restore the last because it may have been changed
 				if (bHasBullet){
 					value.push(result);
 				} else {
-					//add the insert, remove beginning and ending sequece, and add a new line if necessary, but not on the last line
-					value.push(this.indent.bullet + result.substr(beginningSequence.length, result.length - beginningSequence.length - endingSequence.length) + (count == 0 || endingSequence.includes('\n') ? '' : '\n'));
+					//add the indent, remove beginning and ending sequence, and add a new line if necessary, but not on the last line
+					value.push(this.indent.computedIndent + result.substr(beginningSequence.length, result.length - beginningSequence.length - endingSequence.length) + (count == 0 ? '' : '\n'));
 				}
 				this.context = oldContext;
 			});
 			value = value.join('');
 			if (!bHasBullet){
+				if (bOnNewLine){
+					if (beginningSequence.endsWith(indentText)){
+						beginningSequence = beginningSequence.substr(0, beginningSequence.length - indentText.length); // remove the indent because it was handled in the iteration
+					} else {
+						value = value.substr(indentText.length); // remove the first indent because it is already part of the last line
+					}
+				} else {
+					beginningSequence += '\n'; // start indented on a new line
+				}
 				this.indent = this.indent.parentIndent;  // done indenting
-				// emit the value between the original beginning and ending sequences
-				value = beginningSequence.substr(0, beginningSequence.length - indentText.length) + value + endingSequence;
+				// emit the iterated result value between the beginning and ending sequences surround by those sequences
+				value = beginningSequence + value + endingSequence;
 			}
 		} else {
 			value = this.visitChildren(ctx)[0];
@@ -607,7 +652,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let indent : Indent = new Indent(bulletText, this.indent);
 		this.indent = indent;
 		let bulletNewLine = ctx.children[0].getText().startsWith('\n') ? '\n' : ''
-		let bullet : string = bulletNewLine + indent.beforeBullet + indent.bullet + indent.afterBullet;
+		let bullet : string = bulletNewLine + indent.beforeBullet + indent.computedIndent + indent.afterBullet;
 		let result = ctx.children[1].accept(this);
 		this.indent = indent; // restore the current level of indent which may have been changed by the children
 		let multilineResult = '';
@@ -618,7 +663,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let multilines = result[i];
 				for (let j = 0; j < multilines.length; j++){
 					result[i] = multilines[j];
-					multilineResult += ((bulletNewLine + indent.beforeBullet + this.indent.bullet + indent.afterBullet) + result.join(''));
+					multilineResult += ((bulletNewLine + indent.beforeBullet + this.indent.computedIndent + indent.afterBullet) + result.join(''));
 					bulletNewLine = '\n'; // the lack of a new line is a special case for a bullet or indent that occurs at the very beginning of input
 					if (j < (multilines.length - 1)){
 						this.indent = new Indent(bulletText, this.indent); // increase the index
@@ -876,60 +921,51 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	getTemplateWithoutComments = function(ctx){
 		let templateParts = [];
-		ctx.children.forEach(child=>{
-			let childName = child.constructor.name;
-			switch (childName) {
-				case "TextContext":
-					templateParts.push(ctx.getText());
-					break;
-				case "MethodableIdentiferContext":
-					break;
-				case "TemplatecontentsContext":
-					templateParts.push(child.getText());
-					break;
-				case "TemplatecontexttokenContext":
-					break;
-				case "CompilationUnitContext":
-					break;
-				case "MethodContext":
-					break;
-				case "MethodInvokedContext":
-					break;
-				case "QuoteLiteralContext":
-					break;
-				case "ApostropheLiteralContext":
-					break;
-				case "MethodInvocationContext":
-					break;
-				case "CommentContext":
-					break;
-				case "BracedthinarrowContext":
-					break;
-				case "BracedarrowContext":
-					break;
-				case "LogicalOperatorContext":
-					break;
-				case "MethodableTemplatespecContext":
-					break;
-				case "NamedSubtemplateContext":
-					break;
-				case "SubtemplateSpecsContext":
-					break;
-				case "BracedMethodableContext":
-					break;
-				case "BracketedArgumentContext":
-					break;
-				case "IndentContext":
-					break;
-				case "BeginningIndent":
-					break;
-				default:
+		let ctxName = ctx.constructor.name;
+		switch (ctxName) {
+			case "NamedSubtemplateContext":
+			case "MethodInvokedContext":
+			case "MethodableIdentiferContext":
+			case "BulletHolderContext":
+			case "TextContext":
+				templateParts.push(ctx.getText());
+				break;
+			case "TemplatetokenContext":
+				templateParts.push('{');
+				for (let i : number = 1; i < ctx.children.length - 1; i++){
+					templateParts.push(this.getTemplateWithoutComments(ctx.children[i]))
+				}
+				templateParts.push('}');
+				break;
+			//case "OptionallyInvokedMethodableContext":
+			//	templateParts.push('{' + ctx.getText() + '}');
+			//	break;
+			case "BracketedtemplatespecContext":
+				templateParts.push('[');
+				for (let i : number = 1; i < ctx.children.length - 1; i++){
+					if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
+						templateParts.push(this.getTemplateWithoutComments(ctx.children[i]))
+					}
+				}
+				templateParts.push(']');
+				break;
+			case "BracedarrowtemplatespecContext":
+			case "BracedarrowContext":
+				templateParts.push(this.getTemplateWithoutComments(ctx.children[0]));
+				templateParts.push(ctx.children[1].getText());
+				if (ctx.children.length > 2){
+					templateParts.push(this.getTemplateWithoutComments(ctx.children[2]));
+				}
+				break;
+				
+			default:
+				ctx.children.forEach(child=>{
 					if (child.getChildCount() > 0){
 						templateParts.push(this.getTemplateWithoutComments(child));
 					}
-					break;
-			}
-		});
+				});
+				break;
+		}
 		return templateParts.join('');
 	}
 }
