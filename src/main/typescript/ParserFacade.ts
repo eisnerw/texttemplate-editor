@@ -204,7 +204,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	annotations = {};
 	lastLine : string = '';
 	visitText = function(ctx){
-		return ctx.getText();
+		let result = ctx.getText();
+		if (result.includes('\n')){
+			this.lastLine = result.replace(/.*(\n.*)$/s, '$1'); 
+		} else {
+			this.lastLine += result;
+		}
+		return result;
 	};
 	visitMethodableIdentifer = function(ctx) {
 		var key = ctx.getText();
@@ -224,8 +230,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// there are three children, the left brace, the token, and the right brace
 		let result : any = ctx.children[1].accept(this);
 		if (Array.isArray(result)){
-			return result[0];
+			result = result[0];
 		}
+		this.lastLine += ctx.getText(); // use token to treat all values as non-blank text
 		return result;
 	};
 	visitTemplatecontents = function(ctx) {
@@ -315,6 +322,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result;
 	};
 	visitCompilationUnit = function(ctx) {
+		//console.log(this.getParseTree(ctx)); // for debugging
 		if (!ctx.children){
 			return ''; // no data
 		}
@@ -335,6 +343,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitMethodInvoked = function(ctx) {
 		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#');
+		let oldLastLine = this.lastLine; // preserve last line so it isn't affected during method calculation
 		let oldAnnotations = {};
 		// clone by shallow copy
 		for (let key in this.annotations){
@@ -379,6 +388,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		});
 		this.annotations = oldAnnotations; // restore the annotations
+		this.lastLine = oldLastLine; // restore last line
 		return value;
 	};
 	visitQuoteLiteral = function(ctx) {
@@ -423,7 +433,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBracedthinarrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
+		let oldLastLine = this.lastLine; // preserve last line so it is not effected by conditions
 		let result : any = ctx.children[0].accept(this);
+		this.lastLine = oldLastLine; // restore original last line;
 		this.annotations.MissingValue = oldMissingValue;
 		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
 			return this.visitChildren(ctx.children[2].children[0]); // true
@@ -436,7 +448,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBracedarrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
+		let oldLastLine = this.lastLine; // preserve last line so it is not effected by conditions
 		let result : boolean = ctx.children[0].accept(this);
+		this.lastLine = oldLastLine; // restore original last line;
 		this.annotations.MissingValue = oldMissingValue;
 			if (Array.isArray(result)){
 			result = result[0]; // TODO:why is this one level deep????
@@ -468,13 +482,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		for (let i : number = 1; i < ctx.children.length - 1; i++){
 			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
 				let childResult = ctx.children[i].accept(this);
-				if (typeof childResult == "string"){
-					if (childResult.includes('\n')){
-						this.lastLine = childResult.replace(/.*(\n.*)$/s, '$1'); 
-					} else {
-						this.lastLine += childResult;
-					}
-				}
+				//if (typeof childResult == "string"){
+				//	if (childResult.includes('\n')){
+				//		this.lastLine = childResult.replace(/.*(\n.*)$/s, '$1'); 
+				//	} else {
+				//		this.lastLine += childResult;
+				//	}
+				//}
 				result.push(childResult);
 			}
 		}
@@ -489,10 +503,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let value : any;
 		if (this.context && this.context.type == 'list'){
 			value = [];
-			console.log('TEMPLATE:'+ctx.getText());
 			let template : string = this.getTemplateWithoutComments(ctx);
+			if (template != ctx.getText()){
+				console.log('TEMPLATE:'+ctx.getText());
+				console.log('NOCOMMENTS:'+template);
+			}
 			template = template.substr(1, template.length - 2);
-			console.log('NOCOMMENTS:'+template);
 			// The strategy starts by extracting from the template a "beginning sequence" of whitespace, if any, followed by the first new line character followed by whitespace with or without a bullet indicator.
 			// From that, we can determine if indents are to be handled by the bullet mechanism, calculate any indent and see if the template has beginning or ending new lines.
 			// If this instance is part of a new line, we will have to determine the current indent and indent 4 spaces (nominally) from that.
@@ -506,18 +522,31 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let endingSequence = template.replace(/.*?((\n)[ \t]*)?$/s, "$1");
 			let bHasBullet = beginningSequence.includes('{.}') || !!(this.indent && this.indent.indentText.includes('{.}')); // comment
 			let bOnNewLine = /\n[ \t]*$/.test(this.lastLine + beginningSequence);
-			let lastIndent = bOnNewLine ? this.lastLine.replace(/.*?(\n([ \t]+))?$/s, '$2') : this.lastLine.replace(/^\n?([ \T]*).*$/s, '$1');
+			let bAddBullets = bHasBullet && !beginningSequence.includes('{.}');
+			let lastIndent = bOnNewLine ? this.lastLine.replace(/.*?(\n([ \t]+))?$/s, '$2') : this.lastLine.replace(/^\n?([ \t]*).*$/s, '$1');
 			let indentText = bOnNewLine ? (this.lastLine + beginningSequence).replace(/.*?(\n([ \t]+))?$/s, '$2') : lastIndent;
+			let bIndentBullets = false;
 			if (!bHasBullet){
 				// indent from the previous indent.  Default to 4 spaces if no indent (TODO: allow an annotation to change this)
-				//this.indent = new Indent((!!this.indent && !bOnNewLine ? this.indent.computedIndent : (bOnNewLine ? '' : lastIndent)) + ((indentText.length > 0 || bOnNewLine ? indentText : '    ')), this.indent); 
 				let newIndent = indentText;
 				if (!bOnNewLine){
 					newIndent += '    '; // default of 4 spaces
 				}
 				this.indent = new Indent(newIndent, this.indent);
+			} else if (bAddBullets) {
+				let lastIndentSequence = this.indent.beforeBullet + this.indent.computedIndent + this.indent.afterBullet;
+				if (this.lastLine.startsWith('\n' + lastIndentSequence)){
+					let residual = this.lastLine.substr(lastIndentSequence.length + 1);
+					if (residual.replace(/^[ \t]*/s,'') != ''){
+						// there are residual characters after the bullet, so indenting is necessary
+						bIndentBullets = true;
+						this.indent = new Indent('    ' + this.indent.indentText, this.indent);
+						value.push('\n' + this.indent.beforeBullet + this.indent.computedIndent + this.indent.afterBullet);
+					}
+				}
 			}
 			let count = this.context.count(); // used to determine when we are at the end of the list
+			let firstResultCount = count - 1;
 			let oldLastLine = this.lastLine;
 			this.context.iterateList((newContext : TemplateData)=>{
 				count--;
@@ -528,7 +557,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				let result = this.visitChildren(ctx)[0];
 				this.lastLine = oldLastLine; // restore the last because it may have been changed
-				if (bHasBullet){
+				if (bAddBullets || bIndentBullets){
+					if (count == firstResultCount){
+						value.push(result + '\n')
+					} else {
+						this.indent = new Indent(this.indent.indentText, this.indent);
+						value.push(this.indent.beforeBullet + this.indent.computedIndent + this.indent.afterBullet + result + (count == 0 ? '' : '\n'));
+					}
+				} else if (bHasBullet){
 					value.push(result);
 				} else {
 					//add the indent, remove beginning and ending sequence, and add a new line if necessary, but not on the last line
@@ -536,6 +572,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				this.context = oldContext;
 			});
+			if (bIndentBullets){
+				this.indent = this.indent.parentIndent;
+			}
 			value = value.join('');
 			if (!bHasBullet){
 				if (bOnNewLine){
@@ -648,13 +687,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0];
 	};
 	visitIndent = function(ctx) {
-		let bulletText : string = ctx.children[0].getText();
+		let bulletTextArray = [];
+		ctx.children[0].children.forEach(child=>{
+			if (child.constructor.name == 'TerminalNodeImpl'){
+				bulletTextArray.push(child.getText());
+			} else {
+				bulletTextArray.push(child.accept(this));
+			}
+		});
+		let bulletText = bulletTextArray.join('');
 		let indent : Indent = new Indent(bulletText, this.indent);
 		this.indent = indent;
 		let bulletNewLine = ctx.children[0].getText().startsWith('\n') ? '\n' : ''
 		let bullet : string = bulletNewLine + indent.beforeBullet + indent.computedIndent + indent.afterBullet;
+		this.lastLine = bullet;
 		let result = ctx.children[1].accept(this);
-		this.indent = indent; // restore the current level of indent which may have been changed by the children
+		if (indent.level != this.indent.level){
+			this.indent = indent; // restore the current level of indent which may have been changed by the children
+		}
 		let multilineResult = '';
 		for (let i = 0; i < result.length; i++){
 			// arrays within the results are values that need to be bulleted
@@ -921,26 +971,37 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	getTemplateWithoutComments = function(ctx){
 		let templateParts = [];
-		let ctxName = ctx.constructor.name;
+		let ctxName = ctx.constructor.name.replace('Context', '');
 		switch (ctxName) {
-			case "NamedSubtemplateContext":
-			case "MethodInvokedContext":
-			case "MethodableIdentiferContext":
-			case "BulletHolderContext":
-			case "TextContext":
+			case "NamedSubtemplate":
+			case "MethodInvoked":
+			case "MethodableIdentifer":
+			case "BulletHolder":
+			case "Text":
 				templateParts.push(ctx.getText());
 				break;
-			case "TemplatetokenContext":
+			case "Templatecontexttoken":
 				templateParts.push('{');
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
-					templateParts.push(this.getTemplateWithoutComments(ctx.children[i]))
+					if (!ctx.children[i].children){
+						templateParts.push(':');
+					} else {
+						templateParts.push(this.getTemplateWithoutComments(ctx.children[i]))
+					}
 				}
 				templateParts.push('}');
 				break;
-			//case "OptionallyInvokedMethodableContext":
+			case "Templatetoken":
+				templateParts.push('{');
+				for (let i : number = 1; i < ctx.children.length - 1; i++){
+					templateParts.push(this.getTemplateWithoutComments(ctx.children[i]));
+				}
+				templateParts.push('}');
+				break;
+			//case "OptionallyInvokedMethodable":
 			//	templateParts.push('{' + ctx.getText() + '}');
 			//	break;
-			case "BracketedtemplatespecContext":
+			case "Bracketedtemplatespec":
 				templateParts.push('[');
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
 					if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
@@ -949,8 +1010,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				templateParts.push(']');
 				break;
-			case "BracedarrowtemplatespecContext":
-			case "BracedarrowContext":
+			case "Bracedarrowtemplatespec":
+			case "Bracedarrow":
 				templateParts.push(this.getTemplateWithoutComments(ctx.children[0]));
 				templateParts.push(ctx.children[1].getText());
 				if (ctx.children.length > 2){
@@ -967,6 +1028,81 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				break;
 		}
 		return templateParts.join('');
+	}
+	getParseTree = function(ctx, indent?){
+		const indentBlanks = '   ';
+		if (indent === undefined){
+			indent = '';
+		}
+		let templateParts = [];
+		let ctxName = ctx.constructor.name.replace('Context','');
+		switch (ctxName) {
+			case "Templatecontents":
+			case "CompilationUnit":
+			case "QuoteLiteral":
+			case "ApostropheLiteral":
+			case "MethodInvocation":
+			case "Comment":
+			case "Bracedthinarrow":
+			case "LogicalOperator":
+			case "MethodableTemplatespec":
+			case "SubtemplateSpecs":
+			case "BracketedArgument":
+			case "Indent":
+			case "BeginningIndent":
+			case "MethodInvoked":
+			case "Templatecontexttoken":
+				templateParts.push(indent + ctxName);
+				ctx.children.forEach(child=>{
+					if (child.getChildCount() > 0){
+						templateParts.push(this.getParseTree(child, indentBlanks + indent));
+					}
+				});
+				break;
+			case "Method":
+			case "MethodableIdentifer":
+			case "NamedSubtemplate":
+				templateParts.push(indent + ctxName + ' (' + ctx.getText() + ')');
+				ctx.children.forEach(child=>{
+					if (child.getChildCount() > 0){
+						templateParts.push(this.getParseTree(child, indentBlanks + indent));
+					}
+				});
+				break;
+			case "Text":
+				templateParts.push(indent + 'Text ("' + ctx.getText().replace(/\n/g,'\\n') + '")');
+				break;
+			case "Bracketedtemplatespec":
+			case "Templatetoken":
+				templateParts.push(indent + ctxName);
+				for (let i : number = 1; i < ctx.children.length - 1; i++){
+					templateParts.push(this.getParseTree(ctx.children[i], indentBlanks + indent));
+				}
+				break;
+			case "Bracedarrowtemplatespec":
+			case "Bracedarrow":
+				templateParts.push(indent + ctxName);
+				templateParts.push(this.getParseTree(ctx.children[0], indentBlanks + indent));
+				if (ctx.children.length > 2){
+					templateParts.push(this.getParseTree(ctx.children[2], indentBlanks + indent));
+				}
+				break;
+			case "TerminalNodeImpl":
+				break; // has no children
+				
+			default:
+				ctx.children.forEach(child=>{
+					if (child.getChildCount() > 0){
+						templateParts.push(this.getParseTree(child, indent));
+					}
+				});
+				break;
+		}
+		let result = templateParts.join('\n');
+		while (result.includes('\n\n')){
+			result = result.replace('\n\n','\n'); // empty lines come from children that aren't included in the parse tree
+		}
+		return result; 
 	}
 }
 

@@ -18,7 +18,7 @@ templatecontents: comment? (subtemplateSection | indent | templatetoken | templa
 
 indent: bulletHolder indented;
 
-bulletHolder: NL SPACES? LBRACE DOT RBRACE SPACES? ;
+bulletHolder: NL SPACES? LBRACE DOT RBRACE comment? SPACES? ;
 
 indented: (comment? (templatetoken | templatecontexttoken | text+))+;
 
