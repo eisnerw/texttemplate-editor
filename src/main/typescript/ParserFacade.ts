@@ -295,7 +295,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
 			let oldNoValues = this.bNoValues;
 			this.bNoValues = false; // need values to get context
-			let context : any = ctx.children[1].children[0].accept(this);
+			let context : any;
+			if (ctx.children[1].constructor.name == 'NamedSubtemplateContext'){
+				context = ctx.children[1].accept(this);
+			} else {
+				context = ctx.children[1].children[0].accept(this);
+			}
 			this.bNoValues = oldNoValues;
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
@@ -639,7 +644,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.lastLine = '\n' + this.indent.computedIndent; // children need to see what the indent will be
 				}
 				let result = this.visitChildren(ctx)[0];
-				if (/^.*[^ \t\n]+.*\n.*\{\.\}/s.test(noValueResult)){
+				if (/^[^ \t\n]+.*\n.*\{\.\}/s.test(noValueResult)){
 					this.indent = currentIndent; // force the numbering for the bullet to start over again
 				} else if (!bHasBullet && !!this.indent && this.indent.indentText.includes('{.}')){
 					// the existence of a new bullet indent is sufficient to set the flag unless the bullet is on s mre ;omr
