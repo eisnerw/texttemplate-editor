@@ -209,6 +209,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	indent : Indent = null;
 	annotations = {};
 	lastLine = '\n';  // eliminate an edge effect by pretending that we are starting from a new line
+	bNoValues : boolean = false; // used when visiting children to get pure interpolations with tokens
 	visitText = function(ctx){
 		let result = ctx.getText();
 		if (result.includes('\n')){
@@ -220,6 +221,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitMethodableIdentifer = function(ctx) {
 		var key = ctx.getText();
+		if (this.bNoValues){
+			this.bNoValues = false;
+			let result = this.visitMethodableIdentifer(ctx);
+			this.bNoValues = true;
+			if (!key.startsWith('$') && typeof result == 'string'){
+				return '{' + key + '}';
+			}
+			return result;
+		}
 		this.lastLine += key;
 		if (!this.context || !(this.context instanceof TemplateData)){
 			return undefined; // attempt to look up a variable without a context returns undefined
@@ -238,6 +248,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let result : any = ctx.children[1].accept(this);
 		if (Array.isArray(result)){
 			result = result[0];
+		}
+		if (this.bNoValues){
+			return result;
 		}
 		return result;
 	};
@@ -280,7 +293,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let oldContext : TemplateData = this.context;
 		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
 		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
+			let oldNoValues = this.bNoValues;
+			this.bNoValues = false; // need values to get context
 			let context : any = ctx.children[1].children[0].accept(this);
+			this.bNoValues = oldNoValues;
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
 			}
@@ -353,6 +369,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#');
 		let oldLastLine = this.lastLine; // preserve last line so it isn't affected during method calculation
 		let oldAnnotations = {};
+		let oldNoValues = this.bNoValues;
 		// clone by shallow copy
 		for (let key in this.annotations){
 			oldAnnotations[key] = this.annotations[key];
@@ -360,43 +377,65 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		ctx.children.slice(1).forEach((child) => {
 			let method : string = child.children[0].accept(this);
 			if (method.startsWith('@') && bMethodableIsTemplate){
+				this.bNoValues = false; // get the real arguments
 				let args : any = child.children[1];
+				this.bNoValues = oldNoValues;
 				this.callMethod(method, this.annotations, args);
 			} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && this.annotations.MissingValue){
 				delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls
 			}
 		});
+		let noValueValue : any = undefined;
 		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
 			// create an arry of results and then run the method on the array
 			value = [];
+			noValueValue = []
 			this.context.iterateList((newContext : TemplateData)=>{
 				let oldContext = this.context;
 				this.context = newContext;
+				this.bNoValues = false;
 				value.push(ctx.children[0].accept(this));
+				this.bNoValues = oldNoValues;
+				if (this.bNoValues){
+					noValueValue.push(ctx.children[0].accept(this));
+				}
 				this.context = oldContext;
 			});
 		} else {
+			this.bNoValues = false;
 			value = ctx.children[0].accept(this);
+			this.bNoValues = oldNoValues;
+			if (this.bNoValues){
+				noValueValue = ctx.children[0].accept(this);
+			}
 		}
 		// call each method, which follow the identifier value
 		ctx.children.slice(1).forEach((child) => {
 			let method : string = child.children[0].accept(this);
 			if (!method.startsWith('@')){
-				let args : any = child.children[1];
-				if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
-					let computedValue : string[] = [];
-					value.forEach((val) =>{
-						computedValue.push(this.callMethod(method, val, args));
-					});
-					value = computedValue;
-				} else {
-					value = this.callMethod(method, value, args);
+				if (!this.bNoValues || (method == 'Case' || method == 'Anded' || method == 'Count' || method == 'Where')){
+					this.bNoValues = false;
+					let args : any = child.children[1];
+					this.bNoValues = oldNoValues;
+					if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
+						let computedValue : string[] = [];
+						value.forEach((val) =>{
+							computedValue.push(this.callMethod(method, val, args));
+						});
+						value = computedValue;
+					} else {
+						value = this.callMethod(method, value, args);
+					}
+					noValueValue = value;
 				}
 			}
 		});
 		this.annotations = oldAnnotations; // restore the annotations
 		this.lastLine = oldLastLine; // restore last line
+		if (this.bNoValues){
+			return noValueValue;
+		}
 		return value;
 	};
 	visitQuoteLiteral = function(ctx) {
@@ -442,7 +481,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
 		let oldLastLine = this.lastLine; // preserve last line so it is not effected by conditions
+		let oldNoValues = this.bNoValues;
+		this.bNoValues = false; // conditions are checked with real data
 		let result : any = ctx.children[0].accept(this);
+		this.bNoValues = oldNoValues;
 		this.lastLine = oldLastLine; // restore original last line;
 		this.annotations.MissingValue = oldMissingValue;
 		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
@@ -457,7 +499,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
 		let oldLastLine = this.lastLine; // preserve last line so it is not effected by conditions
+		let oldNoValues = this.bNoValues;
+		this.bNoValues = false; // conditions are checked with real data
 		let result : boolean = ctx.children[0].accept(this);
+		this.bNoValues = oldNoValues;
 		this.lastLine = oldLastLine; // restore original last line;
 		this.annotations.MissingValue = oldMissingValue;
 			if (Array.isArray(result)){
@@ -508,6 +553,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result.join('');
 	};
 	visitMethodableTemplatespec = function(ctx) {
+		if (this.bNoValues){
+			if (this.context && this.context.type == 'list'){
+				return this.visitChildrenWithoutValues(ctx);
+			}
+			return this.visitChildren(ctx)[0];
+		}
 		let value : any;
 		if (this.context && this.context.type == 'list'){
 			value = [];
@@ -528,6 +579,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			
 			let beginningSequence = template.replace(/^([ \t]*\n?[ \t]*(\{\.\})?)?.*/s,'$1');
 			let endingSequence = template.replace(/.*?((\n)[ \t]*)?$/s, "$1");
+			let noValueResult = this.visitChildrenWithoutValues(ctx);
 			let bHasBullet = beginningSequence.includes('{.}') || (!!this.indent && this.indent.indentText.includes('{.}')); // comment
 			let bOnNewLine = /\n[ \t]*(\{\.\})?[ \t]*$/.test(this.lastLine + beginningSequence);
 			let bAddBullets = bHasBullet && !beginningSequence.includes('{.}');
@@ -587,8 +639,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.lastLine = '\n' + this.indent.computedIndent; // children need to see what the indent will be
 				}
 				let result = this.visitChildren(ctx)[0];
-				if (!bHasBullet && !!this.indent && this.indent.indentText.includes('{.}')){
-					// the existence of a new bullet indent is sufficient to set the flag
+				if (/^.*[^ \t\n]+.*\n.*\{\.\}/s.test(noValueResult)){
+					this.indent = currentIndent; // force the numbering for the bullet to start over again
+				} else if (!bHasBullet && !!this.indent && this.indent.indentText.includes('{.}')){
+					// the existence of a new bullet indent is sufficient to set the flag unless the bullet is on s mre ;omr
 					bHasBullet = true;
 				}
 				this.lastLine = oldLastLine; // restore the last because it may have been changed
@@ -607,6 +661,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				} else if (bHasBullet){
 					value.push(result + (count == 0 || beginningSequence.includes('\n') ? '' : '\n'));
 				} else {
+					if (computedIndent == '    ' + !result.startsWith('\n') && count == firstResultCount && !beginningSequence.includes('\n')){
+						// indent have to start on a new line
+						value.push(result + '\n');
+					}
 					//add the indent, remove beginning and ending sequence, and add a new line if necessary, but not on the last line
 					value.push(computedIndent + result.substr(beginningSequence.length, result.length - beginningSequence.length - endingSequence.length) + (count == 0 ? '' : '\n'));
 				}
@@ -736,7 +794,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		});
 		let bulletText = bulletTextArray.join('');
-		if (!!this.indent && !this.indent.indentText.includes('{.}')){
+		if (this.bNoValues){
+			return bulletText + ctx.children[1].accept(this).join('');
+		}
+		if (!!this.indent && !this.indent.indentText.includes('{.}') && !bulletText.includes('\n')){
 			// first bullet after non-bullet indent, so add in the extra indent
 			bulletText = this.indent.computedIndent + bulletText;
 		}
@@ -779,6 +840,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	callMethod = function(method : string, value : any, args: any){
 		let argValues = [];
+		let oldNoValues = this.bNoValues;
+		this.bNoValues = false; // ignore bNoValues when getting argument values
 		if (args.constructor.name == 'ConditionContext'){
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
@@ -792,6 +855,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				});
 			}
 		}
+		this.bNoValues = oldNoValues;
 		let parentCtx : any = args.parentCtx;
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "MethodabletemplatespecContext";
@@ -1019,6 +1083,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	}
+	visitChildrenWithoutValues = function(ctx){
+		let oldNoValues = this.bNoValues;
+		let oldContext = this.context;
+		let oldLastLine = this.lastLine;
+		if (!!this.context && this.context.type == 'list'){
+			this.context = this.context.list[0];
+		}
+		this.bNoValues = true;
+		let result = this.visitChildren(ctx);
+		this.bNoValues = oldNoValues;
+		this.context = oldContext;
+		this.lastLine = oldLastLine;
+		return result;
+	}
+	
 	getTemplateWithoutComments = function(ctx){
 		let templateParts = [];
 		let ctxName = ctx.constructor.name.replace('Context', '');
