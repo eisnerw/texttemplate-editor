@@ -341,10 +341,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		var result = [];
 		this.lastLine = oldLastLine; // undo any side effects from the above
 		result = ctx.children[bHasContext ?  3 : 2].accept(this);
-		if (oldContext) {
-			// protect agaist error when the parse tree is invalid
-			this.context = oldContext;
-		}
+		this.context = oldContext;
 		return result;
 	};
 	visitCompilationUnit = function(ctx) {
@@ -597,7 +594,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let noValueResult = this.visitChildrenWithoutValues(ctx);
 			let bHasBullet = beginningSequence.includes('{.}') || (!!this.indent && this.indent.indentText.includes('{.}')); // comment
 			let bOnNewLine = /\n[ \t]*(\{\.\})?[ \t]*$/.test(this.lastLine + beginningSequence);
-			let bAddBullets = bHasBullet && !beginningSequence.includes('{.}');
+			let bAddBullets = bHasBullet && !beginningSequence.includes('{.}') && !/\n[ \t]*$/s.test(this.lastLine);
+			let bAddLastLineIndent = bHasBullet && !beginningSequence.includes('{.}') && /\n[ \t]*$/s.test(this.lastLine);
 			let lastIndent = bOnNewLine ? this.lastLine.replace(/.*?(\n([ \t]+))?$/s, '$2') : this.lastLine.replace(/^\n?([ \t]*).*$/s, '$1');
 			let indentText = bOnNewLine ? (this.lastLine + beginningSequence).replace(/.*?(\n([ \t]+))?$/s, '$2') : lastIndent;
 			let lastLineNonblankData = this.lastLine.replace(/^[ \t]*(.*)$/s,'$1');
@@ -646,6 +644,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let oldLastLine = this.lastLine;
 			let computedIndent = !!this.indent ? this.indent.computedIndent : '';
 			let currentIndent = this.indent;
+			let lastLineIndent = this.lastLine.replace(/^.*?\n([ \t]*)?.*$/s,"$1");
 			this.context.iterateList((newContext : TemplateData)=>{
 				count--;
 				let oldContext : TemplateData = this.context;
@@ -654,11 +653,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.lastLine = '\n' + this.indent.computedIndent; // children need to see what the indent will be
 				}
 				let result = this.visitChildren(ctx)[0];
-				if (/[^ \t\n]+.*\n[ \t]*\{\.\}/s.test(noValueResult)){
-					this.indent = currentIndent; // force the numbering for the bullet to start over again
-				} else if (!bHasBullet && !!this.indent && this.indent.indentText.includes('{.}')){
-					// the existence of a new bullet indent is sufficient to set the flag unless the bullet is on s mre ;omr
-					bHasBullet = true;
+				if (!bHasBullet){
+					if (/^[^ \t\n]+.*\n[ \t]*\{\.\}/s.test(noValueResult)){
+						this.indent = currentIndent; // force the numbering for the bullet to start over again
+					} else if (!bHasBullet && !!this.indent && this.indent.indentText.includes('{.}')){
+						// the existence of a new bullet indent is sufficient to set the flag unless the bullet is on s mre ;omr
+						bHasBullet = true;
+					}
 				}
 				this.lastLine = oldLastLine; // restore the last because it may have been changed
 				if (bAddBullets || bIndentBullets){
@@ -674,7 +675,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					currentIndent.index = this.indent.index;
 					this.indent = currentIndent; // restore indent with indication of level/index
 				} else if (bHasBullet){
-					value.push(result + (count == 0 || beginningSequence.includes('\n') ? '' : '\n'));
+					value.push((count == firstResultCount || !bAddLastLineIndent ? '' : lastLineIndent) + result + (count == 0 || beginningSequence.includes('\n') ? '' : '\n'));
 				} else {
 					if (computedIndent == '    ' + !result.startsWith('\n') && count == firstResultCount && !beginningSequence.includes('\n')){
 						// indent have to start on a new line
