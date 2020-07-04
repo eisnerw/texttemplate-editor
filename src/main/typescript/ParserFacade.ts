@@ -115,21 +115,24 @@ class TemplateData {
 		} else {
 			json = jsonData;
 		}
-		this.type = 'dictionary';
 		if (Array.isArray(json)){
-			// the json string is an array.  Convert it into a dictionary with the arbitrary key "data"
-			json = {data: json};
-		}
-		Object.keys(json).forEach((keyname) => {
-			let value: any = json[keyname];
-			if (typeof value == 'object') {
-				if (value != null && (!Array.isArray(value) || value.length > 0)){ // don't add null values or empty arrays
-					this.dictionary[keyname] = new TemplateData(value, this);
+			this.type = 'list';
+			json.forEach((item) => {
+				this.list.push(new TemplateData(item, this));
+			});
+		} else {
+			this.type = 'dictionary';
+			Object.keys(json).forEach((keyname) => {
+				let value: any = json[keyname];
+				if (typeof value == 'object') {
+					if (value != null && (!Array.isArray(value) || value.length > 0)){ // don't add null values or empty arrays
+						this.dictionary[keyname] = new TemplateData(value, this);
+					}
+				} else {
+					this.dictionary[keyname] = value;
 				}
-			} else {
-				this.dictionary[keyname] = value;
-            }
-		});
+			});
+		}
 		if (parent){
 			this.parent = parent;
 		}
@@ -309,13 +312,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				try{
 					if (context.toLowerCase().startsWith('http') || context.startsWith('/')){
 						if (urls[context] && urls[context].data){
-							if (urls[context].data.startsWith('[')){
-								// text templates requires that the top level be a dictionary
-								// create a container for the array under 'data'
-								this.context = new TemplateData('{"data":' + urls[context].data + '}', this.context);
-							} else {
-								this.context = new TemplateData(urls[context].data, this.context);
-							}
+							this.context = new TemplateData(urls[context].data, this.context);
 						} else {
 							bHasContext = false;
 							if (!urls[context]){
@@ -393,20 +390,33 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let noValueValue : any = undefined;
 		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
+			let bAggregatedResult : boolean = ctx.children[0].constructor.name == 'MethodableTemplatespecContext';  // insure proper routine
+			if (bAggregatedResult){
+				ctx.children.slice(1).forEach((child) => {
+					let method = child.children[0].accept(this);
+					if (!method.startsWith('@')){
+						bAggregatedResult = false; // don't unless all methods are annotations
+					}						
+				});
+			}
+			if (bAggregatedResult){
+				value = ctx.children[0].accept(this);
+			} else {
 			// create an arry of results and then run the method on the array
-			value = [];
-			noValueValue = []
-			this.context.iterateList((newContext : TemplateData)=>{
-				let oldContext = this.context;
-				this.context = newContext;
-				this.bNoValues = false;
-				value.push(ctx.children[0].accept(this));
-				this.bNoValues = oldNoValues;
-				if (this.bNoValues){
-					noValueValue.push(ctx.children[0].accept(this));
-				}
-				this.context = oldContext;
-			});
+				value = [];
+				noValueValue = []
+				this.context.iterateList((newContext : TemplateData)=>{
+					let oldContext = this.context;
+					this.context = newContext;
+					this.bNoValues = false;
+					value.push(ctx.children[0].accept(this));
+					this.bNoValues = oldNoValues;
+					if (this.bNoValues){
+						noValueValue.push(ctx.children[0].accept(this));
+					}
+					this.context = oldContext;
+				});
+			}
 		} else {
 			this.bNoValues = false;
 			value = ctx.children[0].accept(this);
@@ -644,7 +654,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.lastLine = '\n' + this.indent.computedIndent; // children need to see what the indent will be
 				}
 				let result = this.visitChildren(ctx)[0];
-				if (/^[^ \t\n]+.*\n.*\{\.\}/s.test(noValueResult)){
+				if (/[^ \t\n]+.*\n[ \t]*\{\.\}/s.test(noValueResult)){
 					this.indent = currentIndent; // force the numbering for the bullet to start over again
 				} else if (!bHasBullet && !!this.indent && this.indent.indentText.includes('{.}')){
 					// the existence of a new bullet indent is sufficient to set the flag unless the bullet is on s mre ;omr
