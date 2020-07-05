@@ -213,6 +213,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	annotations = {};
 	lastLine = '\n';  // eliminate an edge effect by pretending that we are starting from a new line
 	bNoValues : boolean = false; // used when visiting children to get pure interpolations with tokens
+	bNewIndentStrategy : boolean = true; 
 	visitText = function(ctx){
 		let result = ctx.getText();
 		if (result.includes('\n')){
@@ -314,7 +315,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (urls[context] && urls[context].data){
 							this.context = new TemplateData(urls[context].data, this.context);
 						} else {
-							bHasContext = false;
 							if (!urls[context]){
 								urls[context] = {};
 							}
@@ -357,6 +357,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let spliced = result.splice(0, result.length - 1); // remove the result of the <EOF> token
 		if (spliced.length == 1){
 			return spliced[0];
+		}
+		if (this.bNewIndentStrategy){
+			return spliced;
 		}
 		return spliced.join(''); 
 	};
@@ -562,6 +565,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (result.length == 1){
 			return result[0];
 		}
+		if (this.bNewIndentStrategy){
+			return result;
+		}
 		return result.join('');
 	};
 	visitMethodableTemplatespec = function(ctx) {
@@ -573,7 +579,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		let value : any;
 		if (this.context && this.context.type == 'list'){
-			value = [];
+			let listObject = {list: [], type:'list'};
+			if (this.bNewIndentStrategy){
+				this.context.iterateList((newContext : TemplateData)=>{
+					let oldContext : TemplateData = this.context;
+					this.context = newContext;
+					listObject.list.push(this.visitChildren(ctx)[0]);
+					this.context = oldContext;
+				});
+				return listObject;
+			}
 			let template : string = this.getTemplateWithoutComments(ctx);
 			if (template != ctx.getText()){
 				console.log('TEMPLATE:'+ctx.getText());
@@ -812,6 +827,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let bulletText = bulletTextArray.join('');
 		if (this.bNoValues){
 			return bulletText + ctx.children[1].accept(this).join('');
+		}
+		if (this.bNewIndentStrategy){
+			return {type:'indent', bullet: bulletText, result: ctx.children[1].accept(this)};
 		}
 		if (!!this.indent && !this.indent.indentText.includes('{.}') && !bulletText.includes('\n')){
 			// first bullet after non-bullet indent, so add in the extra indent
@@ -1250,6 +1268,62 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result; 
 	}
+	interpretResult = function(result, output, indent){
+		result.forEach((item : any)=>{
+			if (typeof item == 'string' || typeof item == 'number'){
+				this.addToOutput(item.toString(), output);
+			} else if (Array.isArray(item)){
+				this.interpretResult(item, output, indent);
+			} else if (typeof item == 'object'){
+				if (item.type == 'indent'){
+					this.addToOutput(item.bullet, output);
+					if (typeof item.result == 'string' || typeof item.result == 'number'){
+						this.addToOutput(item.result.toString(), output);
+					} else if (typeof item.result == 'object'){
+						if (Array.isArray(item.result) || item.result.type == 'indent' ){
+							this.interpretResult([item.result], output, item.bullet);
+						} else {
+							// list
+							for (let i = 0; i < item.result.list.length(); i ++){
+								this.interpretResult(this.result.list[i], output, item.bullet);
+								if (i < this.result.list.length - 1){
+									this.addToOutput('\n', output);
+								}
+							}
+						}	
+					} else {
+						let x = 'stop';
+					}
+				} else {
+					// list
+					if (!!indent){
+						for (let i = 0; i < item.list.length; i++){
+							if (i == 0){
+								this.interpretResult([item.list[i]], output, indent);
+							} else {
+								if (!indent.includes('\n')){
+									this.addToOutput('\n', output);
+								}
+								this.interpretResult([indent,item.list[i]], output, indent);
+							}
+						}
+					} else {
+						this.interpretResult(item.list, output, indent);
+					}
+				}
+			} else {
+				let x = 'stop';
+			}
+		});
+	}
+	addToOutput(text, output){
+		let ar = text.split('\n');
+		for (let i = 0; i < ar.length - 1; i++){
+			output[output.length - 1] += ar[i];
+			output.push('');
+		}
+		output[output.length - 1] += ar[ar.length - 1];
+	}
 }
 
 interface TextTemplateVisitor {
@@ -1453,7 +1527,13 @@ function validate(input, invocation) : void {
 			if (invocation != invocations){
 				return;
 			}
-			document.getElementById('interpolated').innerHTML = result;
+			if (Array.isArray(result)){
+				let output = [];
+				output.push('');
+				visitor.interpretResult(result, output, null);
+				result = output.join('\n');
+			}
+			document.getElementById('interpolated').innerHTML = result.toString();
 			Object.keys(urls).forEach((key : string) =>{
 				if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
 					delete urls[key] // clean up incomplete urls
