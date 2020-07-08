@@ -36,7 +36,7 @@ bracedoptions: bracedarrow #braceArrow | bracedthinarrow #braceThinArrow | optio
 
 methodInvoked: methodable methodInvocation+;
 
-conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | methodInvoked #condition;
+conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
 
 templatecontexttoken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) COLON | COLON) (namedSubtemplate | optionallyInvokedMethodable) RBRACE;
 
