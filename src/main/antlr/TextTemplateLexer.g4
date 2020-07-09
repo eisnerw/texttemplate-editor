@@ -1,7 +1,8 @@
 lexer grammar TextTemplateLexer;
 
-COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->skip;
-COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF)	 [ \t\r]*;
+NONGREEDY: [ ]*  '///' ~[\n]* ('\n' | EOF) ->skip;
+COMMENT: [ ]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t\r]*;
+COMMENT_NL: [ ]*  '//' ('\n' | EOF)	 [ \t\r]* ->type(COMMENT);   // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
 TEXT: ~[{}/ \n]+ ;
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
@@ -64,9 +65,9 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
-BRACKETED_DUAL_COMMENT: [ ]*  '//' ~[\n]* '\n' [ \t]* '//' ~[\n]* '\n' ->skip;
-BRACKETED_COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->skip;
-BRACKETED_COMMENT: [ ]*  '//' ~[\n]* ('\n' | EOF) [ \t\r]* ->type(COMMENT);
+BRACKETED_NONGREEDY: [ ]*  '///' ~[\n]* ('\n' | EOF) ->skip;
+BRACKETED_COMMENT: [ ]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t\r]* ->type(COMMENT);
+BRACKETED_COMMENT_NL: [ ]*  '//' ('\n' | EOF) [ \t\r]* ->type(COMMENT);  // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
 RBRACKETLP: '](' ->mode(PARENED);
 RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
