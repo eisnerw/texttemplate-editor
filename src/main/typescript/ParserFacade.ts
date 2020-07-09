@@ -271,10 +271,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!ctx.children){
 			return ''; // no data
 		}
-		if (ctx.children.length > 2 && ctx.children[ctx.children.length - 2].children[0].constructor.name == 'SubtemplateSectionContext'){
-			// the next to the last node is subtemplates, so visit it first to get the subtemplate dictionary
-			this.visitChildren(ctx.children[ctx.children.length - 2])
-		}
+		this.loadSubtemplates(ctx);
 		let result : [] = this.visitChildren(ctx);
 		let spliced = result.splice(0, result.length - 1); // remove the result of the <EOF> token
 		if (spliced.length == 1){
@@ -351,14 +348,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.bNoValues = false;
 					let args : any = child.children[1];
 					this.bNoValues = oldNoValues;
-					if (Array.isArray(value) && (method == 'ToUpper' || method == 'ToLower' || method == 'Matches')){
+					if (Array.isArray(value)){
 						let computedValue : string[] = [];
-						value.forEach((val) =>{
-							computedValue.push(this.callMethod(method, val, args));
-						});
-						value = computedValue;
+						if (method == 'ToUpper' || method == 'ToLower' || method == 'Matches'){
+							value.forEach((val) =>{
+								computedValue.push(this.callMethod(method, val, args));
+							});
+							value = computedValue;
+						} else {
+							value.forEach((val)=>{
+								if (Array.isArray(val) && val.length == 1){
+									computedValue.push(val[0]);
+								} else {
+									computedValue.push(val);
+								}
+							});
+							value = this.callMethod(method, computedValue, args);
+						}
 					} else {
-						value = this.callMethod(method, Array.isArray(value) ? value.join('') : value, args);
+						value = this.callMethod(method, value, args);
 					}
 					noValueValue = value;
 				}
@@ -1003,17 +1011,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	interpretResult = function(result, output, indent){
 		result.forEach((item : any)=>{
-			if (typeof item == 'string' || typeof item == 'number'){
+			if (item == null){
+			} else if (typeof item == 'string' || typeof item == 'number'){
 				this.addToOutput(item.toString(), output);
 			} else if (Array.isArray(item)){
 				this.interpretResult(item, output, indent);
 			} else if (typeof item == 'object'){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
-					if (typeof item.result == 'string' || typeof item.result == 'number'){
+					if (item.result == null) {
+					} else if (typeof item.result == 'string' || typeof item.result == 'number'){
 						this.addToOutput(item.result.toString(), output);
 					} else if (typeof item.result == 'object'){
-						if (Array.isArray(item.result) || item.result.type == 'indent' ){
+						if (Array.isArray(item.result) || item.result.type == 'indent'){
 							this.interpretResult([item.result], output, item.bullet);
 						} else {
 							// list
@@ -1065,6 +1075,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			output.push('');
 		}
 		output[output.length - 1] += ar[ar.length - 1];
+	}
+	loadSubtemplates(ctx){
+		if (ctx.constructor.name == 'SubtemplateSectionContext'){
+			this.visitSubtemplateSection(ctx);
+			return true;
+		}
+		if (!ctx.children){
+			return false;
+		}
+		ctx.children.forEach((child)=>{
+			if (child.constructor.name != 'TerminalNodeImpl' && child.constructor.name != 'ErrorNodeImpl' && this.loadSubtemplates(child)){
+				return true;
+			}
+		});
+		return false;
 	}
 }
 

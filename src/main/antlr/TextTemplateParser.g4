@@ -20,7 +20,7 @@ indent: bulletHolder indented;
 
 bulletHolder: NL SPACES? LBRACE DOT RBRACE comment? SPACES? ;
 
-indented: (comment? (templatetoken | templatecontexttoken | text+))+;
+indented: (comment? (templatetoken | templatecontexttoken | text+))*;
 
 beginningIndent: beginningBulletHolder indented;
 
@@ -42,7 +42,7 @@ templatecontexttoken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) C
 
 templatespec: namedSubtemplate | bracketedtemplatespec;
 
-bracketedtemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* RBRACKET;
+bracketedtemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* subtemplateSection? COMMENT* RBRACKET;
 
 methodabletemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* RBRACKETLP;
 

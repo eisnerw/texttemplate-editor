@@ -75,6 +75,7 @@ BRACKETED_RBRACE: '}' -> type(RBRACE);
 BRACKETED_SP: ' '+ ->type(SPACES);
 BRACKETED_SLASH: '/' ->type(TEXT);
 BRACKETED_NL: '\n' ->type(NL);
+BRACKETED_SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+ ->type(SUBTEMPLATES);
 
 mode NESTED;
 NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
