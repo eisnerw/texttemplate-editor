@@ -1069,7 +1069,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						for (let i = 0; i < item.list.length; i++){
 							let itemResult = item.list[i];
 							let indentObject = itemResult;
-							if (typeof indentObject != 'object'){
+							// let the next level handle an array of items that aren't lists or indents
+							if (!this.containsIndent(indentObject)){
 								indentObject = {type:'indent', result: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
@@ -1088,7 +1089,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else {
 						// create a list and indent it under the current line, if it isn't empty
 						let bEmptyLine = output[output.length - 1] == '';
-						let bContainsNewLine = this.valueAsString(item.list[0]).includes('\n');
+						let bStartsWithNewLine = /^[ \t]*\n/.test(this.valueAsString(item.list[0]))	;
 						let lastIndent = output[output.length - 1].replace(/^([ \t]*).*$/s, '$1');
 						let newIndent = (indent == null ?  '   ' + lastIndent : '   ' + indent);  // TODO: allow override of default tab
 						let bIncompleteIndent = output[output.length - 1] == indent;
@@ -1097,13 +1098,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 						let bFirst = true;
 						item.list.forEach((listItem)=>{
-							if (!bContainsNewLine && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
+							if (!bStartsWithNewLine && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
 								output.push(''); // start a new line
 								if (!!newIndent && newIndent != ''){
 									this.addToOutput(newIndent, output);
 								}
 							}
-							let bIsIndented = !Array.isArray(listItem) && typeof listItem == 'object' && (listItem.type == 'indent' || (typeof listItem.list[0] == 'object' && listItem.list[0].type == 'indent'));
+							let bIsIndented = this.isIndent(listItem) || this.containsIndent(listItem);
 							if (bIsIndented){
 								newIndent = indent;
 							}
@@ -1116,6 +1117,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let x = 'stop';
 			}
 		});
+	}
+	isIndent(item : any){
+		if (typeof item != 'object' || item.type != 'indent'){
+			return false;
+		}
+		return true;
+	}
+	containsIndent(value : any){
+		if (Array.isArray(value)){
+			let bContainsIndent = false;
+			value.forEach((val)=>{
+				if (this.isIndent(val)){
+					bContainsIndent = true;
+				}
+			});
+			return bContainsIndent;
+		} else {
+			return this.isIndent(value);
+		}
 	}
 	valueAsString(value : any){
 		if (Array.isArray(value)){
