@@ -150,7 +150,11 @@
 			$.ajax({
 				url: '/template/' + urlSplit[1],
 				success: function (data) {
-					createEditor(data.replace(/\\\\n/g,"\0x01").replace(/\\n/g,"\n").replace(/\0x01/g,"\\n"));
+					if (typeof data == 'string'){
+						createEditor(data.replace(/\\\\n/g,"\0x01").replace(/\\n/g,"\n").replace(/\0x01/g,"\\n"));
+					} else {
+						createEditor(typeof data == 'object' && !!data.error ? data.error : 'ERROR calling ' + urlSplit[1]);
+					}
 				}
 			});
 		}
