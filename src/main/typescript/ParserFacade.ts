@@ -140,11 +140,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitText = function(ctx){
 		return ctx.getText();
 	};
-	visitMethodableIdentifer = function(ctx) {
+	visitMethodableIdentifier = function(ctx) {
 		var key = ctx.getText();
 		if (this.bNoValues){
 			this.bNoValues = false;
-			let result = this.visitMethodableIdentifer(ctx);
+			let result = this.visitMethodableIdentifier(ctx);
 			this.bNoValues = true;
 			if (!key.startsWith('$') && typeof result == 'string'){
 				return '{' + key + '}';
@@ -166,7 +166,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTemplatetoken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
 		let result : any = ctx.children[1].accept(this);
-		if (Array.isArray(result)){
+		if (Array.isArray(result) && result.length == 1){
 			result = result[0];
 		}
 		if (this.bNoValues){
@@ -176,17 +176,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplatecontents = function(ctx) {
 		var value = this.visitChildren(ctx);
-		if (value){
+		if (Array.isArray(value)){
 			for (let i = 0; i < value.length; i++){
 				if (Array.isArray(value[i])){ 
-					let bIsStringArray = typeof value[i][0] == 'string';
-					for (let j = 1; j < value[i].length; j++){
-						if (bIsStringArray && typeof value[i][j] != 'string'){
-							bIsStringArray = false;
+					let bIsScalarArray = true; 
+					for (let j = 0; j < value[i].length; j++){
+						let val = value[i][j];
+						if (bIsScalarArray && (val == null || typeof val == 'object')){
+							bIsScalarArray = false;
 						}
 					}
-					if (bIsStringArray){
-						value[i] = value[i].join('');
+					if (bIsScalarArray){
+						let joined = '';
+						for (let j = 0; j < value[i].length; j++){
+							joined += value[i][j].toString();
+						}
+						value[i] = joined;
 					}
 				}
 			}
@@ -284,38 +289,41 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
-		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#');
+		// visits first child to obtain a value and then applies each subsequent child to manipulate that value
+		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#'); // value will be obtained from a template
+		let oldNoValues = this.bNoValues; 
+		// preserve the incoming annotations by doing a shallow clone because a method could change one
 		let oldAnnotations = {};
-		let oldNoValues = this.bNoValues;
-		// clone by shallow copy
 		for (let key in this.annotations){
 			oldAnnotations[key] = this.annotations[key];
 		}
+		// process annotations first
 		ctx.children.slice(1).forEach((child) => {
 			let method : string = child.children[0].accept(this);
 			if (method.startsWith('@') && bMethodableIsTemplate){
 				this.bNoValues = false; // get the real arguments
 				let args : any = child.children[1];
 				this.bNoValues = oldNoValues;
-				this.callMethod(method, this.annotations, args);
-			} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && this.annotations.MissingValue){
-				delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls
+				this.callMethod(method, this.annotations, args); // modify the current (inherited) annotations
+			} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && !!this.annotations.MissingValue){
+				delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls )TODO: is this the right place
 			}
 		});
 		let noValueValue : any = undefined;
 		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
-			let bAggregatedResult : boolean = ctx.children[0].constructor.name == 'MethodableTemplatespecContext';  // insure proper routine
+			// necessary to obtain multiple values
+			let bAggregatedResult : boolean = ctx.children[0].constructor.name == 'MethodableTemplatespecContext';  // only aggregate for this context
 			if (bAggregatedResult){
 				ctx.children.slice(1).forEach((child) => {
 					let method = child.children[0].accept(this);
-					if (!method.startsWith('@')){
-						bAggregatedResult = false; // don't unless all methods are annotations
+					if (!method.startsWith('@')){ // TODO: add other tests
+						bAggregatedResult = false; 
 					}						
 				});
 			}
 			if (bAggregatedResult){
-				value = ctx.children[0].accept(this);
+				value = ctx.children[0].accept(this); // let the children process the list
 			} else {
 			// create an arry of results and then run the method on the array
 				value = [];
@@ -334,21 +342,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		} else {
 			this.bNoValues = false;
+			// obtain the single result
 			value = ctx.children[0].accept(this);
 			this.bNoValues = oldNoValues;
 			if (this.bNoValues){
 				noValueValue = ctx.children[0].accept(this);
 			}
 		}
-		// call each method, which follow the identifier value
+		// call each method, which follow the first (value) child, serially
 		ctx.children.slice(1).forEach((child) => {
+			// Each child is a method and an argument(s) tree
 			let method : string = child.children[0].accept(this);
-			if (!method.startsWith('@')){
-				if (!this.bNoValues || (method == 'Case' || method == 'Anded' || method == 'Count' || method == 'Where')){
+			if (!method.startsWith('@')){ // annotations have already been processed
+				if (!this.bNoValues || (method == 'Case' || method == 'Anded' || method == 'Count' || method == 'Where')){  // for noValue, only actually call certain methods
 					this.bNoValues = false;
-					let args : any = child.children[1];
+					let args : any = child.children[1]; // passing the argument tree to CallMethod
 					this.bNoValues = oldNoValues;
 					if (Array.isArray(value)){
+						// value is an array; process each member
 						let computedValue : string[] = [];
 						if (method == 'ToUpper' || method == 'ToLower' || method == 'Matches'){
 							value.forEach((val) =>{
@@ -366,6 +377,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							value = this.callMethod(method, computedValue, args);
 						}
 					} else {
+						// value is a scalar
 						value = this.callMethod(method, value, args);
 					}
 					noValueValue = value;
@@ -551,7 +563,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0]; // remove a level of arrays
 	};
 	visitTemplatespec = function(ctx) {
-		return this.visitChildren(ctx)[0]; // remove a level of arrays
+		let result = this.visitChildren(ctx);
+		if (Array.isArray(result) && result.length == 1){
+			result = result[0];
+		}
+		return result;
 	};
 	visitSubtemplateSection = function(ctx) {
 		// report any subtemplates that take more than one line for folding
@@ -574,7 +590,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return '';
 	};
 	visitOptionallyInvokedMethodable = function(ctx) {
-		return this.visitChildren(ctx)[0];
+		let result = this.visitChildren(ctx);
+		if (result.length == 1){
+			return result[0];
+		}
+		return result;
 	};
 	visitNotConditional = function(ctx) {
 		let result : any = this.visitChildren(ctx)[1];
@@ -637,6 +657,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "MethodabletemplatespecContext";
 		if (bTemplate || method.startsWith('#')){
+			if (Array.isArray(value)){
+				value = value.join('');
+			}
 			let oldContext : TemplateData = this.context;
 			// TODO: consider a clean context as a child of the context
 			this.context = new TemplateData({}, this.context);
@@ -777,7 +800,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							// temporarily set the context to the value being evaluated
 							this.context = <TemplateData>value;
 							let result = [];
-							if (this.context.type = 'list'){
+							if (this.context.type == 'list'){
 								this.context.iterateList((newContext)=>{
 									let oldContext : TemplateData = this.context;
 									this.context = newContext;
@@ -879,7 +902,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		switch (ctxName) {
 			case "NamedSubtemplate":
 			case "MethodInvoked":
-			case "MethodableIdentifer":
+			case "MethodableIdentifier":
 			case "BeginningBulletHolder":
 			case "BulletHolder":
 			case "Text":
@@ -965,7 +988,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				});
 				break;
 			case "Method":
-			case "MethodableIdentifer":
+			case "MethodableIdentifier":
 			case "NamedSubtemplate":
 				templateParts.push(indent + ctxName + ' (' + ctx.getText() + ')');
 				ctx.children.forEach(child=>{
@@ -1040,33 +1063,83 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				} else {
 					// list
 					if (!!indent && indent.includes('{.}')){
+						// This is an unbulleted list under a bullet, so we need to turn each list item into an indent object with an indented bullet
+						let bIncompleteBullet = /^[ \t]*\{\.\}[ \t]*$/s.test(output[output.length - 1]);
+						let newBullet = indent.replace(/([ \t]*\{\.\})/,'   ' + '$1'); // TODO: allow override of default tab
 						for (let i = 0; i < item.list.length; i++){
+							let itemResult = item.list[i];
+							let indentObject = itemResult;
+							if (typeof indentObject != 'object'){
+								indentObject = {type:'indent', result: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
+							}
 							if (i == 0){
-								this.interpretResult([item.list[i]], output, indent);
+								let interpretResultParm = [indentObject];
+								if (bIncompleteBullet){
+									interpretResultParm = Array.isArray(itemResult) ? itemResult : [itemResult];
+								}
+								this.interpretResult(interpretResultParm, output, indent);
 							} else {
 								if (!indent.includes('\n')){
 									this.addToOutput('\n', output);
 								}
-								this.interpretResult([indent,item.list[i]], output, indent);
+								this.interpretResult([indentObject], output, indent);
 							}
 						}
 					} else {
-						if ((typeof item.list[0] == 'string' && item.list[0].includes('\n')) || typeof item.list[0] != 'string'){
-							this.interpretResult(item.list, output, indent);
-						} else {
-							let lastIndent = output[output.length - 1].replace(/^([ \t]*).*$/s, '$1');
-							let newIndent = (indent == null ?  '   ' + lastIndent : '   ' + indent);
-							item.list.forEach((listItem)=>{
-								this.interpretResult(['\n' + newIndent + listItem], output, newIndent);  // TODO: allow override of default tab								
-							});
+						// create a list and indent it under the current line, if it isn't empty
+						let bEmptyLine = output[output.length - 1] == '';
+						let bContainsNewLine = this.valueAsString(item.list[0]).includes('\n');
+						let lastIndent = output[output.length - 1].replace(/^([ \t]*).*$/s, '$1');
+						let newIndent = (indent == null ?  '   ' + lastIndent : '   ' + indent);  // TODO: allow override of default tab
+						let bIncompleteIndent = output[output.length - 1] == indent;
+						if (bIncompleteIndent){
+							newIndent = indent;
 						}
-						
+						let bFirst = true;
+						item.list.forEach((listItem)=>{
+							if (!bContainsNewLine && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
+								output.push(''); // start a new line
+								if (!!newIndent && newIndent != ''){
+									this.addToOutput(newIndent, output);
+								}
+							}
+							let bIsIndented = !Array.isArray(listItem) && typeof listItem == 'object' && (listItem.type == 'indent' || (typeof listItem.list[0] == 'object' && listItem.list[0].type == 'indent'));
+							if (bIsIndented){
+								newIndent = indent;
+							}
+							this.interpretResult(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
+							bFirst = false;
+						});		
 					}
 				}
 			} else {
 				let x = 'stop';
 			}
 		});
+	}
+	valueAsString(value : any){
+		if (Array.isArray(value)){
+			let result = [];
+			value.forEach((item)=>{
+				result.push(this.valueAsString(item));
+			});
+			return result.join('');
+		}
+		if (typeof value == 'object'){
+			if (value.type == 'indent'){
+				return value.bullet + this.valueAsString(value.result);
+			} else {
+				// list; return the value of the first item
+				return this.valueAsString(value.list[0]);
+			}
+		}
+		return value.toString();
+	}
+	isScalar(value){
+		if (value != null && typeof value != "object"){
+			return true;
+		}
+		return false;
 	}
 	addToOutput(text, output){
 		let ar = text.split('\n');
@@ -1295,8 +1368,7 @@ function validate(input, invocation) : void {
 				return;
 			}
 			if (Array.isArray(result)){
-				let output = [];
-				output.push('');
+				let output = [""];
 				visitor.interpretResult(result, output, null);
 				result = output.join('\n');
 			}

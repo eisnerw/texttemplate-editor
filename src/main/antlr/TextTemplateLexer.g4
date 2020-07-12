@@ -1,15 +1,15 @@
 lexer grammar TextTemplateLexer;
 
-NONGREEDY: [ ]*  '///' ~[\n]* ('\n' | EOF) ->skip;
-COMMENT: [ ]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t\r]*;
-COMMENT_NL: [ ]*  '//' ('\n' | EOF)	 [ \t\r]* ->type(COMMENT);   // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
+NONGREEDY: ([ \t]*  '///' ~[\n]* ('\n' | EOF) | [ \t]* '//' ~[\n]* '\n' ([ t]* '//' ~[\n]* ('\n' | EOF))+) ->skip;
+COMMENT: [ \t]*  '//' ~[/\n]+ ('\n' | EOF) [ \t]*;
+COMMENT_NL: [ \t]*  '//' ('\n' | EOF)	 [ \t]* ->type(COMMENT);   // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
 TEXT: ~[{}/ \n]+ ;
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
 SPACES: ' '+;
 TEXT_SLASH: '/' ->type(TEXT);
 NL: '\n';
-SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+;
+SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+;
 
 
 mode BRACED;
@@ -20,7 +20,7 @@ DOT: '.';
 ARROW: '=>';
 THINARROW: '->';
 RBRACE: '}' -> popMode;
-WS: [ \t\r\n]+ ->skip; // allow white space in braced
+WS: [ \t\n]+ ->skip; // allow white space in braced
 LP: '(' ->pushMode(NESTED);
 BRACED_RP: ')' ->type(RP)	;
 BRACED_COMMA: ',' ->type(COMMA);
@@ -36,9 +36,9 @@ BRACED_ILLEGAL: ([%*-={;<>?\\+] | ']')+;
 
 mode PARENED;
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
-PARENED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
+PARENED_WS: [ \t\n]+ ->skip; // allow white space in braced
 PARENED_BRACKET: '[' ->type(LBRACKET),pushMode(BRACKETED);	
-ARGUMENTTEXT: ~[(),{}&|!.'"\t\r\n\u005b]+ ->type(TEXT); // u005b left bracket
+ARGUMENTTEXT: ~[(),{}&|!.'"\t\n\u005b]+ ->type(TEXT); // u005b left bracket
 PARENED_METHODNAME: '.' [#a-zA-Z_][a-zA-Z0-9_]* '(' ->type(METHODNAME),pushMode(PARENED);
 RP: ')' -> popMode;
 QUOTE: '"' -> pushMode(QUOTED);
@@ -65,9 +65,9 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
-BRACKETED_NONGREEDY: [ ]*  '///' ~[\n]* ('\n' | EOF) ->skip;
-BRACKETED_COMMENT: [ ]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t\r]* ->type(COMMENT);
-BRACKETED_COMMENT_NL: [ ]*  '//' ('\n' | EOF) [ \t\r]* ->type(COMMENT);  // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
+BRACKETED_NONGREEDY: ([ \t]*  '///' ~[\n]* ('\n' | EOF) | [ \t]* '//' ~[\n]* '\n' ([ t]* '//' ~[\n]* ('\n' | EOF))+) ->skip;
+BRACKETED_COMMENT: [ \t]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t]* ->type(COMMENT);
+BRACKETED_COMMENT_NL: [ \t]*  '//' ('\n' | EOF) [ \t]* ->type(COMMENT);  // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
 RBRACKETLP: '](' ->mode(PARENED);
 RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
@@ -76,14 +76,14 @@ BRACKETED_RBRACE: '}' -> type(RBRACE);
 BRACKETED_SP: ' '+ ->type(SPACES);
 BRACKETED_SLASH: '/' ->type(TEXT);
 BRACKETED_NL: '\n' ->type(NL);
-BRACKETED_SUBTEMPLATES: [ \t\n\r]+ 'Subtemplates:' [ \t\n]+ ->type(SUBTEMPLATES);
+BRACKETED_SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+ ->type(SUBTEMPLATES);
 
 mode NESTED;
 NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 NESTED_IDENTIFIER: [$a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> type(METHODNAME),pushMode(PARENED);
 NESTED_DOT: '.' ->type(DOT);
-NESTED_WS: [ \t\r\n]+ ->skip; // allow white space in braced
+NESTED_WS: [ \t\n]+ ->skip; // allow white space in braced
 NESTED_LP: '(' -> type(LP),pushMode(NESTED);
 NESTED_RP: ')' ->type(RP),popMode;
 NESTED_AND: '&' ->type(AND);
