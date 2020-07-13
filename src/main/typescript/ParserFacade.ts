@@ -1035,10 +1035,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	interpretResult = function(result, output, indent){
 		result.forEach((item : any)=>{
 			if (item == null){
-			} else if (typeof item == 'string' || typeof item == 'number'){
+			} else if (this.isScalar(item)){
 				this.addToOutput(item.toString(), output);
 			} else if (Array.isArray(item)){
-				this.interpretResult(item, output, indent);
+				let indentInTheOutput = output[output.length - 1].replace(/^([ \t]*(\{\.\})?).*/s,'$1'); 
+				// determine if the current bulleted indent is being overridden by a plain indent
+				let bReplaceIndent = !!indent && indent.includes('{.}') && !indentInTheOutput.includes('{.}') && indentInTheOutput.length > 0;
+				this.interpretResult(item, output, bReplaceIndent ? indentInTheOutput : indent);
+				//this.interpretResult(item, output, indent);
 			} else if (typeof item == 'object'){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
@@ -1098,15 +1102,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 						let bFirst = true;
 						item.list.forEach((listItem)=>{
+							let bWillBeIndented = this.isIndent(listItem) || this.containsIndent(listItem);
+							if (bWillBeIndented){
+								newIndent = indent;
+							}
 							if (!bStartsWithNewLine && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
 								output.push(''); // start a new line
-								if (!!newIndent && newIndent != ''){
+								if (!!newIndent && newIndent != '' && !bWillBeIndented){
 									this.addToOutput(newIndent, output);
 								}
-							}
-							let bIsIndented = this.isIndent(listItem) || this.containsIndent(listItem);
-							if (bIsIndented){
-								newIndent = indent;
 							}
 							this.interpretResult(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
 							bFirst = false;
@@ -1125,13 +1129,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return true;
 	}
 	containsIndent(value : any){
+		if (typeof value == 'object' && value.type == 'list'){
+			value = value.list;
+		}
 		if (Array.isArray(value)){
 			let bContainsIndent = false;
-			value.forEach((val)=>{
+			for (let i = 0; i < value.length; i++){
+				let val = value[i];
 				if (this.isIndent(val)){
 					bContainsIndent = true;
+					break;
 				}
-			});
+				if (typeof val != 'string' || !/^[ \t]*$/s.test(val)){
+					// indent can only follow blanks
+					break;
+				}
+			}
 			return bContainsIndent;
 		} else {
 			return this.isIndent(value);
