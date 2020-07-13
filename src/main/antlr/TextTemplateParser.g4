@@ -4,23 +4,23 @@ options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
 	beginningIndent?
-    templatecontents+ 
+    templateContents+ 
     EOF
     ;
 
 subtemplateSection: SUBTEMPLATES text* subtemplateSpecs;
 
-subtemplateSpecs: subtemplatespec*;
+subtemplateSpecs: subtemplateSpec*;
 
-subtemplatespec: templatecontexttoken text*;
+subtemplateSpec: templateContextToken text*;
 
-templatecontents: comment? (subtemplateSection | indent | templatetoken | templatecontexttoken | text+);
+templateContents: comment? (subtemplateSection | indent | templateToken | templateContextToken | text+);
 
 indent: bulletHolder indented;
 
 bulletHolder: NL SPACES? LBRACE DOT RBRACE comment? SPACES? ;
 
-indented: (comment? (templatetoken | templatecontexttoken | text+))*;
+indented: (comment? (templateToken | templateContextToken | text+))*;
 
 beginningIndent: beginningBulletHolder indented;
 
@@ -30,31 +30,31 @@ comment: COMMENT+;
 
 text: TEXT | NL | SPACES;
 
-templatetoken: LBRACE bracedoptions RBRACE;
+templateToken: LBRACE bracedOptions RBRACE;
 
-bracedoptions: bracedarrow #braceArrow | bracedthinarrow #braceThinArrow | optionallyInvokedMethodable #bracedMethodable | conditionalexpression #bracedConditional;
+bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optionallyInvokedMethodable #bracedMethodable | conditionalExpression #bracedConditional;
 
 methodInvoked: methodable methodInvocation+;
 
-conditionalexpression: LP conditionalexpression RP #nestedConditional | NOT conditionalexpression #notConditional | conditionalexpression (AND|OR) conditionalexpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
+conditionalExpression: LP conditionalExpression RP #nestedConditional | NOT conditionalExpression #notConditional | conditionalExpression (AND|OR) conditionalExpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
 
-templatecontexttoken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) COLON | COLON) (namedSubtemplate | optionallyInvokedMethodable) RBRACE;
+templateContextToken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) COLON | COLON) (namedSubtemplate | optionallyInvokedMethodable) RBRACE;
 
-templatespec: namedSubtemplate | bracketedtemplatespec;
+templateSpec: namedSubtemplate | bracketedTemplateSpec;
 
-bracketedtemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* subtemplateSection? COMMENT* RBRACKET;
+bracketedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMMENT* subtemplateSection? COMMENT* RBRACKET;
 
-methodabletemplatespec: LBRACKET COMMENT? beginningIndent? templatecontents* COMMENT* RBRACKETLP;
+invokedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMMENT* RBRACKETLP;
 
-bracedarrow: conditionalexpression ARROW bracedarrowtemplatespec;
+bracedArrow: conditionalExpression ARROW bracedArrowTemplateSpec;
 
-bracedthinarrow: conditionalexpression THINARROW optionallyInvokedMethodable;
+bracedThinArrow: conditionalExpression THINARROW optionallyInvokedMethodable;
 
-bracedarrowtemplatespec: optionallyInvokedMethodable COMMA optionallyInvokedMethodable | optionallyInvokedMethodable;
+bracedArrowTemplateSpec: optionallyInvokedMethodable COMMA optionallyInvokedMethodable | optionallyInvokedMethodable;
 
-methodable: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | templatespec #methodableTemplatespec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #methodableIdentifier;
+methodable: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #methodableIdentifier;
 
-methodInvocation: (method|DOT methodabletemplatespec) (conditionalexpression | arguments*) RP;
+methodInvocation: (method|DOT invokedTemplateSpec) (conditionalExpression | arguments*) RP;
 
 method: METHODNAME;
 
@@ -62,6 +62,6 @@ arguments: argument (COMMA argument)*;
 
 optionallyInvokedMethodable: (methodInvoked | methodable);
 
-argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templatetoken #tokenedArgument | bracketedtemplatespec #bracketedArgument | TEXT+ #textedArgument;
+argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templateToken #tokenedArgument | bracketedTemplateSpec #bracketedArgument | TEXT+ #textedArgument;
 
 namedSubtemplate: POUND IDENTIFIER;

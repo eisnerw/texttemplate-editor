@@ -163,7 +163,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return this.context.getValue(key);
 	};
-	visitTemplatetoken = function(ctx) {
+	visitTemplateToken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
 		let result : any = ctx.children[1].accept(this);
 		if (Array.isArray(result) && result.length == 1){
@@ -174,7 +174,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result;
 	};
-	visitTemplatecontents = function(ctx) {
+	visitTemplateContents = function(ctx) {
 		var value = this.visitChildren(ctx);
 		if (Array.isArray(value)){
 			for (let i = 0; i < value.length; i++){
@@ -218,7 +218,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value != null ? value.join('') :  '';
 	};
-	visitTemplatecontexttoken = function(ctx) {
+	visitTemplateContextToken = function(ctx) {
 		if (ctx.children.length < 3){
 			return null; // invalid
 		}
@@ -319,7 +319,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
 			// necessary to obtain multiple values
-			let bAggregatedResult : boolean = ctx.children[0].constructor.name == 'MethodableTemplatespecContext';  // only aggregate for this context
+			let bAggregatedResult : boolean = ctx.children[0].constructor.name == 'InvokedTemplateSpecContext';  // only aggregate for this context
 			if (bAggregatedResult){
 				ctx.children.slice(1).forEach((child) => {
 					let method = child.children[0].accept(this);
@@ -435,7 +435,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return ' ';
 	};
-	visitBracedthinarrow = function(ctx) {
+	visitBracedThinArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
 		let oldNoValues = this.bNoValues;
@@ -451,7 +451,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return ''; // false means ignore this token
 	};
-	visitBracedarrow = function(ctx) {
+	visitBracedArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
 		let oldNoValues = this.bNoValues;
@@ -481,7 +481,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return ctx.children[2].accept(this);
 	};	
-	visitBracketedtemplatespec = function(ctx) {
+	visitBracketedTemplateSpec = function(ctx) {
 		let oldTokens = this.annotations['Tokens'];
 		this.annotations['Tokens'] = tokensAsString(this.input, ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop), ctx.parser.symbolicNames);
 		let result = [];
@@ -499,7 +499,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result;
 	};
-	visitMethodableTemplatespec = function(ctx) {
+	visitMethodableTemplateSpec = function(ctx) {
 		if (this.bNoValues){
 			if (this.context && this.context.type == 'list'){
 				return this.visitChildrenWithoutValues(ctx);
@@ -568,7 +568,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBraceArrow = function(ctx) {
 		return this.visitChildren(ctx)[0]; // remove a level of arrays
 	};
-	visitTemplatespec = function(ctx) {
+	visitTemplateSpec = function(ctx) {
 		let result = this.visitChildren(ctx);
 		if (Array.isArray(result) && result.length == 1){
 			result = result[0];
@@ -661,7 +661,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.bNoValues = oldNoValues;
 		let parentCtx : any = args.parentCtx;
 		// TODO: table driven argmument handling
-		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "MethodabletemplatespecContext";
+		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "InvokedTemplateSpecContext";
 		if (bTemplate || method.startsWith('#')){
 			if (Array.isArray(value)){
 				value = value.join('');
@@ -914,7 +914,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			case "Text":
 				templateParts.push(ctx.getText());
 				break;
-			case "Templatecontexttoken":
+			case "TemplateContextToken":
 				templateParts.push('{');
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
 					if (!ctx.children[i].children){
@@ -925,7 +925,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				templateParts.push('}');
 				break;
-			case "Templatetoken":
+			case "TemplateToken":
 				templateParts.push('{');
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
 					templateParts.push(this.getTemplateWithoutComments(ctx.children[i]));
@@ -935,7 +935,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			//case "OptionallyInvokedMethodable":
 			//	templateParts.push('{' + ctx.getText() + '}');
 			//	break;
-			case "Bracketedtemplatespec":
+			case "BracketedTemplateSpec":
 				templateParts.push('[');
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
 					if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
@@ -944,8 +944,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				templateParts.push(']');
 				break;
-			case "Bracedarrowtemplatespec":
-			case "Bracedarrow":
+			case "BracedArrowTemplateSpec":
+			case "BracedArrow":
 				templateParts.push(this.getTemplateWithoutComments(ctx.children[0]));
 				templateParts.push(ctx.children[1].getText());
 				if (ctx.children.length > 2){
@@ -971,21 +971,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let templateParts = [];
 		let ctxName = ctx.constructor.name.replace('Context','');
 		switch (ctxName) {
-			case "Templatecontents":
+			case "TemplateContents":
 			case "CompilationUnit":
 			case "QuoteLiteral":
 			case "ApostropheLiteral":
 			case "MethodInvocation":
 			case "Comment":
-			case "Bracedthinarrow":
+			case "BracedThinArrow":
 			case "LogicalOperator":
-			case "MethodableTemplatespec":
+			case "InvokedTemplateSpec":
 			case "SubtemplateSpecs":
 			case "BracketedArgument":
 			case "Indent":
 			case "BeginningIndent":
 			case "MethodInvoked":
-			case "Templatecontexttoken":
+			case "TemplateContextToken":
 				templateParts.push(indent + ctxName);
 				ctx.children.forEach(child=>{
 					if (child.getChildCount() > 0){
@@ -1006,15 +1006,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			case "Text":
 				templateParts.push(indent + 'Text ("' + ctx.getText().replace(/\n/g,'\\n') + '")');
 				break;
-			case "Bracketedtemplatespec":
-			case "Templatetoken":
+			case "BracketedTemplateSpec":
+			case "TemplateToken":
 				templateParts.push(indent + ctxName);
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
 					templateParts.push(this.getParseTree(ctx.children[i], indentBlanks + indent));
 				}
 				break;
-			case "Bracedarrowtemplatespec":
-			case "Bracedarrow":
+			case "BracedArrowTemplateSpec":
+			case "BracedArrow":
 				templateParts.push(indent + ctxName);
 				templateParts.push(this.getParseTree(ctx.children[0], indentBlanks + indent));
 				if (ctx.children.length > 2){
