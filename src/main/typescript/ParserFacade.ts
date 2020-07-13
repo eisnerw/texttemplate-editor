@@ -276,8 +276,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!ctx.children){
 			return ''; // no data
 		}
+		// subtemplates are inherited but can be replaced
+		let oldSubtemplates = {};
+		for (let key in this.subtemplates){
+			oldSubtemplates[key] = this.subtemplates[key];
+		}
 		this.loadSubtemplates(ctx);
 		let result : [] = this.visitChildren(ctx);
+		this.subtemplates = oldSubtemplates;
 		let spliced = result.splice(0, result.length - 1); // remove the result of the <EOF> token
 		if (spliced.length == 1){
 			return spliced[0];
