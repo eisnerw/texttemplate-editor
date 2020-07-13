@@ -1099,6 +1099,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						let bIncompleteIndent = output[output.length - 1] == indent;
 						if (bIncompleteIndent){
 							newIndent = indent;
+						} else if (lastIndent == output[output.length - 1]){
+							// starting a new indent
+							newIndent = lastIndent;
+							bIncompleteIndent = true;
 						}
 						let bFirst = true;
 						item.list.forEach((listItem)=>{
