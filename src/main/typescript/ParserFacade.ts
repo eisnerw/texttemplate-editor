@@ -136,21 +136,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	input;
 	recursionLevel = 0;
 	annotations = {};
-	bNoValues : boolean = false; // used when visiting children to get pure interpolations with tokens
 	visitText = function(ctx){
 		return ctx.getText();
 	};
 	visitMethodableIdentifier = function(ctx) {
 		var key = ctx.getText();
-		if (this.bNoValues){
-			this.bNoValues = false;
-			let result = this.visitMethodableIdentifier(ctx);
-			this.bNoValues = true;
-			if (!key.startsWith('$') && typeof result == 'string'){
-				return '{' + key + '}';
-			}
-			return result;
-		}
 		if (!this.context || !(this.context instanceof TemplateData)){
 			return undefined; // attempt to look up a variable without a context returns undefined
 		}
@@ -169,54 +159,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (Array.isArray(result) && result.length == 1){
 			result = result[0];
 		}
-		if (this.bNoValues){
-			return result;
-		}
 		return result;
 	};
 	visitTemplateContents = function(ctx) {
 		var value = this.visitChildren(ctx);
-		if (Array.isArray(value)){
-			for (let i = 0; i < value.length; i++){
-				if (Array.isArray(value[i])){ 
-					let bIsScalarArray = true; 
-					for (let j = 0; j < value[i].length; j++){
-						let val = value[i][j];
-						if (bIsScalarArray && (val == null || typeof val == 'object')){
-							bIsScalarArray = false;
-						}
-					}
-					if (bIsScalarArray){
-						let joined = '';
-						for (let j = 0; j < value[i].length; j++){
-							joined += value[i][j].toString();
-						}
-						value[i] = joined;
-					}
-				}
-			}
-		}		
-		/*
-		if (Array.isArray(value) && Array.isArray(value[0]) && value[0].length > 1){
-			let newValue : string[] = [];
-			value[0].forEach((val)=>{
-				if (typeof val == 'string'){
-					val.split('\n').forEach((subval)=>{
-						newValue.push(subval);
-					});
-				}
-			});
-			
-			value[0] = newValue.join('\n    ') + '\n';
-		}
-		*/
-		if (!ctx.children || ctx.children[0].constructor.name == 'SubtemplateSectionContext'){
-			return ''; //prevent displaying the Subtemplate section and avoid error for invalid brace 
-		}
 		if (Array.isArray(value) && value.length == 1){
 			return value[0];
 		}
-		return value != null ? value.join('') :  '';
+		return value;
 	};
 	visitTemplateContextToken = function(ctx) {
 		if (ctx.children.length < 3){
@@ -225,15 +175,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let oldContext : TemplateData = this.context;
 		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
 		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
-			let oldNoValues = this.bNoValues;
-			this.bNoValues = false; // need values to get context
 			let context : any;
 			if (ctx.children[1].constructor.name == 'NamedSubtemplateContext'){
 				context = ctx.children[1].accept(this);
 			} else {
 				context = ctx.children[1].children[0].accept(this);
 			}
-			this.bNoValues = oldNoValues;
+			context = this.interpretResult(context);
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
 			}
@@ -297,7 +245,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitMethodInvoked = function(ctx) {
 		// visits first child to obtain a value and then applies each subsequent child to manipulate that value
 		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#'); // value will be obtained from a template
-		let oldNoValues = this.bNoValues; 
 		// preserve the incoming annotations by doing a shallow clone because a method could change one
 		let oldAnnotations = {};
 		for (let key in this.annotations){
@@ -307,15 +254,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		ctx.children.slice(1).forEach((child) => {
 			let method : string = child.children[0].accept(this);
 			if (method.startsWith('@') && bMethodableIsTemplate){
-				this.bNoValues = false; // get the real arguments
 				let args : any = child.children[1];
-				this.bNoValues = oldNoValues;
 				this.callMethod(method, this.annotations, args); // modify the current (inherited) annotations
 			} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && !!this.annotations.MissingValue){
 				delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls )TODO: is this the right place
 			}
 		});
-		let noValueValue : any = undefined;
 		let value : any = undefined;
 		if (this.context && this.context.type == 'list'){
 			// necessary to obtain multiple values
@@ -333,71 +277,50 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 			// create an arry of results and then run the method on the array
 				value = [];
-				noValueValue = []
 				this.context.iterateList((newContext : TemplateData)=>{
 					let oldContext = this.context;
 					this.context = newContext;
-					this.bNoValues = false;
 					value.push(ctx.children[0].accept(this));
-					this.bNoValues = oldNoValues;
-					if (this.bNoValues){
-						noValueValue.push(ctx.children[0].accept(this));
-					}
 					this.context = oldContext;
 				});
 			}
 		} else {
-			this.bNoValues = false;
 			// obtain the single result
 			value = ctx.children[0].accept(this);
-			this.bNoValues = oldNoValues;
-			if (this.bNoValues){
-				noValueValue = ctx.children[0].accept(this);
-			}
 		}
 		// call each method, which follow the first (value) child, serially
 		ctx.children.slice(1).forEach((child) => {
 			// Each child is a method and an argument(s) tree
 			let method : string = child.children[0].accept(this);
 			if (!method.startsWith('@')){ // annotations have already been processed
-				if (!this.bNoValues || (method == 'Case' || method == 'Anded' || method == 'Count' || method == 'Where')){  // for noValue, only actually call certain methods
-					this.bNoValues = false;
-					let args : any = child.children[1]; // passing the argument tree to CallMethod
-					this.bNoValues = oldNoValues;
-					if (Array.isArray(value)){
-						// value is an array; process each member
-						let computedValue : string[] = [];
-						if (method == 'ToUpper' || method == 'ToLower' || method == 'Matches'){
-							value.forEach((val) =>{
-								computedValue.push(this.callMethod(method, val, args));
-							});
-							value = computedValue;
-						} else {
-							value.forEach((val)=>{
-								if (Array.isArray(val) && val.length == 1){
-									computedValue.push(val[0]);
-								} else {
-									computedValue.push(val);
-								}
-							});
-							value = this.callMethod(method, computedValue, args);
-						}
+				let args : any = child.children[1]; // passing the argument tree to CallMethod
+				value = this.callMethod(method, this.interpretResult(value), args);
+				/*
+				if (Array.isArray(value)){
+					// value is an array; process each member
+					let computedValue : string[] = [];
+					if (method == 'ToUpper' || method == 'ToLower' || method == 'Matches'){
+						value.forEach((val) =>{
+							computedValue.push(this.callMethod(method, this.interpretResult(val), args));
+						});
+						value = computedValue;
 					} else {
-						// value is a scalar
-						value = this.callMethod(method, value, args);
+						value.forEach((val)=>{
+							computedValue.push(this.interpretResult(val));
+						});
+						value = this.callMethod(method, computedValue, args);
 					}
-					noValueValue = value;
+				} else {
+					// value is a scalar
+					value = this.callMethod(method, value, args);
 				}
+				*/
 			}
 		});
 		this.annotations = oldAnnotations; // restore the annotations
-		if (this.bNoValues){
-			return noValueValue;
-		}
 		return value;
 	};
 	visitQuoteLiteral = function(ctx) {
-		//return ctx.children[1].getText().replace(/\\n/g,"\n").replace(/\\"/g,'"').replace(/\\\\/g,"\\").replace(/\\b/g,"\b").replace(/\\f/g,"\f").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\\//g,"\/"); // handle backslash plus "\/bfnrt
 		// using the JSON parser to unescape the string
 		var tempJson = JSON.parse('{"data":"' + ctx.children[1].getText() + '"}');
 		return tempJson.data;
@@ -438,10 +361,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBracedThinArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
-		let oldNoValues = this.bNoValues;
-		this.bNoValues = false; // conditions are checked with real data
 		let result : any = ctx.children[0].accept(this);
-		this.bNoValues = oldNoValues;
 		this.annotations.MissingValue = oldMissingValue;
 		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
 			return this.visitChildren(ctx.children[2].children[0]); // true
@@ -454,10 +374,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBracedArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
-		let oldNoValues = this.bNoValues;
-		this.bNoValues = false; // conditions are checked with real data
 		let result : boolean = ctx.children[0].accept(this);
-		this.bNoValues = oldNoValues;
 		this.annotations.MissingValue = oldMissingValue;
 			if (Array.isArray(result)){
 			result = result[0]; // TODO:why is this one level deep????
@@ -500,12 +417,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result;
 	};
 	visitMethodableTemplateSpec = function(ctx) {
-		if (this.bNoValues){
-			if (this.context && this.context.type == 'list'){
-				return this.visitChildrenWithoutValues(ctx);
-			}
-			return this.visitChildren(ctx)[0];
-		}
 		let value : any;
 		if (this.context && this.context.type == 'list'){
 			let listObject = {list: [], type:'list'};
@@ -633,9 +544,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		});
 		let bulletText = bulletTextArray.join('');
-		if (this.bNoValues){
-			return bulletText + ctx.children[1].accept(this).join('');
-		}
 		return {type:'indent', bullet: bulletText, result: ctx.children[1].accept(this)};
 	};
 	visitBeginningIndent = function(ctx) {
@@ -643,8 +551,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	callMethod = function(method : string, value : any, args: any){
 		let argValues = [];
-		let oldNoValues = this.bNoValues;
-		this.bNoValues = false; // ignore bNoValues when getting argument values
 		if (args.constructor.name == 'ConditionContext'){
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
@@ -653,12 +559,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (argResults){
 				argResults.forEach((arg) =>{
 					if (arg !== undefined){ // remove result of commas
-						argValues.push(arg);
+						argValues.push(this.interpretResult(arg));
 					}
 				});
 			}
 		}
-		this.bNoValues = oldNoValues;
 		let parentCtx : any = args.parentCtx;
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "InvokedTemplateSpecContext";
@@ -760,6 +665,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Anded':
 					if (Array.isArray(value)){
+						// Reduce each of the complex values TODO: thi
 						for (let i : number = 0; i < value.length - 1; i++){
 							if (i == (value.length - 2)){
 								value[i] += ' and ';
@@ -889,19 +795,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	}
-	visitChildrenWithoutValues = function(ctx){
-		let oldNoValues = this.bNoValues;
-		let oldContext = this.context;
-		if (!!this.context && this.context.type == 'list'){
-			this.context = this.context.list[0];
-		}
-		this.bNoValues = true;
-		let result = this.visitChildren(ctx);
-		this.bNoValues = oldNoValues;
-		this.context = oldContext;
-		return result;
-	}
-	
 	getTemplateWithoutComments = function(ctx){
 		let templateParts = [];
 		let ctxName = ctx.constructor.name.replace('Context', '');
@@ -1038,7 +931,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result; 
 	}
-	interpretResult = function(result, output, indent){
+	interpretResult = function(result){
+		if (typeof result == 'object'){
+			if (result instanceof TemplateData){
+				return result;
+			}
+			result = [result];
+		}
+		if (!Array.isArray(result)){
+			return result;
+		}
+		let output = [""];
+		this.doInterpretResult(result, output, null);
+		return output.join('\n');
+	}
+	doInterpretResult = function(result, output, indent){
 		result.forEach((item : any)=>{
 			if (item == null){
 			} else if (this.isScalar(item)){
@@ -1047,8 +954,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let indentInTheOutput = output[output.length - 1].replace(/^([ \t]*(\{\.\})?).*/s,'$1'); 
 				// determine if the current bulleted indent is being overridden by a plain indent
 				let bReplaceIndent = !!indent && indent.includes('{.}') && !indentInTheOutput.includes('{.}') && indentInTheOutput.length > 0;
-				this.interpretResult(item, output, bReplaceIndent ? indentInTheOutput : indent);
-				//this.interpretResult(item, output, indent);
+				this.doInterpretResult(item, output, bReplaceIndent ? indentInTheOutput : indent);
+				//this.doInterpretResult(item, output, indent);
 			} else if (typeof item == 'object'){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
@@ -1057,11 +964,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.addToOutput(item.result.toString(), output);
 					} else if (typeof item.result == 'object'){
 						if (Array.isArray(item.result) || item.result.type == 'indent'){
-							this.interpretResult([item.result], output, item.bullet);
+							this.doInterpretResult([item.result], output, item.bullet);
 						} else {
 							// list
 							for (let i = 0; i < item.result.list.length(); i ++){
-								this.interpretResult(this.result.list[i], output, item.bullet);
+								this.doInterpretResult(this.result.list[i], output, item.bullet);
 								if (i < this.result.list.length - 1){
 									this.addToOutput('\n', output);
 								}
@@ -1084,16 +991,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								indentObject = {type:'indent', result: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
-								let interpretResultParm = [indentObject];
+								let doInterpretResultParm = [indentObject];
 								if (bIncompleteBullet){
-									interpretResultParm = Array.isArray(itemResult) ? itemResult : [itemResult];
+									doInterpretResultParm = Array.isArray(itemResult) ? itemResult : [itemResult];
 								}
-								this.interpretResult(interpretResultParm, output, indent);
+								this.doInterpretResult(doInterpretResultParm, output, indent);
 							} else {
 								if (!indent.includes('\n')){
 									this.addToOutput('\n', output);
 								}
-								this.interpretResult([indentObject], output, indent);
+								this.doInterpretResult([indentObject], output, indent);
 							}
 						}
 					} else {
@@ -1122,7 +1029,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									this.addToOutput(newIndent, output);
 								}
 							}
-							this.interpretResult(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
+							this.doInterpretResult(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
 							bFirst = false;
 						});		
 					}
@@ -1175,6 +1082,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				// list; return the value of the first item
 				return this.valueAsString(value.list[0]);
 			}
+		}
+		if (value == null){
+			return '';
 		}
 		return value.toString();
 	}
@@ -1411,9 +1321,7 @@ function validate(input, invocation) : void {
 				return;
 			}
 			if (Array.isArray(result)){
-				let output = [""];
-				visitor.interpretResult(result, output, null);
-				result = output.join('\n');
+				result = visitor.interpretResult(result);
 			}
 			document.getElementById('interpolated').innerHTML = result.toString();
 			Object.keys(urls).forEach((key : string) =>{
