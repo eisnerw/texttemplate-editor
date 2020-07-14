@@ -32,13 +32,13 @@ text: TEXT | NL | SPACES;
 
 templateToken: LBRACE bracedOptions RBRACE;
 
-bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optionallyInvokedMethodable #bracedMethodable | conditionalExpression #bracedConditional;
+bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optionallyInvoked #braced | conditionalExpression #bracedConditional;
 
 methodInvoked: methodable methodInvocation+;
 
 conditionalExpression: LP conditionalExpression RP #nestedConditional | NOT conditionalExpression #notConditional | conditionalExpression (AND|OR) conditionalExpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
 
-templateContextToken: LBRACE ((namedSubtemplate | optionallyInvokedMethodable) COLON | COLON) (namedSubtemplate | optionallyInvokedMethodable) RBRACE;
+templateContextToken: LBRACE ((namedSubtemplate | optionallyInvoked) COLON | COLON) (namedSubtemplate | optionallyInvoked) RBRACE;
 
 templateSpec: namedSubtemplate | bracketedTemplateSpec;
 
@@ -48,11 +48,11 @@ invokedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMMEN
 
 bracedArrow: conditionalExpression ARROW bracedArrowTemplateSpec;
 
-bracedThinArrow: conditionalExpression THINARROW optionallyInvokedMethodable;
+bracedThinArrow: conditionalExpression THINARROW optionallyInvoked;
 
-bracedArrowTemplateSpec: optionallyInvokedMethodable COMMA optionallyInvokedMethodable | optionallyInvokedMethodable;
+bracedArrowTemplateSpec: optionallyInvoked COMMA optionallyInvoked | optionallyInvoked;
 
-methodable: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #methodableIdentifier;
+methodable: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #identifier;
 
 methodInvocation: (method|DOT invokedTemplateSpec) (conditionalExpression | arguments*) RP;
 
@@ -60,7 +60,7 @@ method: METHODNAME;
 
 arguments: argument (COMMA argument)*;
 
-optionallyInvokedMethodable: (methodInvoked | methodable);
+optionallyInvoked: (methodInvoked | methodable);
 
 argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templateToken #tokenedArgument | bracketedTemplateSpec #bracketedArgument | TEXT+ #textedArgument;
 

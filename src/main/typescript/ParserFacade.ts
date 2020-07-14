@@ -139,7 +139,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitText = function(ctx){
 		return ctx.getText();
 	};
-	visitMethodableIdentifier = function(ctx) {
+	visitIdentifier = function(ctx) {
 		var key = ctx.getText();
 		if (!this.context || !(this.context instanceof TemplateData)){
 			return undefined; // attempt to look up a variable without a context returns undefined
@@ -181,7 +181,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				context = ctx.children[1].children[0].accept(this);
 			}
-			context = this.interpretResult(context);
+			context = this.interpret(context);
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
 			}
@@ -275,14 +275,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (bAggregatedResult){
 				value = ctx.children[0].accept(this); // let the children process the list
 			} else {
-			// create an arry of results and then run the method on the array
-				value = [];
+			// create a templatedata list object and then run the method on the list
+				let list = [];
 				this.context.iterateList((newContext : TemplateData)=>{
 					let oldContext = this.context;
 					this.context = newContext;
-					value.push(ctx.children[0].accept(this));
+					list.push(this.interpret(ctx.children[0].accept(this))); // reduce results to strings
 					this.context = oldContext;
 				});
+				value = {type:'argument', list:list};
 			}
 		} else {
 			// obtain the single result
@@ -294,19 +295,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let method : string = child.children[0].accept(this);
 			if (!method.startsWith('@')){ // annotations have already been processed
 				let args : any = child.children[1]; // passing the argument tree to CallMethod
-				value = this.callMethod(method, this.interpretResult(value), args);
+				value = this.callMethod(method, this.interpret(value), args);
 				/*
 				if (Array.isArray(value)){
 					// value is an array; process each member
 					let computedValue : string[] = [];
 					if (method == 'ToUpper' || method == 'ToLower' || method == 'Matches'){
 						value.forEach((val) =>{
-							computedValue.push(this.callMethod(method, this.interpretResult(val), args));
+							computedValue.push(this.callMethod(method, this.interpret(val), args));
 						});
 						value = computedValue;
 					} else {
 						value.forEach((val)=>{
-							computedValue.push(this.interpretResult(val));
+							computedValue.push(this.interpret(val));
 						});
 						value = this.callMethod(method, computedValue, args);
 					}
@@ -506,7 +507,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.visitChildren(ctx);
 		return '';
 	};
-	visitOptionallyInvokedMethodable = function(ctx) {
+	visitOptionallyInvoked = function(ctx) {
 		let result = this.visitChildren(ctx);
 		//if (result.length == 1){
 			return result[0];
@@ -520,7 +521,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitCondition = function(ctx) {
 		return this.visitChildren(ctx)[0];
 	};
-	visitBracedMethodable = function(ctx) {
+	visitBraced = function(ctx) {
 		// remove extraneous array
 		return this.visitChildren(ctx)[0];
 	};
@@ -559,7 +560,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (argResults){
 				argResults.forEach((arg) =>{
 					if (arg !== undefined){ // remove result of commas
-						argValues.push(this.interpretResult(arg));
+						argValues.push(this.interpret(arg));
 					}
 				});
 			}
@@ -664,16 +665,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'Anded':
-					if (Array.isArray(value)){
-						// Reduce each of the complex values TODO: thi
-						for (let i : number = 0; i < value.length - 1; i++){
-							if (i == (value.length - 2)){
-								value[i] += ' and ';
+					if (typeof value == 'object' && value.type == 'argument'){
+						let list = value.list;
+						for (let i : number = 0; i < list.length - 1; i++){
+							if (i == (list.length - 2)){
+								list[i] += ' and ';
 							} else {
-								value[i] += ', ';
+								list[i] += ', ';
 							}
 						}
-						value = value.join('');
+						value = list.join('');
 					}
 					break;
 					
@@ -801,7 +802,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		switch (ctxName) {
 			case "NamedSubtemplate":
 			case "MethodInvoked":
-			case "MethodableIdentifier":
+			case "Identifier":
 			case "BeginningBulletHolder":
 			case "BulletHolder":
 			case "Text":
@@ -825,7 +826,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				templateParts.push('}');
 				break;
-			//case "OptionallyInvokedMethodable":
+			//case "OptionallyInvoked":
 			//	templateParts.push('{' + ctx.getText() + '}');
 			//	break;
 			case "BracketedTemplateSpec":
@@ -887,7 +888,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				});
 				break;
 			case "Method":
-			case "MethodableIdentifier":
+			case "Identifier":
 			case "NamedSubtemplate":
 				templateParts.push(indent + ctxName + ' (' + ctx.getText() + ')');
 				ctx.children.forEach(child=>{
@@ -931,9 +932,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result; 
 	}
-	interpretResult = function(result){
+	interpret = function(result){
 		if (typeof result == 'object'){
-			if (result instanceof TemplateData){
+			if (result instanceof TemplateData || result.type == 'argument'){
 				return result;
 			}
 			result = [result];
@@ -942,10 +943,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return result;
 		}
 		let output = [""];
-		this.doInterpretResult(result, output, null);
+		this.doInterpret(result, output, null);
 		return output.join('\n');
 	}
-	doInterpretResult = function(result, output, indent){
+	doInterpret = function(result, output, indent){
 		result.forEach((item : any)=>{
 			if (item == null){
 			} else if (this.isScalar(item)){
@@ -954,8 +955,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let indentInTheOutput = output[output.length - 1].replace(/^([ \t]*(\{\.\})?).*/s,'$1'); 
 				// determine if the current bulleted indent is being overridden by a plain indent
 				let bReplaceIndent = !!indent && indent.includes('{.}') && !indentInTheOutput.includes('{.}') && indentInTheOutput.length > 0;
-				this.doInterpretResult(item, output, bReplaceIndent ? indentInTheOutput : indent);
-				//this.doInterpretResult(item, output, indent);
+				this.doInterpret(item, output, bReplaceIndent ? indentInTheOutput : indent);
+				//this.doInterpret(item, output, indent);
 			} else if (typeof item == 'object'){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
@@ -964,11 +965,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.addToOutput(item.result.toString(), output);
 					} else if (typeof item.result == 'object'){
 						if (Array.isArray(item.result) || item.result.type == 'indent'){
-							this.doInterpretResult([item.result], output, item.bullet);
+							this.doInterpret([item.result], output, item.bullet);
 						} else {
 							// list
 							for (let i = 0; i < item.result.list.length(); i ++){
-								this.doInterpretResult(this.result.list[i], output, item.bullet);
+								this.doInterpret(this.result.list[i], output, item.bullet);
 								if (i < this.result.list.length - 1){
 									this.addToOutput('\n', output);
 								}
@@ -991,16 +992,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								indentObject = {type:'indent', result: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
-								let doInterpretResultParm = [indentObject];
+								let doInterpretParm = [indentObject];
 								if (bIncompleteBullet){
-									doInterpretResultParm = Array.isArray(itemResult) ? itemResult : [itemResult];
+									doInterpretParm = Array.isArray(itemResult) ? itemResult : [itemResult];
 								}
-								this.doInterpretResult(doInterpretResultParm, output, indent);
+								this.doInterpret(doInterpretParm, output, indent);
 							} else {
 								if (!indent.includes('\n')){
 									this.addToOutput('\n', output);
 								}
-								this.doInterpretResult([indentObject], output, indent);
+								this.doInterpret([indentObject], output, indent);
 							}
 						}
 					} else {
@@ -1029,7 +1030,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									this.addToOutput(newIndent, output);
 								}
 							}
-							this.doInterpretResult(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
+							this.doInterpret(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
 							bFirst = false;
 						});		
 					}
@@ -1321,7 +1322,7 @@ function validate(input, invocation) : void {
 				return;
 			}
 			if (Array.isArray(result)){
-				result = visitor.interpretResult(result);
+				result = visitor.interpret(result);
 			}
 			document.getElementById('interpolated').innerHTML = result.toString();
 			Object.keys(urls).forEach((key : string) =>{
