@@ -157,7 +157,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// there are three children, the left brace, the token, and the right brace
 		let result : any = ctx.children[1].accept(this);
 		if (Array.isArray(result) && result.length == 1){
-			result = result[0];
+			return result[0];
 		}
 		return result;
 	};
@@ -481,10 +481,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitTemplateSpec = function(ctx) {
 		let result = this.visitChildren(ctx);
-		if (Array.isArray(result) && result.length == 1){
-			result = result[0];
-		}
-		return result;
+		//if (Array.isArray(result) && result.length == 1){
+			return result[0];
+		//}
+		//return result;
 	};
 	visitSubtemplateSection = function(ctx) {
 		// report any subtemplates that take more than one line for folding
@@ -508,10 +508,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitOptionallyInvokedMethodable = function(ctx) {
 		let result = this.visitChildren(ctx);
-		if (result.length == 1){
+		//if (result.length == 1){
 			return result[0];
-		}
-		return result;
+		//}
+		//return result;
 	};
 	visitNotConditional = function(ctx) {
 		let result : any = this.visitChildren(ctx)[1];
