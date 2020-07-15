@@ -202,6 +202,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.context = oldContext;
 					return 'Error loading context: ' + e.message;
 				}
+				if (ctx.children.length > 1 && ctx.children[1].children && ctx.children[1].children[0].constructor.name == 'MethodInvokedContext'){
+					// there is a method invocation on a context that was created here.  We need to rerun the method(s)
+					let invocations = ctx.children[1].children[0].children.slice(1);
+					this.context = this.invokeMethods(null, invocations); // a null valueContext implies this.context
+				}
+				
 			} else if (bHasContext) { // context may not be specified
 				if (context){
 					this.context = context;
@@ -243,84 +249,76 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return methodName.substr(1, methodName.length - 2);  // drop parens
 	};
 	visitMethodInvoked = function(ctx) {
-		// visits first child to obtain a value and then applies each subsequent child to manipulate that value
-		let bMethodableIsTemplate = ctx.getText().startsWith('[') || ctx.getText().startsWith('#'); // value will be obtained from a template
-		// preserve the incoming annotations by doing a shallow clone because a method could change one
+		let valueContext = ctx.children[0]; // first child is the target value context
+		let invocations = ctx.children.slice(1); // subsequent children are cascaded methods
+		let targetValue : any; 
+		let value = this.invokeMethods(valueContext, invocations);
+		return value;
+	};
+	invokeMethods = function(valueContext, invocations){
 		let oldAnnotations = {};
+		let value : any = undefined;
 		for (let key in this.annotations){
 			oldAnnotations[key] = this.annotations[key];
 		}
-		// process annotations first
-		ctx.children.slice(1).forEach((child) => {
-			let method : string = child.children[0].accept(this);
-			if (method.startsWith('@') && bMethodableIsTemplate){
-				let args : any = child.children[1];
-				this.callMethod(method, this.annotations, args); // modify the current (inherited) annotations
-			} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && !!this.annotations.MissingValue){
-				delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls )TODO: is this the right place
-			}
-		});
-		let value : any = undefined;
-		if (this.context && this.context.type == 'list'){
-			// necessary to obtain multiple values
-			let bAggregatedResult : boolean = ctx.children[0].constructor.name == 'InvokedTemplateSpecContext';  // only aggregate for this context
-			if (bAggregatedResult){
-				ctx.children.slice(1).forEach((child) => {
-					let method = child.children[0].accept(this);
-					if (!method.startsWith('@')){ // TODO: add other tests
-						bAggregatedResult = false; 
-					}						
+		if (valueContext != null){ // null implies that the value is the current context
+			let bTargetIsTemplate = valueContext.getText().startsWith('[') || valueContext.getText().startsWith('#'); // value will be obtained from a template
+			// preserve the incoming annotations by doing a shallow clone because a method could change one
+			// process annotations first
+			if (bTargetIsTemplate){ // TODO: flag annotations on non-templates as errors
+				invocations.forEach((child) => {
+					let method : string = child.children[0].accept(this);
+					if (method.startsWith('@') && bTargetIsTemplate){
+						let args : any = child.children[1];
+						this.callMethod(method, this.annotations, args); // modify the current annotations so that old annotations are inherited
+					} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && !!this.annotations.MissingValue){
+						delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls TODO: is this the right place?
+					}
 				});
 			}
-			if (bAggregatedResult){
-				value = ctx.children[0].accept(this); // let the children process the list
+			if (this.context && this.context.type == 'list'){
+				// for non-annotations and under special circumstances, depending on how it was parsed, we'll obtain a single value rather than a list
+				let bAggregatedResult : boolean = valueContext.constructor.name == 'InvokedTemplateSpecContext';  // only aggregate for this specific context
+				if (bAggregatedResult){
+					invocations.forEach((child) => {
+						let method = child.children[0].accept(this);
+						if (!method.startsWith('@')){ // TODO: add other tests
+							bAggregatedResult = false; 
+						}						
+					});
+				}
+				if (bAggregatedResult){
+					value = valueContext.accept(this); // let the children process the list to obtain a single value
+				} else {
+					// create an "argument" list object to pass to the method
+					let list = [];
+					this.context.iterateList((newContext : TemplateData)=>{
+						let oldContext = this.context;
+						this.context = newContext;
+						list.push(this.interpret(valueContext.accept(this))); // reduce each result to a string
+						this.context = oldContext;
+					});
+					value = {type:'argument', list:list};
+				}
 			} else {
-			// create a templatedata list object and then run the method on the list
-				let list = [];
-				this.context.iterateList((newContext : TemplateData)=>{
-					let oldContext = this.context;
-					this.context = newContext;
-					list.push(this.interpret(ctx.children[0].accept(this))); // reduce results to strings
-					this.context = oldContext;
-				});
-				value = {type:'argument', list:list};
+				// obtain the single result
+				value = valueContext.accept(this);
 			}
 		} else {
-			// obtain the single result
-			value = ctx.children[0].accept(this);
+			value = this.context;
 		}
-		// call each method, which follow the first (value) child, serially
-		ctx.children.slice(1).forEach((child) => {
+		// process non-annotactions by calling each method serially
+		invocations.forEach((child) => {
 			// Each child is a method and an argument(s) tree
 			let method : string = child.children[0].accept(this);
 			if (!method.startsWith('@')){ // annotations have already been processed
 				let args : any = child.children[1]; // passing the argument tree to CallMethod
 				value = this.callMethod(method, this.interpret(value), args);
-				/*
-				if (Array.isArray(value)){
-					// value is an array; process each member
-					let computedValue : string[] = [];
-					if (method == 'ToUpper' || method == 'ToLower' || method == 'Matches'){
-						value.forEach((val) =>{
-							computedValue.push(this.callMethod(method, this.interpret(val), args));
-						});
-						value = computedValue;
-					} else {
-						value.forEach((val)=>{
-							computedValue.push(this.interpret(val));
-						});
-						value = this.callMethod(method, computedValue, args);
-					}
-				} else {
-					// value is a scalar
-					value = this.callMethod(method, value, args);
-				}
-				*/
 			}
 		});
 		this.annotations = oldAnnotations; // restore the annotations
 		return value;
-	};
+	}
 	visitQuoteLiteral = function(ctx) {
 		// using the JSON parser to unescape the string
 		var tempJson = JSON.parse('{"data":"' + ctx.children[1].getText() + '"}');
