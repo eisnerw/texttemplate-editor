@@ -1347,8 +1347,10 @@ function tokensAsString(input, treeTokens : CommonToken[], symbolicNames : strin
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
 function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = delay (autorun), 2 = skip
-	document.getElementById('interpolated').innerHTML = 'lexing...';
-	console.log('lexing...');
+	if (mode != 2){
+		document.getElementById('interpolated').innerHTML = 'lexing...';
+		console.log('lexing...');
+	}
 	setTimeout(()=>{
 		if (invocation != invocations){
 			return;
@@ -1358,8 +1360,10 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 		const lexer = createLexer(input);
 		lexer.removeErrorListeners();
 		lexer.addErrorListener(new ConsoleErrorListener());
-		document.getElementById('interpolated').innerHTML = 'parsing...';
-		console.log('parsing...');
+		if (mode != 2){
+			document.getElementById('interpolated').innerHTML = 'parsing...';
+			console.log('parsing...');
+		}
 		setTimeout(()=>{
 			if (invocation != invocations){
 				return;
@@ -1384,8 +1388,10 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			};
 			let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
 			let parserTokens = tokensAsString(input, parser._interp._input.tokens, parser.symbolicNames);
-			document.getElementById('interpolated').innerHTML = "interpolating...";
-			console.log('interpolating...');
+			if (mode != 2){
+				document.getElementById('interpolated').innerHTML = "interpolating...";
+				console.log('interpolating...');
+			}
 			setTimeout(()=>{
 				if (invocation != invocations){
 					return;
@@ -1437,9 +1443,11 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					}
 				});
 				if (urlsBeingLoaded.length > 0){
-					document.getElementById('interpolated').innerHTML = 'loading ' +  (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))));
-					console.log('lexing...');
+					let loadingMessage = 'loading ' +  (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))));
+					document.getElementById('interpolated').innerHTML = loadingMessage;
+					console.log(loadingMessage);
 				} else if (mode != 2){
+					console.log('done')
 					document.getElementById('interpolated').innerHTML = result.toString();
 				}
 				let monacoErrors = [];
