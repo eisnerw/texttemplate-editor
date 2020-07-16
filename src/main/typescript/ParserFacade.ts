@@ -11,6 +11,53 @@ class ConsoleErrorListener extends error.ErrorListener {
         console.log('ERROR ' + msg);
     }
 }
+class BulletIndent {
+	public level : number;
+	public index : number;
+	public indent : string;
+	public parent : BulletIndent;
+	public lastBullet = '';
+	constructor(indent : string, currentBulletIndent : BulletIndent){
+		let currentIndent = currentBulletIndent == null ? '' : currentBulletIndent.indent;
+		this.indent = indent;
+		if (currentBulletIndent == null ){
+			// establish the first level
+			this.level = 0;
+			this.index = 0;
+			this.parent = null;
+		} else if (indent == currentIndent){
+			// staying on the same level
+			this.level = currentBulletIndent.level;
+			this.index = currentBulletIndent.index + 1;
+			this.parent = currentBulletIndent.parent;
+		} else {
+			// search for the same level
+			let matchingLevel : BulletIndent = currentBulletIndent.parent; // used to find a previous level
+			while (matchingLevel != null){
+				if (indent == matchingLevel.indent){
+					// found a matching level, so this one is a continuation
+					this.level = matchingLevel.level;
+					this.index = matchingLevel.index + 1;
+					this.parent = matchingLevel.parent;
+					break;
+				} else {
+					matchingLevel = matchingLevel.parent;
+				}
+			} 
+			if (matchingLevel == null){
+				// create a new level even if this indent is less than the previous
+				this.level = currentBulletIndent.level + 1;
+				this.index = 0;
+				this.parent = currentBulletIndent;
+			}
+		}
+	}
+	getBullet(){
+		let bullet = '(' + this.level + '.' + this.index + ')'; // TODO: bullet style
+		this.lastBullet = this.indent + bullet;
+		return bullet;
+	}
+}
 class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
@@ -134,6 +181,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	errors = [];
 	model;
 	input;
+	bulletIndent : BulletIndent;
 	recursionLevel = 0;
 	annotations = {};
 	visitText = function(ctx){
@@ -493,7 +541,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return '';
 		}
 		ctx.children[1].children.forEach((child)=>{
-			if (child.start.line != child.stop.line){
+			if (child.constructor.name != 'TerminalNodeImpl' && child.start.line != child.stop.line){
 				folds.push({
 					start: child.start.line,
 					end: child.stop.line,
@@ -784,6 +832,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value['MissingValue'] = argValues[0];
 					break;
 					
+				case '@ResetBullets':
+					this.bulletIndent = null;
+					break;
+					
 				default:
 					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
 					let parentCtx : any = args.parentCtx;
@@ -945,6 +997,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return output.join('\n');
 	}
 	doInterpret = function(result, output, indent){
+		
 		result.forEach((item : any)=>{
 			if (item == null){
 			} else if (this.isScalar(item)){
@@ -954,7 +1007,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				// determine if the current bulleted indent is being overridden by a plain indent
 				let bReplaceIndent = !!indent && indent.includes('{.}') && !indentInTheOutput.includes('{.}') && indentInTheOutput.length > 0;
 				this.doInterpret(item, output, bReplaceIndent ? indentInTheOutput : indent);
-				//this.doInterpret(item, output, indent);
 			} else if (typeof item == 'object'){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
@@ -980,7 +1032,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					// list
 					if (!!indent && indent.includes('{.}')){
 						// This is an unbulleted list under a bullet, so we need to turn each list item into an indent object with an indented bullet
-						let bIncompleteBullet = /^[ \t]*\{\.\}[ \t]*$/s.test(output[output.length - 1]);
+						let bIncompleteBullet = /^[ \t]*\{\.\}[ \t]*$/.test(output[output.length - 1]);
 						let newBullet = indent.replace(/([ \t]*\{\.\})/,'   ' + '$1'); // TODO: allow override of default tab
 						for (let i = 0; i < item.list.length; i++){
 							let itemResult = item.list[i];
@@ -1006,7 +1058,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// create a list and indent it under the current line, if it isn't empty
 						let bEmptyLine = output[output.length - 1] == '';
 						let bStartsWithNewLine = /^[ \t]*\n/.test(this.valueAsString(item.list[0]))	;
-						let lastIndent = output[output.length - 1].replace(/^([ \t]*).*$/s, '$1');
+						let lastIndent = output[output.length - 1].replace(/^([ \t]*).*$/, '$1');
 						let newIndent = (indent == null ?  '   ' + lastIndent : '   ' + indent);  // TODO: allow override of default tab
 						let bIncompleteIndent = output[output.length - 1] == indent;
 						if (bIncompleteIndent){
@@ -1094,12 +1146,34 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return false;
 	}
 	addToOutput(text, output){
+		if (/^[ \t]*\{\.\}[ \t]*$/.test(output[output.length - 1])){
+			// there is a residual bullet already in the output
+			let indent = output[output.length - 1].replace(/^([ \t]*).*$/, '$1');
+			this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
+			output[output.length - 1] = output[output.length - 1].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
+		} else {
+			let lastLine = output[output.length - 1];
+			if (this.bulletIndent != null && lastLine.length > 0 && !lastLine.startsWith(this.bulletIndent.lastBullet) && !/^\s*\{\.\}/.test(text)){ // TODO: this MAY be a condition that only occurs with no indenting
+				// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
+				let lastLineIndent = lastLine.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
+				while (this.bulletIndent != null && this.bulletIndent.indent.length >= lastLineIndent.length){
+					this.bulletIndent = this.bulletIndent.parent;
+				}
+			}
+		}
 		let ar = text.split('\n');
 		for (let i = 0; i < ar.length - 1; i++){
+			if (false && /^[ \t]*\{\.\}/.test(ar[i])){
+				// the line contains a bullet
+				let indent = ar[i].replace(/^([ \t]*).*$/, '$1');
+				this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
+				ar[i] = ar[i].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
+			}
 			output[output.length - 1] += ar[i];
 			output.push('');
 		}
-		output[output.length - 1] += ar[ar.length - 1];
+		let lastLine = ar[ar.length - 1];
+		output[output.length - 1] += lastLine;
 	}
 	loadSubtemplates(ctx){
 		if (ctx.constructor.name == 'SubtemplateSectionContext'){
@@ -1249,13 +1323,13 @@ export let folds = [];
 let urls = {};
 let invocations = 0;
 
-export function inputChanged(input) : void {
+export function inputChanged(input ,mode) : void {
 	let invocation = ++invocations;
 	setTimeout(()=>{
 		if (invocation == invocations){
-			validate(input, invocation);
+			validate(input, invocation, mode);
 		}
-	}, invocation == 1 ? 0 : 2000); // first time is immediate.  Otherwise, wait 2 seconds after last keystroke to allow typing in the editor to continue
+	}, mode != 1 || invocation == 1 ? 0 : 2000); // if delay (other than the first time), wait 2 seconds after last keystroke to allow typing in the editor to continue
 }
 function tokensAsString(input, treeTokens : CommonToken[], symbolicNames : string[]){
 	let parsed = '';
@@ -1272,97 +1346,115 @@ function tokensAsString(input, treeTokens : CommonToken[], symbolicNames : strin
 	}
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
-function validate(input, invocation) : void {
-    let errors : Error[] = [];
-    const lexer = createLexer(input);
-    lexer.removeErrorListeners();
-    lexer.addErrorListener(new ConsoleErrorListener());
-
-    const parser = createParserFromLexer(lexer);
+function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = delay (autorun), 2 = skip
+	document.getElementById('interpolated').innerHTML = 'lexing...';
+	console.log('lexing...');
 	setTimeout(()=>{
 		if (invocation != invocations){
 			return;
 		}
-		parser.removeErrorListeners();
-		parser.addErrorListener(new CollectorErrorListener(errors));
-		parser._errHandler = new TextTemplateErrorStrategy();
-
-		const tree = parser.compilationUnit();
-		/* used to get json representation of tree for debugging
-		const getCircularReplacer = () => {
-		  const seen = new WeakSet();
-		  return (key, value) => {
-			if (typeof value === 'object' && value !== null) {
-			  if (seen.has(value)) {
-				return;
-			  }
-			  seen.add(value);
-			}
-			return value;
-		  };
-		};
-		let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
-		
-		let parsed = '';
-		parsed = tokensAsString(input, parser._interp._input.tokens, parser.symbolicNames);
+		input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
+		let errors : Error[] = [];
+		const lexer = createLexer(input);
+		lexer.removeErrorListeners();
+		lexer.addErrorListener(new ConsoleErrorListener());
+		document.getElementById('interpolated').innerHTML = 'parsing...';
+		console.log('parsing...');
 		setTimeout(()=>{
 			if (invocation != invocations){
 				return;
 			}
-			var visitor = new TextTemplateVisitor();
-			visitor.annotations['Tokens'] = parsed;
-			visitor.errors = errors;
-			visitor.model = model;
-			visitor.input = input;
-			folds = []; // folds will be computed while visiting
-			var result = visitor.visitCompilationUnit(tree);
-			if (invocation != invocations){
-				return;
-			}
-			if (Array.isArray(result)){
-				result = visitor.interpret(result);
-			}
-			document.getElementById('interpolated').innerHTML = result.toString();
-			Object.keys(urls).forEach((key : string) =>{
-				if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
-					delete urls[key] // clean up incomplete urls
-				} else {
-					if (!urls[key].data && !urls[key].loading){
-						urls[key].loading = true;
-						$.ajax({
-							url: key,
-							success: function (data) {
-								if (data.error){
-									urls[key].data = data.error;
-								} else {
-									if (typeof data != 'string'){
-										data = JSON.stringify(data);
-									}
-									urls[key].data = data;
-									let invocation = ++invocations;
-									setTimeout(()=>{
-										if (invocation == invocations){
-											validate(visitor.model.getValue(), invocation);
-										}
-									}, 0);
-								}
-							}
-						});
-					}
+			const parser = createParserFromLexer(lexer);
+			parser.removeErrorListeners();
+			parser.addErrorListener(new CollectorErrorListener(errors));
+			parser._errHandler = new TextTemplateErrorStrategy();
+			const tree = parser.compilationUnit();
+			/* used to get json representation of tree for debugging
+			const getCircularReplacer = () => {
+			  const seen = new WeakSet();
+			  return (key, value) => {
+				if (typeof value === 'object' && value !== null) {
+				  if (seen.has(value)) {
+					return;
+				  }
+				  seen.add(value);
 				}
-			});
-			let monacoErrors = [];
-			for (let e of errors) {
-				monacoErrors.push({
-					startLineNumber: e.startLine,
-					startColumn: e.startCol,
-					endLineNumber: e.endLine,
-					endColumn: e.endCol,
-					message: e.message,
-					severity: monaco.MarkerSeverity.Error
-				});
+				return value;
+			  };
 			};
-			monaco.editor.setModelMarkers(model, "owner", monacoErrors);
-		}, 0);
-	}, 0);
+			let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
+			let parserTokens = tokensAsString(input, parser._interp._input.tokens, parser.symbolicNames);
+			document.getElementById('interpolated').innerHTML = "interpolating...";
+			console.log('interpolating...');
+			setTimeout(()=>{
+				if (invocation != invocations){
+					return;
+				}
+				var visitor = new TextTemplateVisitor();
+				visitor.annotations['Tokens'] = parserTokens;
+				visitor.errors = errors;
+				visitor.model = model;
+				visitor.input = input;
+				visitor.bulletIndent = null; // start bulleting from 0,0
+				folds = []; // folds will be computed while visiting
+				var result = visitor.visitCompilationUnit(tree);
+				if (invocation != invocations){
+					return;
+				}
+				if (Array.isArray(result)){
+					result = visitor.interpret(result);
+				}
+				let urlsBeingLoaded = [];
+				Object.keys(urls).forEach((key : string) =>{
+					if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
+						delete urls[key] // clean up incomplete urls
+					} else {
+						if (!urls[key].data){
+							urlsBeingLoaded.push(key);
+							if (!urls[key].loading){
+								urls[key].loading = true;
+								$.ajax({
+									url: key,
+									success: function (data) {
+										if (data.error){
+											urls[key].data = data.error;
+										} else {
+											if (typeof data != 'string'){
+												data = JSON.stringify(data);
+											}
+											urls[key].data = data;
+											let invocation = ++invocations;
+											setTimeout(()=>{
+												if (invocation == invocations){
+													validate(visitor.model.getValue(), invocation, 0);
+												}
+											}, 0);
+										}
+									}
+								});
+							}
+						}
+					}
+				});
+				if (urlsBeingLoaded.length > 0){
+					document.getElementById('interpolated').innerHTML = 'loading ' +  (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))));
+					console.log('lexing...');
+				} else if (mode != 2){
+					document.getElementById('interpolated').innerHTML = result.toString();
+				}
+				let monacoErrors = [];
+				for (let e of errors) {
+					monacoErrors.push({
+						startLineNumber: e.startLine,
+						startColumn: e.startCol,
+						endLineNumber: e.endLine,
+						endColumn: e.endCol,
+						message: e.message,
+						severity: monaco.MarkerSeverity.Error
+					});
+				};
+				monaco.editor.setModelMarkers(model, "owner", monacoErrors);
+			}, 1);
+		}, 1);
+	}, 1);
 }

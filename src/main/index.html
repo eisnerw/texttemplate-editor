@@ -14,11 +14,31 @@
 		white-space: -o-pre-wrap;
 		word-wrap: break-word;
 	}
+	.button {
+		background-color: #ddd;
+		border: none;
+		color: black;
+		padding: 10px 20px;
+		text-align: center;
+		text-decoration: none;
+		display: inline-block;
+		margin: 4px 2px;
+		cursor: pointer;
+		border-radius: 16px;
+	}
+	.button:hover {
+		background-color: #D7D3D2;
+	}
 	</style>
 </head>
 <body>
 
-<h2>TextTemplate Editor</h2>
+<div style='margin-block-end: 0.83em;'>
+	<span style='font-size: 1.5em;font-weight: bold;'>TextTemplate Editor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+	<input type="checkbox" checked=true id="autorun"><label for="vehicle1">Run automatically when editor content changes:</label>
+	<span style='font-size: 1.5em;font-weight: bold;'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+	<button id='run' class='button' onclick='return window.editorChanged("button");'>Run</button>
+</div>
 <div id="container" style="width:800px;height:600px;border:1px solid grey; float:left"></div>
 <div><pre id="interpolated"></pre></div>
 <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
@@ -99,7 +119,10 @@
 				}			
 			});
 			editorChanged = function (e) {
-				let code = editor.getValue()
+				let bButtonPressed = typeof e == 'string' && e == 'button';
+				let bAutoRun = document.getElementById('autorun').checked;
+				let mode = bAutoRun ? 1  : bButtonPressed ? 0 : 2;  // mode 0 = button; 1 = autorun; 2 = skip
+				let code = bButtonPressed || bAutoRun ? editor.getValue() : ''; 
 				let model = monaco.editor.getModels()[0];
 				if (!ParserFacade && !parserFacade){
 					return; // protect against an unknown error that can occur during editing if keystrokes are frequent
@@ -109,7 +132,7 @@
 					}
 				}
 				setTimeout(function(){
-					parserFacade.inputChanged(code);
+					parserFacade.inputChanged(code, mode);
 				},0);
 			}
 			editor.onDidChangeModelContent(editorChanged);
