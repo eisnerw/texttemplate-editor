@@ -17,7 +17,11 @@ class BulletIndent {
 	public indent : string;
 	public parent : BulletIndent;
 	public lastBullet = '';
-	constructor(indent : string, currentBulletIndent : BulletIndent){
+	constructor(indent : string = null, currentBulletIndent : BulletIndent = null){
+		if (indent == null){
+			// indicates an empty BulletIndent
+			return;
+		}
 		let currentIndent = currentBulletIndent == null ? '' : currentBulletIndent.indent;
 		this.indent = indent;
 		if (currentBulletIndent == null ){
@@ -51,6 +55,16 @@ class BulletIndent {
 				this.parent = currentBulletIndent;
 			}
 		}
+	}
+	clone(){
+		// clone a bulletIndent that reflects the state 
+		let cloneBulletIndent = new BulletIndent();
+		cloneBulletIndent.level = this.level;
+		cloneBulletIndent.index = this.index;
+		cloneBulletIndent.indent = this.indent;
+		cloneBulletIndent.parent = this.parent;
+		cloneBulletIndent.lastBullet = this.lastBullet;
+		return cloneBulletIndent;
 	}
 	getBullet(){
 		let bullet = '(' + this.level + '.' + this.index + ')'; // TODO: bullet style
@@ -97,7 +111,7 @@ class TemplateData {
 			this.type = 'dictionary';
 			Object.keys(json).forEach((keyname) => {
 				let value: any = json[keyname];
-				if (typeof value == 'object') {
+				if (typeof value == 'object' && value != null) {
 					if (value != null && (!Array.isArray(value) || value.length > 0)){ // don't add null values or empty arrays
 						this.dictionary[keyname] = new TemplateData(value, this);
 					}
@@ -257,11 +271,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 				
 			} else if (bHasContext) { // context may not be specified
-				if (context){
+				//if (context){
 					this.context = context;
-				} else {
-					this.context = new TemplateData({}); // provide an empty context for lookups
-				}
+				//} else {
+				//	this.context = new TemplateData({}); // provide an empty context for lookups
+				//}
 			}
 		}
 		if (!ctx.children[3] || !ctx.children[3].getText() || ctx.children[3].exception){
@@ -711,7 +725,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'Anded':
-					if (typeof value == 'object' && value.type == 'argument'){
+					if (typeof value == 'object' && value != null && value.type == 'argument'){
 						let list = value.list;
 						for (let i : number = 0; i < list.length - 1; i++){
 							if (i == (list.length - 2)){
@@ -983,37 +997,48 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result; 
 	}
 	interpret = function(result){
-		if (typeof result == 'object'){
+		if (typeof result == 'object' && result != null && !Array.isArray(result)){
 			if (result instanceof TemplateData || result.type == 'argument'){
-				return result;
+				return result; // don't interpret if not appropriate
 			}
-			result = [result];
+			result = [result];  // do interpret expects arrays
 		}
 		if (!Array.isArray(result)){
 			return result;
 		}
-		let output = [""];
+		let output = {lines: [""], skipping: false, bulletIndent: this.bulletIndent, bNewLineInOutput: false};
 		this.doInterpret(result, output, null);
-		return output.join('\n');
+		if (output.skipping){
+			// never encountered a new line while skipping
+			if (output.lines.length == 1){
+				return null; // a null in the array nullified the whole array}
+			}
+			return [output.lines.slice(0, output.lines.length - 1).join('\n'), null];
+			//return null; // TODO: there are multiple lines with the last one null. This may require more code
+		}
+		return output.lines.join('\n');
 	}
 	doInterpret = function(result, output, indent){
-		
+		let lines = output.lines;
 		result.forEach((item : any)=>{
 			if (item == null){
+				lines[lines.length - 1] = ''; // skipping this line
+				output.skipping = true;
+				this.bulletIndent = output.bulletIndent; // restore the bulletIndent that was in effect for the skipped line
 			} else if (this.isScalar(item)){
 				this.addToOutput(item.toString(), output);
 			} else if (Array.isArray(item)){
-				let indentInTheOutput = output[output.length - 1].replace(/^([ \t]*(\{\.\})?).*/s,'$1'); 
+				let indentInTheOutput = lines[lines.length - 1].replace(/^([ \t]*(\{\.\})?).*/s,'$1'); 
 				// determine if the current bulleted indent is being overridden by a plain indent
 				let bReplaceIndent = !!indent && indent.includes('{.}') && !indentInTheOutput.includes('{.}') && indentInTheOutput.length > 0;
 				this.doInterpret(item, output, bReplaceIndent ? indentInTheOutput : indent);
-			} else if (typeof item == 'object'){
+			} else if (typeof item == 'object' && item != null){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
 					if (item.result == null) {
 					} else if (typeof item.result == 'string' || typeof item.result == 'number'){
 						this.addToOutput(item.result.toString(), output);
-					} else if (typeof item.result == 'object'){
+					} else if (typeof item.result == 'object' && item.result != null){
 						if (Array.isArray(item.result) || item.result.type == 'indent'){
 							this.doInterpret([item.result], output, item.bullet);
 						} else {
@@ -1032,7 +1057,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					// list
 					if (!!indent && indent.includes('{.}')){
 						// This is an unbulleted list under a bullet, so we need to turn each list item into an indent object with an indented bullet
-						let bIncompleteBullet = /^[ \t]*\{\.\}[ \t]*$/.test(output[output.length - 1]);
+						let bIncompleteBullet = /^[ \t]*\{\.\}[ \t]*$/.test(lines[lines.length - 1]);
 						let newBullet = indent.replace(/([ \t]*\{\.\})/,'   ' + '$1'); // TODO: allow override of default tab
 						for (let i = 0; i < item.list.length; i++){
 							let itemResult = item.list[i];
@@ -1056,14 +1081,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 					} else {
 						// create a list and indent it under the current line, if it isn't empty
-						let bEmptyLine = output[output.length - 1] == '';
+						let bEmptyLine = lines[lines.length - 1] == '';
 						let bStartsWithNewLine = /^[ \t]*\n/.test(this.valueAsString(item.list[0]))	;
-						let lastIndent = output[output.length - 1].replace(/^([ \t]*).*$/, '$1');
+						let lastIndent = lines[lines.length - 1].replace(/^([ \t]*).*$/, '$1');
 						let newIndent = (indent == null ?  '   ' + lastIndent : '   ' + indent);  // TODO: allow override of default tab
-						let bIncompleteIndent = output[output.length - 1] == indent;
+						let bIncompleteIndent = lines[lines.length - 1] == indent;
 						if (bIncompleteIndent){
 							newIndent = indent;
-						} else if (lastIndent == output[output.length - 1]){
+						} else if (lastIndent == lines[lines.length - 1]){
 							// starting a new indent
 							newIndent = lastIndent;
 							bIncompleteIndent = true;
@@ -1075,7 +1100,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								newIndent = indent;
 							}
 							if (!bStartsWithNewLine && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
-								output.push(''); // start a new line
+								this.addToOutput('\n', output); // start a new line
 								if (!!newIndent && newIndent != '' && !bWillBeIndented){
 									this.addToOutput(newIndent, output);
 								}
@@ -1091,13 +1116,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		});
 	}
 	isIndent(item : any){
-		if (typeof item != 'object' || item.type != 'indent'){
+		if (typeof item != 'object' || item == null || item.type != 'indent'){
 			return false;
 		}
 		return true;
 	}
 	containsIndent(value : any){
-		if (typeof value == 'object' && value.type == 'list'){
+		if (typeof value == 'object' && value != null && value.type == 'list'){
 			value = value.list;
 		}
 		if (Array.isArray(value)){
@@ -1126,7 +1151,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			});
 			return result.join('');
 		}
-		if (typeof value == 'object'){
+		if (typeof value == 'object' && value != null){
 			if (value.type == 'indent'){
 				return value.bullet + this.valueAsString(value.result);
 			} else {
@@ -1146,14 +1171,33 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return false;
 	}
 	addToOutput(text, output){
-		if (/^[ \t]*\{\.\}[ \t]*$/.test(output[output.length - 1])){
+		let arText = text.split('\n');
+		if (arText.length > 1){
+			output.bNewLineInOutput = true;
+		}
+		if (output.skipping){
+			if (arText.length == 1){
+				return; // no carriage return, so continue skipping
+			}
+			text = arText.slice(1).join('\n'); // ignore text up to the first new line
+			output.skipping = false;
+		}
+		let lines = output.lines;
+		if (/^[ \t]*\{\.\}[ \t]*$/.test(lines[lines.length - 1])){
 			// there is a residual bullet already in the output
-			let indent = output[output.length - 1].replace(/^([ \t]*).*$/, '$1');
+			let indent = lines[lines.length - 1].replace(/^([ \t]*).*$/, '$1');
+			output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
 			this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
-			output[output.length - 1] = output[output.length - 1].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
+			lines[lines.length - 1] = lines[lines.length - 1].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
 		} else {
-			let lastLine = output[output.length - 1];
-			if (this.bulletIndent != null && lastLine.length > 0 && !lastLine.startsWith(this.bulletIndent.lastBullet) && !/^\s*\{\.\}/.test(text)){ // TODO: this MAY be a condition that only occurs with no indenting
+			let lastLine = lines[lines.length - 1];
+			if (output.bNewLineInOutput 
+					// TODO: This is tricky and may need tuning.  
+					&& this.bulletIndent != null 
+					&& lastLine.length > 0 
+					&& !lastLine.startsWith(this.bulletIndent.lastBullet) 
+					&& !('\n' + text).includes('\n' + this.bulletIndent.lastBullet) 
+					&& !/^\s*\{\.\}/.test(text)){ // TODO: this MAY be a condition that only occurs with no indenting
 				// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
 				let lastLineIndent = lastLine.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
 				while (this.bulletIndent != null && this.bulletIndent.indent.length >= lastLineIndent.length){
@@ -1166,14 +1210,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (false && /^[ \t]*\{\.\}/.test(ar[i])){
 				// the line contains a bullet
 				let indent = ar[i].replace(/^([ \t]*).*$/, '$1');
+				output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
 				this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
 				ar[i] = ar[i].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
 			}
-			output[output.length - 1] += ar[i];
-			output.push('');
+			lines[lines.length - 1] += ar[i];
+			lines.push('');
 		}
 		let lastLine = ar[ar.length - 1];
-		output[output.length - 1] += lastLine;
+		lines[lines.length - 1] += lastLine;
 	}
 	loadSubtemplates(ctx){
 		if (ctx.constructor.name == 'SubtemplateSectionContext'){
@@ -1448,7 +1493,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					console.log(loadingMessage);
 				} else if (mode != 2){
 					console.log('done')
-					document.getElementById('interpolated').innerHTML = result.toString();
+					document.getElementById('interpolated').innerHTML = (result == null ? 'null' : result.toString());
 				}
 				let monacoErrors = [];
 				for (let e of errors) {
