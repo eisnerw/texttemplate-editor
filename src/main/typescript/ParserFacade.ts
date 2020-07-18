@@ -708,7 +708,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Assert':
 				case 'Matches':
-					if (value.includes('{.}')){
+					let originalValue = value;
+					if (typeof value == 'string' && value.includes('{.}')){
 						// special case for matching the output of bulleted templates
 						value = this.interpret([value], 1); // interpret with bulleting
 					}
@@ -730,7 +731,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					if (method == 'Assert'){
 						if (matches == true){
-							value = argValues[1];
+							if (argValues.length > 1){
+								value = argValues[1];
+							} else {
+								value = originalValue; // if the second argument is missing, return the original value
+							}
 						} else {
 							let failure = 'ASSERT FAILURE:\n';
 							let arg = argValues[0];
