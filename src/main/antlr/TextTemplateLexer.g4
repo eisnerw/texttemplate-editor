@@ -16,6 +16,7 @@ mode BRACED;
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->skip;
 IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
+BULLETRESET: [0-9] '.' [0-9];
 DOT: '.';
 ARROW: '=>';
 THINARROW: '->';

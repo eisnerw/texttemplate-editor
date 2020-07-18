@@ -243,7 +243,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				context = ctx.children[1].children[0].accept(this);
 			}
-			context = this.interpret(context);
+			context = this.interpret(context, 0);
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
 			}
@@ -357,7 +357,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.context.iterateList((newContext : TemplateData)=>{
 						let oldContext = this.context;
 						this.context = newContext;
-						list.push(this.interpret(valueContext.accept(this))); // reduce each result to a string
+						list.push(this.interpret(valueContext.accept(this), 0)); // reduce each result to a string
 						this.context = oldContext;
 					});
 					value = {type:'argument', list:list};
@@ -375,7 +375,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let method : string = child.children[0].accept(this);
 			if (!method.startsWith('@')){ // annotations have already been processed
 				let args : any = child.children[1]; // passing the argument tree to CallMethod
-				value = this.callMethod(method, this.interpret(value), args);
+				value = this.callMethod(method, this.interpret(value, 0), args);
 			}
 		});
 		this.annotations = oldAnnotations; // restore the annotations
@@ -620,7 +620,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (argResults){
 				argResults.forEach((arg) =>{
 					if (arg !== undefined){ // remove result of commas
-						argValues.push(this.interpret(arg));
+						argValues.push(this.interpret(arg, 0));
 					}
 				});
 			}
@@ -706,20 +706,51 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 
+				case 'Assert':
 				case 'Matches':
+					if (value.includes('{.}')){
+						// special case for matching the output of bulleted templates
+						value = this.interpret([value], 1); // interpret with bulleting
+					}
 					let matches : boolean = false;
 					if (argValues.length == 0 || value == null){
 						if (argValues.length == 0 && value == null){
-							value = true; //TODO: is it appropriate to match nulls?
-						} else {
-							value = false;
+							matches = true; //TODO: is it appropriate to match nulls?
 						}
 					} else {
+						let bFirst = true;
 						argValues.forEach((arg)=>{
-							if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
-								matches = true;
+							if (method != 'Assert' || bFirst){ // Assert only matches the first argument
+								if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
+									matches = true;
+								}
+								bFirst = false;
 							}
 						});
+					}
+					if (method == 'Assert'){
+						if (matches == true){
+							value = argValues[1];
+						} else {
+							let failure = 'ASSERT FAILURE:\n';
+							let arg = argValues[0];
+							let i = 0;
+							for (; i < value.length && i < arg.length; i++){
+								if (value.substr(i, 1) != arg.substr(i, 1)){
+									break;
+								}
+							}
+							failure += value.substr(0, i) + '--->';
+							if (i == value.length){
+								failure += ('Missing: ' + arg.substr(i));
+							} else if (i == arg.length){
+								failure += ('Unexpected: ' + value.substr(i));
+							} else {
+								failure += ('Mismatch: ' + value.substr(i));
+							}
+							value = failure;
+						}
+					} else {
 						value = matches;
 					}
 					break;
@@ -996,7 +1027,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result; 
 	}
-	interpret = function(result){
+	interpret = function(result, mode){
 		if (typeof result == 'object' && result != null && !Array.isArray(result)){
 			if (result instanceof TemplateData || result.type == 'argument'){
 				return result; // don't interpret if not appropriate
@@ -1006,15 +1037,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (!Array.isArray(result)){
 			return result;
 		}
-		let output = {lines: [""], skipping: false, bulletIndent: this.bulletIndent, bNewLineInOutput: false};
+		let output = {lines: [""], skipping: false, mode: 0, bContainsNull: false, bContainsBullet: false};
 		this.doInterpret(result, output, null);
 		if (output.skipping){
 			// never encountered a new line while skipping
 			if (output.lines.length == 1){
 				return null; // a null in the array nullified the whole array}
 			}
-			return [output.lines.slice(0, output.lines.length - 1).join('\n'), null];
-			//return null; // TODO: there are multiple lines with the last one null. This may require more code
+			output.bContainsNull = true;
+			output.lines = output.lines.slice(0, output.lines.length - 1);  // remove the deleted line's new line
+		}
+		if (mode == 1 && output.bContainsBullet){
+			let interpretResult = output.lines.join('\n');
+			output = {lines: [""], skipping: false, mode: 1, bContainsNull: false, bContainsBullet: false};
+			this.doInterpret([interpretResult], output, null);
 		}
 		return output.lines.join('\n');
 	}
@@ -1024,7 +1060,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (item == null){
 				lines[lines.length - 1] = ''; // skipping this line
 				output.skipping = true;
-				this.bulletIndent = output.bulletIndent; // restore the bulletIndent that was in effect for the skipped line
 			} else if (this.isScalar(item)){
 				this.addToOutput(item.toString(), output);
 			} else if (Array.isArray(item)){
@@ -1170,55 +1205,42 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return false;
 	}
-	addToOutput(text, output){
-		let arText = text.split('\n');
-		if (arText.length > 1){
-			output.bNewLineInOutput = true;
-		}
-		if (output.skipping){
-			if (arText.length == 1){
-				return; // no carriage return, so continue skipping
-			}
-			text = arText.slice(1).join('\n'); // ignore text up to the first new line
-			output.skipping = false;
-		}
+	addToOutput(textLines, output){
 		let lines = output.lines;
-		if (/^[ \t]*\{\.\}[ \t]*$/.test(lines[lines.length - 1])){
-			// there is a residual bullet already in the output
-			let indent = lines[lines.length - 1].replace(/^([ \t]*).*$/, '$1');
-			output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
-			this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
-			lines[lines.length - 1] = lines[lines.length - 1].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
-		} else {
-			let lastLine = lines[lines.length - 1];
-			if (output.bNewLineInOutput 
-					// TODO: This is tricky and may need tuning.  
-					&& this.bulletIndent != null 
-					&& lastLine.length > 0 
-					&& !lastLine.startsWith(this.bulletIndent.lastBullet) 
-					&& !('\n' + text).includes('\n' + this.bulletIndent.lastBullet) 
-					&& !/^\s*\{\.\}/.test(text)){ // TODO: this MAY be a condition that only occurs with no indenting
-				// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
-				let lastLineIndent = lastLine.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
-				while (this.bulletIndent != null && this.bulletIndent.indent.length >= lastLineIndent.length){
-					this.bulletIndent = this.bulletIndent.parent;
+		let arText = textLines.split('\n');
+		for (let i = 0; i < arText.length; i++){
+			let text = arText[i];
+			if (i == 0 && output.skipping){
+				if (arText.length == 1){
+					return; // no carriage return, so continue skipping
+				} else {
+					output.skipping = false; // done with skipping
+				}
+			} else {
+				if (output.mode == 1){ // only handle bullets on the final interpretation
+					if (/^[ \t]*\{\.\}/.test(text)){
+						// there is a bullet in the text
+						let indent = text.replace(/^([ \t]*).*$/, '$1');
+						output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
+						this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
+						text = text.replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
+					} else if (this.bulletIndent != null) {
+						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
+						let nextLineIndent = text.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
+						while (this.bulletIndent != null && this.bulletIndent.indent.length >= nextLineIndent.length){
+							this.bulletIndent = this.bulletIndent.parent;
+						}
+					}
+				} else if (!output.bContainsBullet){
+					// during mode 0, indicate if interpret needs a second pass in mode 1
+					output.bContainsBullet = /\n[ \t]*\{\.\}/.test('\n' + text);
+				}
+				lines[lines.length - 1] += text;
+				if (i < (arText.length - 1)){
+					lines.push('');
 				}
 			}
 		}
-		let ar = text.split('\n');
-		for (let i = 0; i < ar.length - 1; i++){
-			if (false && /^[ \t]*\{\.\}/.test(ar[i])){
-				// the line contains a bullet
-				let indent = ar[i].replace(/^([ \t]*).*$/, '$1');
-				output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
-				this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
-				ar[i] = ar[i].replace(/[ \t]*\{\.\}/, indent + this.bulletIndent.getBullet());
-			}
-			lines[lines.length - 1] += ar[i];
-			lines.push('');
-		}
-		let lastLine = ar[ar.length - 1];
-		lines[lines.length - 1] += lastLine;
 	}
 	loadSubtemplates(ctx){
 		if (ctx.constructor.name == 'SubtemplateSectionContext'){
@@ -1453,7 +1475,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					return;
 				}
 				if (Array.isArray(result)){
-					result = visitor.interpret(result);
+					result = visitor.interpret(result, 1);
 				}
 				let urlsBeingLoaded = [];
 				Object.keys(urls).forEach((key : string) =>{
