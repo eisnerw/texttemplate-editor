@@ -374,12 +374,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return value;
 	}
 	visitQuoteLiteral = function(ctx) {
-		// using the JSON parser to unescape the string
-		var tempJson = JSON.parse('{"data":"' + ctx.children[1].getText() + '"}');
-		return tempJson.data;
+		let value = ctx.getText()
+		return this.decodeQuote(value.substr(1, value.length - 2));
 	};
 	visitApostropheLiteral = function(ctx) {
-		return ctx.children[1].getText().replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\b/g,'\b').replace(/\\f/g,'\f').replace(/\\r/g,'\r').replace(/\\t/g,'\t').replace(/\\\//g,'\/'); // handle backslash plus '\/bfnrt
+		let value = ctx.getText();
+		return this.decodeApostrophe(value.substr(1, value.length - 2));
 	};
 	visitMethodInvocation = function(ctx) {
 		let children : any = this.visitChildren(ctx);
@@ -394,16 +394,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return [methodName, methodArgs];
 	};
 	visitQuotedArgument = function(ctx) {
-		return ctx.children[1].getText();
+		let value = ctx.getText();
+		return this.decodeQuote(value.substr(1, value.length - 2));
 	};
 	visitApostrophedArgument = function(ctx) {
-		return ctx.children[1].getText();
-	};
-	visitTokenedArgument = function(ctx) {
-		return this.visitChildren(ctx)[0];
+		let value = ctx.getText();
+		return this.decodeApostrophe(value.substr(1, value.length - 2));
 	};
 	visitTextedArgument = function(ctx) {
-		return ctx.getText();
+		return ctx.getText().trim();
 	};
 	visitComment = function(ctx) {
 		if (ctx.start.start == 0){
@@ -716,7 +715,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (method != 'Assert' || bFirst){ // Assert only matches the first argument
 								if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
 									matches = true;
-								}
+								} else if (typeof arg == 'string' && arg.includes('{.}') && value == this.interpret([arg], 1)){
+									matches = true;
+								} 
 								bFirst = false;
 							}
 						});
@@ -1264,6 +1265,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		});
 		return false;
+	}
+	decodeApostrophe(value){
+		//return value.replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\b/g,'\b').replace(/\\f/g,'\f').replace(/\\r/g,'\r').replace(/\\t/g,'\t').replace(/\\\//g,'\/'); 
+		return value.replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\\//g,'\/'); 
+	}
+	decodeQuote(value){
+		// using the JSON parser to unescape the string
+		let tempJson = JSON.parse('{"data":"' + value + '"}');
+		return tempJson.data;
 	}
 }
 
