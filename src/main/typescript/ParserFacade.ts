@@ -318,14 +318,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return value;
 	};
 	invokeMethods = function(valueContext, invocations){
-		let oldAnnotations = {};
 		let value : any = undefined;
-		for (let key in this.annotations){
-			oldAnnotations[key] = this.annotations[key];
-		}
 		if (valueContext != null){ // null implies that the value is the current context
 			let bTargetIsTemplate = valueContext.getText().startsWith('[') || valueContext.getText().startsWith('#'); // value will be obtained from a template
-			// preserve the incoming annotations by doing a shallow clone because a method could change one
 			// process annotations first
 			if (bTargetIsTemplate){ // TODO: flag annotations on non-templates as errors
 				invocations.forEach((child) => {
@@ -333,8 +328,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (method.startsWith('@') && bTargetIsTemplate){
 						let args : any = child.children[1];
 						this.callMethod(method, this.annotations, args); // modify the current annotations so that old annotations are inherited
-					} else if ((method == 'Exists' || method == 'IfMissing' || method.startsWith('#')) && !!this.annotations.MissingValue){
-						delete this.annotations.MissingValue; // prevent missing value mechanism from replacing nulls TODO: is this the right place?
 					}
 				});
 			}
@@ -378,7 +371,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				value = this.callMethod(method, this.interpret(value, 0), args);
 			}
 		});
-		this.annotations = oldAnnotations; // restore the annotations
 		return value;
 	}
 	visitQuoteLiteral = function(ctx) {
@@ -649,7 +641,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 			this.context = oldContext;
-		} else if (value == null && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
+		} else if (this.valueIsMissing(value) && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
 			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
@@ -714,8 +706,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value = this.interpret([value], 1); // interpret with bulleting
 					}
 					let matches : boolean = false;
-					if (argValues.length == 0 || value == null){
-						if (argValues.length == 0 && value == null){
+					if (argValues.length == 0 || this.valueIsMissing(value)){
+						if (argValues.length == 0 && this.valueIsMissing(value)){
 							matches = true; //TODO: is it appropriate to match nulls?
 						}
 					} else {
@@ -793,7 +785,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = 1;
 							}
 						} else { // Exists
-							if (value == undefined){
+							if (this.valueIsMissing(value)){
 								value = false;
 							} else {
 								value = true;
@@ -836,7 +828,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}
 						if (method == 'Count'){
-							if (value == undefined){
+							if (this.valueIsMissing(value)){
 								value = 0;
 							} else if (value instanceof TemplateData && value.type == 'list'){
 								value = value.count();
@@ -844,7 +836,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = 1;
 							}
 						} else if (method == 'Exists'){
-							if (value){
+							if (!this.valueIsMissing(value)){
 								value = true;
 							} else {
 								value = false;
@@ -1157,6 +1149,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let x = 'stop';
 			}
 		});
+	}
+	valueIsMissing(value){
+		if (value == null || (typeof value == 'object' && value.type == 'missing')){
+			return true;
+		}
+		return false;
 	}
 	isIndent(item : any){
 		if (typeof item != 'object' || item == null || item.type != 'indent'){

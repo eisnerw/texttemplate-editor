@@ -52,7 +52,7 @@ bracedThinArrow: conditionalExpression THINARROW optionallyInvoked;
 
 bracedArrowTemplateSpec: optionallyInvoked COMMA optionallyInvoked | optionallyInvoked;
 
-methodable: QUOTE TEXT QUOTE #quoteLiteral | APOSTROPHE TEXT APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #identifier;
+methodable: QUOTE TEXT? QUOTE #quoteLiteral | APOSTROPHE TEXT? APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #identifier;
 
 methodInvocation: (method|DOT invokedTemplateSpec) (conditionalExpression | arguments*) RP;
 
