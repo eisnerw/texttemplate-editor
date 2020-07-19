@@ -210,8 +210,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return this.annotations[key.substr(2)];
 		}
 		let value = this.context.getValue(key);
-		if (value === undefined && this.annotations.MissingValue !== undefined){
-			return this.annotations.MissingValue;
+		if (value === undefined){
+			return {type: 'missing', missingValue: this.annotations.MissingValue, key: key};
 		}
 		return this.context.getValue(key);
 	};
@@ -854,7 +854,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'IfMissing':
-					if (!value) {
+					if (!value || (typeof value == 'object' && value != null && value.type =='missing')) {
 						value = argValues[0];
 					}
 					break;
@@ -1034,7 +1034,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	interpret = function(result, mode){
 		if (typeof result == 'object' && result != null && !Array.isArray(result)){
-			if (result instanceof TemplateData || result.type == 'argument'){
+			if (result instanceof TemplateData || result.type == 'argument' || result.type == 'missing'){
 				return result; // don't interpret if not appropriate
 			}
 			result = [result];  // do interpret expects arrays
@@ -1062,6 +1062,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	doInterpret = function(result, output, indent){
 		let lines = output.lines;
 		result.forEach((item : any)=>{
+			if (item != null && typeof item == 'object' && item.type == 'missing'){
+				item = item.missingValue;
+			}
 			if (item == null){
 				lines[lines.length - 1] = ''; // skipping this line
 				output.skipping = true;
@@ -1079,7 +1082,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else if (typeof item.result == 'string' || typeof item.result == 'number'){
 						this.addToOutput(item.result.toString(), output);
 					} else if (typeof item.result == 'object' && item.result != null){
-						if (Array.isArray(item.result) || item.result.type == 'indent'){
+						if (Array.isArray(item.result) || item.result.type == 'indent' || item.result.type == 'missing'){
 							this.doInterpret([item.result], output, item.bullet);
 						} else {
 							// list
@@ -1194,6 +1197,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (typeof value == 'object' && value != null){
 			if (value.type == 'indent'){
 				return value.bullet + this.valueAsString(value.result);
+			} else if (value.type == 'missing'){
+				return value.missingValue;
 			} else {
 				// list; return the value of the first item
 				return this.valueAsString(value.list[0]);
