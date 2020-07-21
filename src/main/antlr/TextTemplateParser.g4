@@ -32,11 +32,11 @@ text: TEXT | NL | SPACES;
 
 templateToken: LBRACE bracedOptions RBRACE;
 
-bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optionallyInvoked #braced | conditionalExpression #bracedConditional;
+bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optionallyInvoked #braced | predicateExpression #bracedPredicate;
 
 methodInvoked: methodable methodInvocation+;
 
-conditionalExpression: LP conditionalExpression RP #nestedConditional | NOT conditionalExpression #notConditional | conditionalExpression (AND|OR) conditionalExpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
+predicateExpression: LP predicateExpression RP #nestedPredicate | NOT predicateExpression #notPredicate | predicateExpression (AND|OR) predicateExpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
 
 templateContextToken: LBRACE ((namedSubtemplate | optionallyInvoked) COLON | COLON) (namedSubtemplate | optionallyInvoked) RBRACE;
 
@@ -46,15 +46,15 @@ bracketedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMM
 
 invokedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMMENT* RBRACKETLP;
 
-bracedArrow: conditionalExpression ARROW bracedArrowTemplateSpec;
+bracedArrow: predicateExpression ARROW bracedArrowTemplateSpec;
 
-bracedThinArrow: conditionalExpression THINARROW optionallyInvoked;
+bracedThinArrow: predicateExpression THINARROW optionallyInvoked;
 
 bracedArrowTemplateSpec: optionallyInvoked COMMA optionallyInvoked | optionallyInvoked;
 
 methodable: QUOTE TEXT? QUOTE #quoteLiteral | APOSTROPHE TEXT? APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #identifier;
 
-methodInvocation: (method|DOT invokedTemplateSpec) (conditionalExpression | arguments*) RP;
+methodInvocation: (method|DOT invokedTemplateSpec) (predicateExpression | arguments*) RP;
 
 method: METHODNAME;
 

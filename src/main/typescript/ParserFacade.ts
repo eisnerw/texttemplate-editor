@@ -243,7 +243,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				context = ctx.children[1].children[0].accept(this);
 			}
-			context = this.interpret(context, 0);
+			context = this.compose(context, 0);
 			if (Array.isArray(context) && context.length == 1){
 				context = context[0]; // support templates as contexts
 			}
@@ -350,7 +350,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.context.iterateList((newContext : TemplateData)=>{
 						let oldContext = this.context;
 						this.context = newContext;
-						list.push(this.interpret(valueContext.accept(this), 0)); // reduce each result to a string
+						list.push(this.compose(valueContext.accept(this), 0)); // reduce each result to a string
 						this.context = oldContext;
 					});
 					value = {type:'argument', list:list};
@@ -368,7 +368,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let method : string = child.children[0].accept(this);
 			if (!method.startsWith('@')){ // annotations have already been processed
 				let args : any = child.children[1]; // passing the argument tree to CallMethod
-				value = this.callMethod(method, this.interpret(value, 0), args);
+				value = this.callMethod(method, this.compose(value, 0), args);
 			}
 		});
 		return value;
@@ -412,7 +412,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitBracedThinArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
-		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
+		delete this.annotations.MissingValue; // predicates need to see the absense of a value
 		let result : any = ctx.children[0].accept(this);
 		this.annotations.MissingValue = oldMissingValue;
 		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
@@ -425,7 +425,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitBracedArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
-		delete this.annotations.MissingValue; // conditionals need to see the absense of a value
+		delete this.annotations.MissingValue; // predicates need to see the absense of a value
 		let result : boolean = ctx.children[0].accept(this);
 		this.annotations.MissingValue = oldMissingValue;
 			if (Array.isArray(result)){
@@ -565,7 +565,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		//}
 		//return result;
 	};
-	visitNotConditional = function(ctx) {
+	visitNotPredicate = function(ctx) {
 		let result : any = this.visitChildren(ctx)[1];
 		return !result;
 	};
@@ -580,8 +580,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// remove extraneous array
 		return this.visitChildren(ctx)[0];
 	};
-	visitNestedConditional = function(ctx) {
-		return this.visitChildren(ctx)[1];  // return second of three children (left paren, the conditional, right paren)
+	visitNestedPredicate = function(ctx) {
+		return this.visitChildren(ctx)[1];  // return second of three children (left paren, the predicate, right paren)
 	};
 	visitBraceThinArrow = function(ctx) {
 		return this.visitChildren(ctx)[0];
@@ -615,7 +615,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (argResults){
 				argResults.forEach((arg) =>{
 					if (arg !== undefined){ // remove result of commas
-						argValues.push(this.interpret(arg, 0));
+						argValues.push(this.compose(arg, 0));
 					}
 				});
 			}
@@ -706,7 +706,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let originalValue = value;
 					if (typeof value == 'string' && value.includes('\0x01{.}')){
 						// special case for matching the output of bulleted templates
-						value = this.interpret([value], 1); // interpret with bulleting
+						value = this.compose([value], 1); // compose with bulleting
 					}
 					let matches : boolean = false;
 					if (argValues.length == 0 || this.valueIsMissing(value)){
@@ -719,7 +719,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (method != 'Assert' || bFirst){ // Assert only matches the first argument
 								if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
 									matches = true;
-								} else if (typeof arg == 'string' && arg.includes('\0x01{.}') && value == this.interpret([arg], 1)){
+								} else if (typeof arg == 'string' && arg.includes('\0x01{.}') && value == this.compose([arg], 1)){
 									matches = true;
 								} 
 								bFirst = false;
@@ -796,7 +796,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = true;
 							}
 						}
-					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotConditionalContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedConditionalContext')){
+					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotPredicateContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedPredicateContext')){
 						let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 						this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 						value = msg;
@@ -1029,18 +1029,18 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result; 
 	}
-	interpret = function(result, mode){
+	compose = function(result, mode){
 		if (typeof result == 'object' && result != null && !Array.isArray(result)){
 			if (result instanceof TemplateData || result.type == 'argument' || result.type == 'missing'){
-				return result; // don't interpret if not appropriate
+				return result; // don't compose if not appropriate
 			}
-			result = [result];  // do interpret expects arrays
+			result = [result];  // do compose expects arrays
 		}
 		if (!Array.isArray(result)){
 			return result;
 		}
 		let output = {lines: [""], skipping: false, mode: 0, bContainsNull: false, bContainsBullet: false};
-		this.doInterpret(result, output, null);
+		this.doCompose(result, output, null);
 		if (output.skipping){
 			// never encountered a new line while skipping
 			if (output.lines.length == 1){
@@ -1050,13 +1050,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			output.lines = output.lines.slice(0, output.lines.length - 1);  // remove the deleted line's new line
 		}
 		if (mode == 1 && output.bContainsBullet){
-			let interpretResult = output.lines.join('\n');
+			let composeResult = output.lines.join('\n');
 			output = {lines: [""], skipping: false, mode: 1, bContainsNull: false, bContainsBullet: false};
-			this.doInterpret([interpretResult], output, null);
+			this.doCompose([composeResult], output, null);
 		}
 		return output.lines.join('\n');
 	}
-	doInterpret = function(result, output, indent){
+	doCompose = function(result, output, indent){
 		let lines = output.lines;
 		result.forEach((item : any)=>{
 			if (item != null && typeof item == 'object' && item.type == 'missing'){
@@ -1071,7 +1071,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let indentInTheOutput = lines[lines.length - 1].replace(/^([ \t]*(\0x01\{\.\})?).*/s,'$1'); 
 				// determine if the current bulleted indent is being overridden by a plain indent
 				let bReplaceIndent = !!indent && indent.includes('\0x01{.}') && !indentInTheOutput.includes('\0x01{.}') && indentInTheOutput.length > 0;
-				this.doInterpret(item, output, bReplaceIndent ? indentInTheOutput : indent);
+				this.doCompose(item, output, bReplaceIndent ? indentInTheOutput : indent);
 			} else if (typeof item == 'object' && item != null){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
@@ -1080,11 +1080,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.addToOutput(item.result.toString(), output);
 					} else if (typeof item.result == 'object' && item.result != null){
 						if (Array.isArray(item.result) || item.result.type == 'indent' || item.result.type == 'missing'){
-							this.doInterpret([item.result], output, item.bullet);
+							this.doCompose([item.result], output, item.bullet);
 						} else {
 							// list
 							for (let i = 0; i < item.result.list.length(); i ++){
-								this.doInterpret(this.result.list[i], output, item.bullet);
+								this.doCompose(this.result.list[i], output, item.bullet);
 								if (i < this.result.list.length - 1){
 									this.addToOutput('\n', output);
 								}
@@ -1107,16 +1107,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								indentObject = {type:'indent', result: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
-								let doInterpretParm = [indentObject];
+								let doComposeParm = [indentObject];
 								if (bIncompleteBullet){
-									doInterpretParm = Array.isArray(itemResult) ? itemResult : [itemResult];
+									doComposeParm = Array.isArray(itemResult) ? itemResult : [itemResult];
 								}
-								this.doInterpret(doInterpretParm, output, indent);
+								this.doCompose(doComposeParm, output, indent);
 							} else {
 								if (!indent.includes('\n')){
 									this.addToOutput('\n', output);
 								}
-								this.doInterpret([indentObject], output, indent);
+								this.doCompose([indentObject], output, indent);
 							}
 						}
 					} else {
@@ -1145,7 +1145,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									this.addToOutput(newIndent, output);
 								}
 							}
-							this.doInterpret(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
+							this.doCompose(Array.isArray(listItem) ? listItem : [listItem], output, newIndent);
 							bFirst = false;
 						});		
 					}
@@ -1230,7 +1230,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					output.skipping = false; // done with skipping
 				}
 			} else {
-				if (output.mode == 1){ // only handle bullets on the final interpretation
+				if (output.mode == 1){ // only handle bullets on the final composition
 					if (/^[ \t]*\0x01\{\.\}/.test(text)){
 						// there is a bullet in the text
 						let indent = text.replace(/^([ \t]*).*$/, '$1');
@@ -1245,7 +1245,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 					}
 				} else if (!output.bContainsBullet){
-					// during mode 0, indicate if interpret needs a second pass in mode 1
+					// during mode 0, indicate if compose needs a second pass in mode 1
 					output.bContainsBullet = /\n[ \t]*\0x01\{\.\}/.test('\n' + text);
 				}
 				lines[lines.length - 1] += text;
@@ -1497,7 +1497,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					return;
 				}
 				if (Array.isArray(result)){
-					result = visitor.interpret(result, 1);
+					result = visitor.compose(result, 1);
 				}
 				let urlsBeingLoaded = [];
 				Object.keys(urls).forEach((key : string) =>{
