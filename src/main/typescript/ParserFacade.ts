@@ -17,7 +17,7 @@ class BulletIndent {
 	public indent : string;
 	public parent : BulletIndent;
 	public lastBullet = '';
-	constructor(indent : string = null, currentBulletIndent : BulletIndent = null){
+	constructor(indent : string = null, currentBulletIndent : BulletIndent = null, level = null){
 		if (indent == null){
 			// indicates an empty BulletIndent
 			return;
@@ -26,10 +26,10 @@ class BulletIndent {
 		this.indent = indent;
 		if (currentBulletIndent == null ){
 			// establish the first level
-			this.level = 0;
+			this.level = level == null ? 0 : level;
 			this.index = 0;
 			this.parent = null;
-		} else if (indent == currentIndent){
+		} else if (this.level == level || indent == currentIndent){
 			// staying on the same level
 			this.level = currentBulletIndent.level;
 			this.index = currentBulletIndent.index + 1;
@@ -38,7 +38,7 @@ class BulletIndent {
 			// search for the same level
 			let matchingLevel : BulletIndent = currentBulletIndent.parent; // used to find a previous level
 			while (matchingLevel != null){
-				if (indent == matchingLevel.indent){
+				if ((level != null && matchingLevel.level == level) || indent == matchingLevel.indent){
 					// found a matching level, so this one is a continuation
 					this.level = matchingLevel.level;
 					this.index = matchingLevel.index + 1;
@@ -50,7 +50,7 @@ class BulletIndent {
 			} 
 			if (matchingLevel == null){
 				// create a new level even if this indent is less than the previous
-				this.level = currentBulletIndent.level + 1;
+				this.level = level == null ? (currentBulletIndent.level + 1) : level;
 				this.index = 0;
 				this.parent = currentBulletIndent;
 			}
@@ -600,7 +600,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		});
 		let bulletText = bulletTextArray.join('');
-		return {type:'indent', bullet: bulletText, result: ctx.children[1].accept(this)};
+		return {type:'indent', bullet: bulletText, parts: ctx.children[1].accept(this)};
 	};
 	visitBeginningIndent = function(ctx) {
 		return this.visitIndent(ctx);
@@ -1029,36 +1029,53 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result; 
 	}
-	compose = function(result, mode){
-		if (typeof result == 'object' && result != null && !Array.isArray(result)){
-			if (result instanceof TemplateData || result.type == 'argument' || result.type == 'missing'){
-				return result; // don't compose if not appropriate
+	compose = function(parts, mode){
+		if (typeof parts == 'object' && parts != null && !Array.isArray(parts)){
+			if (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing'){
+				return parts; // don't compose if not appropriate
 			}
-			result = [result];  // do compose expects arrays
+			parts = [parts];  // do compose expects arrays
 		}
-		if (!Array.isArray(result)){
-			return result;
+		if (!Array.isArray(parts)){
+			return parts;
 		}
-		let output = {lines: [""], skipping: false, mode: 0, bContainsNull: false, bContainsBullet: false};
-		this.doCompose(result, output, null);
+		let output = {lines: [""], skipping: false, mode: 0, bullets: {}};
+		this.doCompose(parts, output, null);
 		if (output.skipping){
 			// never encountered a new line while skipping
 			if (output.lines.length == 1){
 				return null; // a null in the array nullified the whole array}
 			}
-			output.bContainsNull = true;
 			output.lines = output.lines.slice(0, output.lines.length - 1);  // remove the deleted line's new line
 		}
-		if (mode == 1 && output.bContainsBullet){
-			let composeResult = output.lines.join('\n');
-			output = {lines: [""], skipping: false, mode: 1, bContainsNull: false, bContainsBullet: false};
-			this.doCompose([composeResult], output, null);
+		let bullets = output.bullets;
+		// sort the found bullets by length and use that to assign them a level 
+		let keys = Object.keys(bullets);
+		if (mode == 1 && keys.length > 0){
+			let level = 0;
+			let bSorting = true;
+			while (bSorting){
+				let lowest = null;
+				keys.forEach((key)=>{
+					if (bullets[key].level == null && (lowest == null || bullets[key].length < bullets[lowest].length)){
+						lowest = key;
+					}
+				});
+				if (lowest != null){
+					bullets[lowest].level = level++;
+				} else {
+					bSorting = false;
+				}
+			}
+			let composed = output.lines.join('\n');
+			output = {lines: [""], skipping: false, mode: 1, bullets: bullets};
+			this.doCompose([composed], output, null);
 		}
 		return output.lines.join('\n');
 	}
-	doCompose = function(result, output, indent){
+	doCompose = function(parts, output, indent){
 		let lines = output.lines;
-		result.forEach((item : any)=>{
+		parts.forEach((item : any)=>{
 			if (item != null && typeof item == 'object' && item.type == 'missing'){
 				item = item.missingValue;
 			}
@@ -1075,17 +1092,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else if (typeof item == 'object' && item != null){
 				if (item.type == 'indent'){
 					this.addToOutput(item.bullet, output);
-					if (item.result == null) {
-					} else if (typeof item.result == 'string' || typeof item.result == 'number'){
-						this.addToOutput(item.result.toString(), output);
-					} else if (typeof item.result == 'object' && item.result != null){
-						if (Array.isArray(item.result) || item.result.type == 'indent' || item.result.type == 'missing'){
-							this.doCompose([item.result], output, item.bullet);
+					if (item.parts == null) {
+					} else if (typeof item.parts == 'string' || typeof item.parts == 'number'){
+						this.addToOutput(item.parts.toString(), output);
+					} else if (typeof item.parts == 'object' && item.parts != null){
+						if (Array.isArray(item.parts) || item.parts.type == 'indent' || item.parts.type == 'missing'){
+							this.doCompose([item.parts], output, item.bullet);
 						} else {
 							// list
-							for (let i = 0; i < item.result.list.length(); i ++){
-								this.doCompose(this.result.list[i], output, item.bullet);
-								if (i < this.result.list.length - 1){
+							for (let i = 0; i < item.parts.list.length(); i ++){
+								this.doCompose(this.parts.list[i], output, item.bullet);
+								if (i < this.parts.list.length - 1){
 									this.addToOutput('\n', output);
 								}
 							}
@@ -1104,7 +1121,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let indentObject = itemResult;
 							// let the next level handle an array of items that aren't lists or indents
 							if (!this.containsIndent(indentObject)){
-								indentObject = {type:'indent', result: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
+								indentObject = {type:'indent', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
 								let doComposeParm = [indentObject];
@@ -1199,7 +1216,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		if (typeof value == 'object' && value != null){
 			if (value.type == 'indent'){
-				return value.bullet + this.valueAsString(value.result);
+				return value.bullet + this.valueAsString(value.parts);
 			} else if (value.type == 'missing'){
 				return value.missingValue;
 			} else {
@@ -1235,7 +1252,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// there is a bullet in the text
 						let indent = text.replace(/^([ \t]*).*$/, '$1');
 						output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
-						this.bulletIndent = new BulletIndent(indent, this.bulletIndent);
+						let bulletObject = output.bullets[text.replace(/^([ \t]*\0x01\{\.\}).*$/, '$1')];
+						if (bulletObject == null){
+							lines.push('ERROR computing bullet');
+						} else {
+							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level);
+						}
 						text = text.replace(/[ \t]*\0x01\{\.\}/, indent + this.bulletIndent.getBullet());
 					} else if (this.bulletIndent != null) {
 						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
@@ -1244,9 +1266,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							this.bulletIndent = this.bulletIndent.parent;
 						}
 					}
-				} else if (!output.bContainsBullet){
-					// during mode 0, indicate if compose needs a second pass in mode 1
-					output.bContainsBullet = /\n[ \t]*\0x01\{\.\}/.test('\n' + text);
+				} else if (/^[ \t]*\0x01\{\.\}/.test(text)){
+					// during mode 0, capture the unique bullets
+					let bullet = text.replace(/^([ \t]*\0x01\{\.\}).*$/, '$1');
+					output.bullets[bullet] = {bullet: bullet, length: bullet.length};
 				}
 				lines[lines.length - 1] += text;
 				if (i < (arText.length - 1)){
