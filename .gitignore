@@ -6,3 +6,5 @@ dist
 .vs/texttemplate-editor/v16/.suo
 *.sqlite
 .vs/VSWorkspaceState.json
+src/main/antlr/TextTemplateLexerTest.g4
+src/main/antlr/TextTemplateParserTest.g4

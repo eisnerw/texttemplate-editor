@@ -587,20 +587,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0];
 	};
 	visitIndent = function(ctx) {
-		let bulletTextArray = [];
-		ctx.children[0].children.forEach(child=>{
-			if (child.constructor.name == 'TerminalNodeImpl'){
-				let value = child.getText();
-				if (value == '{'){
-					value = '\0x01' + '{'; // protect against tokens in data by specifically marking ones from templates
-				}
-				bulletTextArray.push(value);
-			} else {
-				bulletTextArray.push(child.accept(this));
-			}
-		});
-		let bulletText = bulletTextArray.join('');
-		return {type:'indent', bullet: bulletText, parts: ctx.children[1].accept(this)};
+		return {type:'indent', bullet: ctx.getText().replace('{','\0x01{'), parts: []};
 	};
 	visitBeginningIndent = function(ctx) {
 		return this.visitIndent(ctx);
@@ -733,6 +720,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							} else {
 								value = originalValue; // if the second argument is missing, return the original value
 							}
+						} else if (argValues.length > 2){
+							value = argValues[2];
 						} else {
 							let failure = 'ASSERT FAILURE:\n';
 							let arg = argValues[0];
@@ -877,10 +866,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case '@MissingValue':
 					value['MissingValue'] = argValues[0];
-					break;
-					
-				case '@ResetBullets':
-					this.bulletIndent = null;
 					break;
 					
 				default:
@@ -1075,7 +1060,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	doCompose = function(parts, output, indent){
 		let lines = output.lines;
-		parts.forEach((item : any)=>{
+		for (let iParts = 0; iParts < parts.length; iParts++){
+			let item = parts[iParts];
+			if (item != null && typeof item == 'object' && item.type == 'indent'){
+				for (iParts++; iParts < parts.length; iParts++){
+					item.parts.push(parts[iParts]); // repackage the remaining parts under the indent object 
+				}
+			}
 			if (item != null && typeof item == 'object' && item.type == 'missing'){
 				item = item.missingValue;
 			}
@@ -1170,7 +1161,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				let x = 'stop';
 			}
-		});
+		}
 	}
 	valueIsMissing(value){
 		if (value == null || (typeof value == 'object' && value.type == 'missing')){
@@ -1254,7 +1245,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
 						let bulletObject = output.bullets[text.replace(/^([ \t]*\0x01\{\.\}).*$/, '$1')];
 						if (bulletObject == null){
-							lines.push('ERROR computing bullet');
+							lines.push('ERROR computing bullet'); // should never happen TODO: raise exception?
 						} else {
 							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level);
 						}

@@ -1,5 +1,6 @@
 lexer grammar TextTemplateLexer;
 
+BULLET: '\n' [ \t]* '{.}';
 NONGREEDY: ([ \t]*  '///' ~[\n]* ('\n' | EOF) | [ \t]* '//' ~[\n]* '\n' ([ t]* '//' ~[\n]* ('\n' | EOF))+) ->skip;
 COMMENT: [ \t]*  '//' ~[/\n]+ ('\n' | EOF) [ \t]*;
 COMMENT_NL: [ \t]*  '//' ('\n' | EOF)	 [ \t]* ->type(COMMENT);   // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
@@ -11,12 +12,10 @@ TEXT_SLASH: '/' ->type(TEXT);
 NL: '\n';
 SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+;
 
-
 mode BRACED;
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->skip;
 IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
-BULLETRESET: [0-9] '.' [0-9];
 DOT: '.';
 ARROW: '=>';
 THINARROW: '->';
@@ -66,6 +65,7 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
+BRACKETED_BULLET: [ \t]* '{.}' ->type(BULLET);
 BRACKETED_NONGREEDY: ([ \t]*  '///' ~[\n]* ('\n' | EOF) | [ \t]* '//' ~[\n]* '\n' ([ t]* '//' ~[\n]* ('\n' | EOF))+) ->skip;
 BRACKETED_COMMENT: [ \t]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t]* ->type(COMMENT);
 BRACKETED_COMMENT_NL: [ \t]*  '//' ('\n' | EOF) [ \t]* ->type(COMMENT);  // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
