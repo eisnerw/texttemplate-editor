@@ -525,6 +525,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return result;  
 	}
+	// TODO: this should go away because subtemplates are now preprocessed
 	visitSubtemplateSpecs = function(ctx) {
 		if (ctx.children){
 			ctx.children.forEach((child)=>{
@@ -1342,6 +1343,18 @@ class CollectorErrorListener extends error.ErrorListener {
     }
 
 }
+class RelocatingCollectorErrorListener extends CollectorErrorListener {
+	private _line : number
+	private _column : number;
+	constructor(errors: Error[], line : number, column : number){
+		super(errors);
+		this._line = line - 1; // easier if zero origined
+		this._column = column;
+	}
+    syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
+		super.syntaxError(recognizer, offendingSymbol, line + this._line, line == 1 ? (column + this._column) : column, msg, e);
+    }
+}
 declare global {
   interface Window {
     ParserFacade: any;
@@ -1376,7 +1389,7 @@ export function processSubtemplates(input: String) : {} {
 	}
 	for (let e of treeTokens){
 		if (e.type != -1) {
-			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop});
+			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop, column: e.column, line: e.line});
 		}
 	}
 	let bFound = false;
@@ -1402,7 +1415,7 @@ export function processSubtemplates(input: String) : {} {
 						}
 					}
 					if (parts.length > 6 && parts[5].name == 'RBRACKET' && parts[6].name == 'RBRACE'){
-						subtemplates['#' + parts[2].text] = input.substring(parts[4].start, parts[6].start);
+						subtemplates['#' + parts[2].text] = {text: input.substring(parts[4].start, parts[6].start), line: parts[0].line, column:parts[4].column};
 					} else {
 						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace';
 					}
@@ -1623,8 +1636,20 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 				visitor.model = model;
 				visitor.input = input;
 				visitor.bulletIndent = null; // start bulleting from 0,0
+				// add subtemplates found by processSubtemplates to visitor
 				Object.keys(processed.subtemplates).forEach((key)=>{
-					visitor.subtemplates[key] = processed.subtemplates[key]; // subtemplates found by processSubtemplates
+					let input = processed.subtemplates[key].text;
+					let subtemplate = processed.subtemplates[key];
+					visitor.subtemplates[key] = subtemplate.text;
+					const lexer = createLexer(input);
+					lexer.removeErrorListeners();
+					lexer.addErrorListener(new ConsoleErrorListener());
+					const parser = createParserFromLexer(lexer);
+					parser.removeErrorListeners();
+					parser.addErrorListener(new RelocatingCollectorErrorListener(errors, subtemplate.line, subtemplate.column)); //relocates  based on where the subtemplate is positioned in the editor
+					parser._errHandler = new TextTemplateErrorStrategy();
+					let tree = parser.compilationUnit();
+					parsedTemplates[input] = tree;
 				});
 				folds = []; // folds will be computed while visiting
 				var result = visitor.visitCompilationUnit(tree);
