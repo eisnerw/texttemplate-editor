@@ -6,6 +6,9 @@ import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLex
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
 import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
 
+var parsedTemplates = {};
+var parsedTokens = {};
+
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
         console.log('ERROR ' + msg);
@@ -191,7 +194,7 @@ class TemplateData {
 
 class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
-	subtemplates : any = {};
+	subtemplates = {};
 	errors = [];
 	model;
 	input;
@@ -452,7 +455,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};	
 	visitBracketedTemplateSpec = function(ctx) {
 		let oldTokens = this.annotations['Tokens'];
-		this.annotations['Tokens'] = tokensAsString(this.input, ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop), ctx.parser.symbolicNames);
+		this.annotations['Tokens'] = tokensAsString(this.input, ctx);
 		let result = [];
 		// skip the first and last children because the are the surrounding brackets
 		for (let i : number = 1; i < ctx.children.length - 1; i++){
@@ -497,9 +500,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			this.subtemplates[subtemplateName] = urls[subtemplateUrl].data;
 		}
 		let parserInput = '{:' + this.subtemplates[subtemplateName] + '}';
-		const lexer = createLexer(parserInput);
-		const parser = createParserFromLexer(lexer);
-		const tree = parser.compilationUnit();
+		let tree = parsedTemplates[parserInput];
+		if (!tree){
+			const lexer = createLexer(parserInput);
+			const parser = createParserFromLexer(lexer);
+			tree = parser.compilationUnit();
+			parsedTemplates[parserInput] = tree;
+			parsedTokens[parserInput] = tokensAsString(parserInput, tree);
+		}
 		if (this.recursionLevel > 20){
 			return 'ERROR: too many levels of recursion when invoking ' + subtemplateName;
 		}
@@ -507,7 +515,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let oldTokenString = this.annotations['Tokens'];
 		let oldInput = this.input;
 		this.input = parserInput;
-		this.annotations['Tokens'] = tokensAsString(parserInput, parser._interp._input.tokens, parser.symbolicNames);
+		this.annotations['Tokens'] = parsedTokens[parserInput];
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
 		this.annotations['Tokens'] = oldTokenString;
@@ -945,7 +953,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			indent = '';
 		}
 		let templateParts = [];
-		let ctxName = ctx.constructor.name.replace('Context','');
+		let ctxName = ctx.constructor.name.replace(/Context$/,'');
 		switch (ctxName) {
 			case "TemplateContents":
 			case "CompilationUnit":
@@ -1349,6 +1357,112 @@ export function createLexer(input: String) {
     return lexer;
 }
 
+export function processSubtemplates(input: String) : {} {
+	if (!input.includes('\nSubtemplates:')){
+		return {input: input, subtemplates: {}}
+	}
+	let subtemplates = {};
+	let newInput : string;
+	const chars = new InputStream(input);
+	const lexer = new TextTemplateLexer(chars);
+	lexer.strictMode = false;
+	const tokens = new CommonTokenStream(lexer);
+	tokens.fill();
+	let treeTokens : CommonToken[] = tokens.tokens;
+	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
+	let tokenArray = [];
+	if (input.length == 0){
+		return input;
+	}
+	for (let e of treeTokens){
+		if (e.type != -1) {
+			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop});
+		}
+	}
+	let bFound = false;
+	for (let iToken = 0; iToken < tokenArray.length; iToken++){
+		let tokenObject =tokenArray[iToken];
+		let name = tokenObject.name;
+		if (tokenObject.name == 'SUBTEMPLATES'){
+			bFound = true;
+			newInput = input.substr(0, tokenObject.start);
+			let bExtractingSubtemplates = true;
+			while (bExtractingSubtemplates){
+				let parts = [];
+				for (++iToken; parts.length < 5 && iToken < tokenArray.length; iToken++){
+					if (tokenArray[iToken].name != 'COMMENT' && tokenArray[iToken].name != 'NL' && tokenArray[iToken].name != 'SPACES'){
+						parts.push(tokenArray[iToken]);
+					}
+				}
+				if (parts.length == 5 && parts[0].name == 'LBRACE' && parts[1].name == 'POUND'  && parts[2].name == 'IDENTIFIER' && parts[3].name == 'COLON' && parts[4].name == 'LBRACKET' && parts[2].text.length > 0){
+					iToken = findMatching('LBRACKET',tokenArray, iToken - 1);
+					for (; parts.length < 7 && iToken < tokenArray.length; iToken++){
+						if (tokenArray[iToken].name != 'COMMENT' && tokenArray[iToken].name != 'NL' && tokenArray[iToken].name != 'SPACES'){
+							parts.push(tokenArray[iToken]);
+						}
+					}
+					if (parts.length > 6 && parts[5].name == 'RBRACKET' && parts[6].name == 'RBRACE'){
+						subtemplates['#' + parts[2].text] = input.substring(parts[4].start, parts[6].start);
+					} else {
+						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace';
+					}
+				} else {
+					if (parts.length > 2 && parts[1].name == 'POUND' && parts[2].name == 'IDENTIFIER' && parts[2].text.length > 0){
+						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' invalid subtemplate syntax';
+					} else {
+						newInput += '\nERROR extracting subtemplates';
+					}
+				}
+				while (iToken < tokenArray.length && (tokenArray[iToken].name == 'COMMENT' || tokenArray[iToken].name == 'NL' || tokenArray[iToken].name == 'SPACES')){
+					iToken++;
+				}
+				if (iToken < tokenArray.length && tokenArray[iToken].name == 'LBRACE'){
+					iToken--; // get ready to extract another subtemplate
+				} else {
+					bExtractingSubtemplates = false;
+					if (iToken < tokenArray.length){
+						newInput += '\nERROR extraneous input (' + tokenArray[iToken].name + ') at the end of the subtemplates';
+					}
+				}
+			}
+		} else if (name == 'LBRACE'){
+			iToken = findMatching(name, tokenArray, iToken);
+		}
+	}
+	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
+}
+
+function findMatching(name : string, tokenArray : any[], iTokenIn: number){
+	let match : string;
+	switch (name){
+		case 'LBRACE':
+			match = 'RBRACE';
+			break;
+		case 'LBRACKET':
+			match = 'RBRACKET';
+			break;
+		case 'LP':
+			match = 'RP';
+			break;
+		case 'APOSTROPHE':
+			match = 'APOSTROPHE';
+			break;
+		case 'QUOTE':
+			match = 'QUOTE';
+			break;
+	}
+	for (let iToken = iTokenIn + 1; iToken < tokenArray.length; iToken++){
+		let tokenObject =tokenArray[iToken];
+		let name = tokenObject.name;
+		if (name == match){
+			return iToken;
+		}
+		if (name == 'LBRACE' || name == 'LBRACKET' || name == 'LP' || name == 'APOSTROPHE' || name == 'QUOTE'){
+			iToken = findMatching(name, tokenArray, iToken);
+		}
+	}
+}
+
 export function getTokens(input: String) : Token[] {
     return createLexer(input).getAllTokens()
 }
@@ -1434,7 +1548,9 @@ export function inputChanged(input ,mode) : void {
 		}
 	}, mode != 1 || invocation == 1 ? 0 : 2000); // if delay (other than the first time), wait 2 seconds after last keystroke to allow typing in the editor to continue
 }
-function tokensAsString(input, treeTokens : CommonToken[], symbolicNames : string[]){
+function tokensAsString(input, ctx){
+	let treeTokens : CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
+	let symbolicNames : string[] = ctx.parser.symbolicNames
 	let parsed = '';
 	if (input){
 		try{
@@ -1450,19 +1566,12 @@ function tokensAsString(input, treeTokens : CommonToken[], symbolicNames : strin
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
 function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = delay (autorun), 2 = skip
-	if (mode != 2){
-		document.getElementById('interpolated').innerHTML = 'lexing...';
-		console.log('lexing...');
-	}
 	setTimeout(()=>{
 		if (invocation != invocations){
 			return;
 		}
 		input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
 		let errors : Error[] = [];
-		const lexer = createLexer(input);
-		lexer.removeErrorListeners();
-		lexer.addErrorListener(new ConsoleErrorListener());
 		if (mode != 2){
 			document.getElementById('interpolated').innerHTML = 'parsing...';
 			console.log('parsing...');
@@ -1471,11 +1580,21 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			if (invocation != invocations){
 				return;
 			}
-			const parser = createParserFromLexer(lexer);
-			parser.removeErrorListeners();
-			parser.addErrorListener(new CollectorErrorListener(errors));
-			parser._errHandler = new TextTemplateErrorStrategy();
-			const tree = parser.compilationUnit();
+			let processed : any = processSubtemplates(input);
+			input = processed.input;
+			let tree = parsedTemplates[input];
+			if (!tree){
+				const lexer = createLexer(input);
+				lexer.removeErrorListeners();
+				lexer.addErrorListener(new ConsoleErrorListener());
+				const parser = createParserFromLexer(lexer);
+				parser.removeErrorListeners();
+				parser.addErrorListener(new CollectorErrorListener(errors));
+				parser._errHandler = new TextTemplateErrorStrategy();
+				tree = parser.compilationUnit();
+				parsedTemplates[input] = tree;
+				parsedTokens[input] = tokensAsString(input, tree);
+			}
 			/* used to get json representation of tree for debugging
 			const getCircularReplacer = () => {
 			  const seen = new WeakSet();
@@ -1490,7 +1609,6 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			  };
 			};
 			let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
-			let parserTokens = tokensAsString(input, parser._interp._input.tokens, parser.symbolicNames);
 			if (mode != 2){
 				document.getElementById('interpolated').innerHTML = "interpolating...";
 				console.log('interpolating...');
@@ -1500,11 +1618,14 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					return;
 				}
 				var visitor = new TextTemplateVisitor();
-				visitor.annotations['Tokens'] = parserTokens;
+				visitor.annotations['Tokens'] = parsedTokens[input];
 				visitor.errors = errors;
 				visitor.model = model;
 				visitor.input = input;
 				visitor.bulletIndent = null; // start bulleting from 0,0
+				Object.keys(processed.subtemplates).forEach((key)=>{
+					visitor.subtemplates[key] = processed.subtemplates[key]; // subtemplates found by processSubtemplates
+				});
 				folds = []; // folds will be computed while visiting
 				var result = visitor.visitCompilationUnit(tree);
 				if (invocation != invocations){
