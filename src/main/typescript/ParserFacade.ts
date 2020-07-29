@@ -206,14 +206,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitIdentifier = function(ctx) {
 		var key = ctx.getText();
-		if (!this.context || !(this.context instanceof TemplateData)){
-			return undefined; // attempt to look up a variable without a context returns undefined
-		}
 		if (key.startsWith('@.')){
 			return this.annotations[key.substr(2)];
 		}
+		if (!this.context || !(this.context instanceof TemplateData)){
+			console.error('Attempting to look up "' + key + '" with no context');
+			return undefined; // attempt to look up a variable without a context returns undefined
+		}
 		let value = this.context.getValue(key);
 		if (value === undefined){
+			console.debug('Missing value for ' + key);
 			return {type: 'missing', missingValue: this.annotations.MissingValue, key: key};
 		}
 		return this.context.getValue(key);
@@ -260,11 +262,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								urls[context] = {};
 							}
 						}
-					} else {
+					} else if (context.substr(0,1) == '[' || context.substr(0,1) == '{'){
 						this.context = new TemplateData(context, this.context);
+					} else {
+						// the string isn't JSON and is probably an error, so just output it
+						this.context = oldContext;
+						return context;
 					}
 				} catch(e){
 					this.context = oldContext;
+					console.error('Error loading context: ' + e.message);
 					return 'Error loading context: ' + e.message;
 				}
 				if (ctx.children.length > 1 && ctx.children[1].children && ctx.children[1].children[0].constructor.name == 'MethodInvokedContext'){
@@ -449,17 +456,30 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};	
 	visitBracketedTemplateSpec = function(ctx) {
 		let oldTokens = this.annotations['Tokens'];
+		let oldSubtemplates = []; // only needed if this spec contains subtemplates
 		this.annotations['Tokens'] = tokensAsString(this.input, ctx);
+		let lastChildIndex = ctx.getChildCount() - 2;
+		let bHasSubtemplates = ctx.children[lastChildIndex].constructor.name == "TemplateContentsContext" && ctx.children[lastChildIndex].getChildCount() > 0 && ctx.children[lastChildIndex].children[0].constructor.name == "SubtemplateSectionContext";
+		if (bHasSubtemplates){
+			// clone the current subtemplates because the ones found here are scoped
+			for (let key in this.subtemplates){
+				oldSubtemplates[key] = this.subtemplates[key];
+			}
+			ctx.children[lastChildIndex].accept(this); // visit to load subtemplates
+			lastChildIndex--; // no need to visit it again
+		}
 		let result = [];
-		// skip the first and last children because the are the surrounding brackets
-		for (let i : number = 1; i < ctx.children.length - 1; i++){
+		// skipping the first and last children (and the subtemplates) because the are the surrounding brackets
+		for (let i : number = 1; i <= lastChildIndex; i++){
 			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
 				let childResult = ctx.children[i].accept(this);
 				result.push(childResult);
 			}
 		}
-		//let result : any = this.visitChildren(ctx);
 		this.annotations['Tokens'] = oldTokens;
+		if (bHasSubtemplates){
+			this.subtemplates = oldSubtemplates; // subtemplates are scoped so remove the ones we found
+		}
 		if (result.length == 1){
 			return result[0];
 		}
@@ -492,6 +512,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				return 'loading subtemplate "' + subtemplateName + '"';
 			}
 			let data = urls[subtemplateUrl].data;
+			if (data.substr(0 ,1) != '['){
+				return 'Error loading subtemplate "' + subtemplateName + '": ' + data;
+			}
 			let processed : any = processSubtemplates(data.substr(1, data.length - 2)); // remove brackets for processSubTemplates
 			this.subtemplates[subtemplateName] = '[' + processed.input + ']'; // replace the brackets around the extracted input when storing the subtemplate
 			Object.keys(processed.subtemplates).forEach((key)=>{
@@ -509,6 +532,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			parsedTokens[parserInput] = tokensAsString(parserInput, tree);
 		}
 		if (this.recursionLevel > 20){
+			console.error('ERROR: too many levels of recursion when invoking ' + subtemplateName);
 			return 'ERROR: too many levels of recursion when invoking ' + subtemplateName;
 		}
 		++this.recursionLevel;
@@ -610,7 +634,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0];
 	};
 	visitIndent = function(ctx) {
-		return {type:'indent', bullet: ctx.getText().replace('{','\0x01{'), parts: []};
+		return {type:'indent', bullet: ctx.getText().replace(/^.*(\n.*)$/s,'$1').replace('{','\0x01{'), parts: []};
 	};
 	visitBeginningIndent = function(ctx) {
 		return this.visitIndent(ctx);
@@ -660,22 +684,27 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
 			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
 			value = msg;
+			console.error(msg);
 		} else if (args.children && (method == 'ToUpper' || method == 'ToLower')){
 			let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 			value = msg;
+			console.error(msg);
 		} else if (!args.children && (method == 'GreaterThan' || method == 'LessThan')){
 			let msg = 'ERROR: missing argument for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
 			value = msg;
+			console.error(msg);
 		} else if (args.children && args.children.length > 1 && (method == 'GreaterThan' || method == 'LessThan')){
 			let msg = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 			value = msg;
+			console.error(msg);
 		} else if (args.children && args.children.length < 3 && method == 'Case'){
 			let msg = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
 			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 			value = msg;
+			console.error(msg);
 		} else {
 			switch (method){
 				case 'ToUpper':
@@ -793,6 +822,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let parentCtx : any = args.parentCtx;
 							this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
 							value = msg;
+							console.error(msg);
 						} else if (method == 'Count'){
 							if (value == undefined){
 								value = 0;
@@ -812,6 +842,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 						this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
 						value = msg;
+						console.error(msg);
 					} else {
 						if (value instanceof TemplateData){
 							let oldContext : TemplateData = this.context;
@@ -895,6 +926,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
 					let parentCtx : any = args.parentCtx;
 					let msg = 'ERROR: unknown function: .' + method + '(' + argValues.join(', ') + ')';
+					console.error(msg);
 					this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
 					break;
 			}
@@ -1119,6 +1151,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				item = item.missingValue;
 			}
 			if (item == null){
+				console.debug('Skipping line containing ' + lines[lines.length - 1] + ' because of a null in the composition input');
 				lines[lines.length - 1] = ''; // skipping this line
 				output.skipping = true;
 			} else if (this.isScalar(item)){
@@ -1471,12 +1504,15 @@ export function processSubtemplates(input: String) : {} {
 						subtemplates['#' + parts[2].text] = {text: text, line: parts[0].line, column:parts[4].column, subtemplates: subSubtemplates};
 					} else {
 						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace';
+						console.error('ERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace');
 					}
 				} else {
 					if (parts.length > 2 && parts[1].name == 'POUND' && parts[2].name == 'IDENTIFIER' && parts[2].text.length > 0){
 						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' invalid subtemplate syntax';
+						console.error('ERROR extracting subtemplate "' + parts[2].text + '"' + ' invalid subtemplate syntax');
 					} else {
 						newInput += '\nERROR extracting subtemplates';
+						console.error('ERROR extracting subtemplates');
 					}
 				}
 				while (iToken < tokenArray.length && (tokenArray[iToken].name == 'COMMENT' || tokenArray[iToken].name == 'NL' || tokenArray[iToken].name == 'SPACES')){
@@ -1488,6 +1524,7 @@ export function processSubtemplates(input: String) : {} {
 					bExtractingSubtemplates = false;
 					if (iToken < tokenArray.length){
 						newInput += '\nERROR extraneous input (' + tokenArray[iToken].name + ') at the end of the subtemplates';
+						console.error('ERROR extraneous input (' + tokenArray[iToken].name + ') at the end of the subtemplates');
 					}
 				}
 			}
@@ -1626,6 +1663,7 @@ function tokensAsString(input, ctx){
 				}
 			}
 		} catch(err) {
+			console.error('Error in tokensAsString: ' + err);
 			parsed = '*****ERROR*****';
 		}
 	}
@@ -1710,24 +1748,26 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 						if (!urls[key].data){
 							urlsBeingLoaded.push(key);
 							if (!urls[key].loading){
-								urls[key].loading = true;
+								urls[key].loading = true
+								console.debug('loading ' + key);
 								$.ajax({
 									url: key,
 									success: function (data) {
 										if (data.error){
-											urls[key].data = data.error;
+											urls[key].data = data.error
+											console.error(data.error);
 										} else {
 											if (typeof data != 'string'){
 												data = JSON.stringify(data);
 											}
 											urls[key].data = data;
-											let invocation = ++invocations;
-											setTimeout(()=>{
-												if (invocation == invocations){
-													validate(visitor.model.getValue(), invocation, 0);
-												}
-											}, 0);
 										}
+										let invocation = ++invocations;
+										setTimeout(()=>{
+											if (invocation == invocations){
+												validate(visitor.model.getValue(), invocation, 0);
+											}
+										}, 0);
 									}
 								});
 							}

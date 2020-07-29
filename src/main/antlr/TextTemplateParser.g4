@@ -16,7 +16,7 @@ subtemplateSpec: templateContextToken text*;
 
 templateContents: comment? (subtemplateSection | indent | templateToken | templateContextToken | text+);
 
-indent: NL BULLET SPACES?;
+indent: (NL | COMMENT) BULLET SPACES?;
 
 beginningIndent: BULLET SPACES?;
 
