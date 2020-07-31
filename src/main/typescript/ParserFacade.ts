@@ -643,10 +643,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBullet = function(ctx) {
 		let text = ctx.getText();
 		if (!text.includes('\n')){
-			let previousTokenText = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start - 1, ctx.getSourceInterval().start)[0].text;
-			if (previousTokenText.startsWith('[') && previousTokenText.includes('\n') && !previousTokenText.includes('`')){  // don't correct if continue character (`) is pressent
-				// correct for bracket removing white space if followed by a bullet
-				text = previousTokenText.replace(/^[^\n]+(.*)/, '$1') + text;
+			let previousTokenArray = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start - 1, ctx.getSourceInterval().start);
+			if (previousTokenArray != null){ // check for first token
+				let previousTokenText = previousTokenArray	[0].text;
+				if (previousTokenText.startsWith('[') && previousTokenText.includes('\n') && !previousTokenText.includes('`')){  // don't correct if continue character (`) is pressent
+					// correct for bracket removing white space if followed by a bullet
+					text = previousTokenText.replace(/^[^\n]+(.*)/, '$1') + text;
+				}
 			}
 		}
 		return {type:'bullet', bullet: text.replace('{','\0x01{'), parts: []};
