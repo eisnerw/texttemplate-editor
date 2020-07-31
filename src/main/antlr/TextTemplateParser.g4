@@ -18,7 +18,7 @@ templateContents: (subtemplateSection | bullet | templateToken | templateContext
 
 bullet: NL BULLET SPACES?;
 
-beginningBullet: CONTINUATION? BULLET SPACES?;
+beginningBullet: BULLET SPACES?;
 
 text: TEXT | NL | SPACES | continuation;
 

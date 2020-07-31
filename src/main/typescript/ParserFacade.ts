@@ -644,12 +644,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let text = ctx.getText();
 		if (!text.includes('\n')){
 			let previousTokenText = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start - 1, ctx.getSourceInterval().start)[0].text;
-			if (previousTokenText.startsWith('[') && previousTokenText.includes('\n')){
-				// correct for bracket removing white space
+			if (previousTokenText.startsWith('[') && previousTokenText.includes('\n') && !previousTokenText.includes('`')){  // don't correct if continue character (`) is pressent
+				// correct for bracket removing white space if followed by a bullet
 				text = previousTokenText.replace(/^[^\n]+(.*)/, '$1') + text;
 			}
-		} else if (text.includes('`') && text.includes('\n')){
-			text = text.replace(/^[^\n]+\n(.*)$/s, '$1');
 		}
 		return {type:'bullet', bullet: text.replace('{','\0x01{'), parts: []};
 	};

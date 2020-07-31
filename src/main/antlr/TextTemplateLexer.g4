@@ -14,6 +14,7 @@ NL: '\n';
 SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+;
 
 mode BRACED;
+LBRACKET_CONTINUE: '[' ' '* '`' ~'\n'* '\n' ->type(LBRACKET),pushMode(BRACKETED);
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->skip;
 IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
