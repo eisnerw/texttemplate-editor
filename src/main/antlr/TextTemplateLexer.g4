@@ -3,7 +3,6 @@ lexer grammar TextTemplateLexer;
 COMMENT_LINE: '\n' [ \t]* '//' ~[\n]*  ->skip;
 COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
 CONTINUATION: [ \t]*  '`' [ \t]* '\n' [ \t]*;
-CONTINUE_BULLET: [ \t]*  '`' [ \t]* '\n' [ \t]* '{.}' ->type(BULLET);
 CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]* ->type(CONTINUATION);
 BULLET: [ \t]* '{.}';
 TEXT: ~[{}/ \n]+ ;
@@ -71,7 +70,6 @@ mode BRACKETED;
 BRACKETED_COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->skip;
 BRACKETED_BULLET: [ \t]* '{.}' ->type(BULLET);
 BRACKETED_COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
-BRACKETED_CONTINUE_BULLET: [ \t]*  '`' [ \t]* '\n' [ \t]* '{.}' ->type(BULLET);  // special case to recognize bullet at the beginning of a template no preceded by a new line
 BRACKETED_CONTINUE: [ \t]*  '`' [ \t]* '\n' [ \t]* ->type(CONTINUATION);
 BRACKETED_CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]*  ->type(CONTINUATION);
 RBRACKET_WHITE_SPACE: [ \t]* '\n' [ \t]* ']' ->type(RBRACKET),popMode;

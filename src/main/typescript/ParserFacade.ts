@@ -648,7 +648,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				// correct for bracket removing white space
 				text = previousTokenText.replace(/^[^\n]+(.*)/, '$1') + text;
 			}
-		} else if (text.startsWith('`') && text.includes('\n')){
+		} else if (text.includes('`') && text.includes('\n')){
 			text = text.replace(/^[^\n]+\n(.*)$/s, '$1');
 		}
 		return {type:'bullet', bullet: text.replace('{','\0x01{'), parts: []};
@@ -950,6 +950,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	}
+	// this routine is no longer used and has old class names in it
 	getTemplateWithoutComments = function(ctx){
 		let templateParts = [];
 		let ctxName = ctx.constructor.name.replace(/Context$/, '');
@@ -1051,8 +1052,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			case "InvokedTemplateSpec":
 			case "SubtemplateSpecs":
 			case "BracketedArgument":
-			case "Indent":
-			case "BeginningIndent":
+			case "Bullet":
+			case "BeginningBullet":
 			case "MethodInvoked":
 			case "TemplateContextToken":
 				templateParts.push(indent + ctxName);
@@ -1161,7 +1162,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 			if (item != null && typeof item == 'object' && item.type == 'missing'){
-				item = item.missingValue;
+				item = item.missingValuecocc
 			}
 			if (item == null){
 				console.debug('Skipping line containing ' + lines[lines.length - 1] + ' because of a null in the composition input');
