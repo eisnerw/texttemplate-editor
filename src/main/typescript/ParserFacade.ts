@@ -201,16 +201,37 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
 	annotations = {};
+	
 	visitText = function(ctx){
+		if (ctx.children[0].constructor.name == 'ContinuationContext'){
+			// replace all white space captured as a "continuation" (starts with `) with a single blank
+			return ' ';
+		}
 		return ctx.getText();
 	};
 	visitIdentifier = function(ctx) {
 		var key = ctx.getText();
 		if (key.startsWith('@.')){
+			if (key == '@.Tokens' || key == '@.Tree'){
+				let parentName;
+				let parent = ctx;
+				do {
+					parentName = parent.constructor.name.replace(/Context$/,'');
+					parent = parent.parentCtx;
+				} while (parent != null && parentName != 'TemplateContents');
+				if (parent != null){
+					// the parent of the template contents is a template.  
+					if (key == '@.Tokens'){
+						// Return the contents without the tokens the "@.Tokens"
+						return tokensAsString(parent).replace(' LBRACE({) IDENTIFIER(@) DOT(.) IDENTIFIER(Tokens) RBRACE(})','');
+					}
+					return this.getParseTree(parent);
+				}
+			}
 			return this.annotations[key.substr(2)];
 		}
 		if (!this.context || !(this.context instanceof TemplateData)){
-			console.error('Attempting to look up "' + key + '" with no context');
+			console.warn('Attempting to look up "' + key + '" with no context');
 			return undefined; // attempt to look up a variable without a context returns undefined
 		}
 		let value = this.context.getValue(key);
@@ -408,12 +429,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTextedArgument = function(ctx) {
 		return ctx.getText().trim();
 	};
-	visitComment = function(ctx) {
-		if (ctx.start.start == 0){
-			return ''; // special case for a comment at the beginning of the fileCreatedDate{
-		}
-		return ' ';
-	};
 	visitBracedThinArrow = function(ctx) {
 		let oldMissingValue = this.annotations.MissingValue;
 		delete this.annotations.MissingValue; // predicates need to see the absense of a value
@@ -455,9 +470,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.children[2].accept(this);
 	};	
 	visitBracketedTemplateSpec = function(ctx) {
-		let oldTokens = this.annotations['Tokens'];
 		let oldSubtemplates = []; // only needed if this spec contains subtemplates
-		this.annotations['Tokens'] = tokensAsString(this.input, ctx);
 		let lastChildIndex = ctx.getChildCount() - 2;
 		let bHasSubtemplates = ctx.children[lastChildIndex].constructor.name == "TemplateContentsContext" && ctx.children[lastChildIndex].getChildCount() > 0 && ctx.children[lastChildIndex].children[0].constructor.name == "SubtemplateSectionContext";
 		if (bHasSubtemplates){
@@ -476,7 +489,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				result.push(childResult);
 			}
 		}
-		this.annotations['Tokens'] = oldTokens;
 		if (bHasSubtemplates){
 			this.subtemplates = oldSubtemplates; // subtemplates are scoped so remove the ones we found
 		}
@@ -525,18 +537,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let parserInput = '{:' + this.subtemplates[subtemplateName] + '}';
 		let tree = parsedTemplates[parserInput];
 		if (!tree){
-			const lexer = createLexer(parserInput);
-			const parser = createParserFromLexer(lexer);
-			tree = parser.compilationUnit();
+			tree = parseTemplate(parserInput);
 			parsedTemplates[parserInput] = tree;
-			parsedTokens[parserInput] = tokensAsString(parserInput, tree);
+			parsedTokens[parserInput] = tokensAsString(tree);
 		}
 		if (this.recursionLevel > 20){
 			console.error('ERROR: too many levels of recursion when invoking ' + subtemplateName);
 			return 'ERROR: too many levels of recursion when invoking ' + subtemplateName;
 		}
 		++this.recursionLevel;
-		let oldTokenString = this.annotations['Tokens'];
 		let oldInput = this.input;
 		let oldSubtemplates = {};
 		let localSubtemplateNames = [];
@@ -551,12 +560,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			this.subtemplates[localSubtemplateName.substring(subtemplateName.length + 1)] = this.subtemplates[localSubtemplateName];
 		});
 		this.input = parserInput;
-		this.annotations['Tokens'] = parsedTokens[parserInput];
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
 		// restore (pop) old states
 		this.subtemplates = oldSubtemplates;
-		this.annotations['Tokens'] = oldTokenString;
 		this.input = oldInput;
 		if (typeof result == 'string'){
 			result = [result]; // return in an array for consistency
@@ -633,11 +640,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitBraceThinArrow = function(ctx) {
 		return this.visitChildren(ctx)[0];
 	};
-	visitIndent = function(ctx) {
-		return {type:'indent', bullet: ctx.getText().replace(/^.*(\n.*)$/s,'$1').replace('{','\0x01{'), parts: []};
+	visitBullet = function(ctx) {
+		let text = ctx.getText();
+		if (!text.includes('\n')){
+			let previousTokenText = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start - 1, ctx.getSourceInterval().start)[0].text;
+			if (previousTokenText.startsWith('[') && previousTokenText.includes('\n')){
+				// correct for bracket removing white space
+				text = previousTokenText.replace(/^[^\n]+(.*)/, '$1') + text;
+			}
+		} else if (text.startsWith('`') && text.includes('\n')){
+			text = text.replace(/^[^\n]+\n(.*)$/s, '$1');
+		}
+		return {type:'bullet', bullet: text.replace('{','\0x01{'), parts: []};
 	};
-	visitBeginningIndent = function(ctx) {
-		return this.visitIndent(ctx);
+	visitBeginningBullet = function(ctx) {
+		return this.visitBullet(ctx);
 	};
 	callMethod = function(method : string, value : any, args: any){
 		let argValues = [];
@@ -744,7 +761,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				case 'Matches':
 					let originalValue = value;
 					if (typeof value == 'string' && value.includes('\0x01{.}')){
-						// special case for matching the output of bulleted templates
+						// special case for matching the output of bullet templates
 						value = this.compose([value], 1); // compose with bulleting
 					}
 					let matches : boolean = false;
@@ -935,7 +952,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	getTemplateWithoutComments = function(ctx){
 		let templateParts = [];
-		let ctxName = ctx.constructor.name.replace('Context', '');
+		let ctxName = ctx.constructor.name.replace(/Context$/, '');
 		switch (ctxName) {
 			case "NamedSubtemplate":
 			case "MethodInvoked":
@@ -994,7 +1011,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return templateParts.join('');
 	}
-	
+	// NOTE: the following is only necessary because of a serious performance issue in the ANTLR4 parser (at least the Javascript version)
+	// It the issue is ultimately addressed, this code can be simplified by removing calls to parseSubtemplates and letting visitSubtemplates extract the subtemplates
+	//
 	// parseSubtemplates receives a subtemplate object provided by processSubtemplates plus the key, if the subtemplate is global, and the line/column where the is specified in the editor
 	// If the key is supplied, it saves the template text in the global subtemplates map.
 	// The routine parses template text, placing the resulting parse tree in the global map of parsed templates.
@@ -1004,14 +1023,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let input = subtemplate.text;
 		// if key is null, the subtemplate was found in the editor within a subtemplate
 		this.subtemplates[key] = input; // global dictionary of loaded subtemplate
-		const lexer = createLexer(input);
-		lexer.removeErrorListeners();
-		lexer.addErrorListener(new ConsoleErrorListener());
-		const parser = createParserFromLexer(lexer);
-		parser.removeErrorListeners();
-		parser.addErrorListener(new RelocatingCollectorErrorListener(this.errors, line, column)); //relocates  based on where the subtemplate is positioned in the editor
-		parser._errHandler = new TextTemplateErrorStrategy();
-		let tree = parser.compilationUnit();
+		//RelocatingCollectorErrorListener relocates based on where the subtemplate is positioned in the editor
+		let tree = parseTemplate(input, [new ConsoleErrorListener(), new RelocatingCollectorErrorListener(this.errors, line, column)])
 		parsedTemplates[input] = tree;
 		if (subtemplate.subtemplates != null){
 			Object.keys(subtemplate.subtemplates).forEach((subtemplateKey)=>{
@@ -1142,7 +1155,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let lines = output.lines;
 		for (let iParts = 0; iParts < parts.length; iParts++){
 			let item = parts[iParts];
-			if (item != null && typeof item == 'object' && item.type == 'indent'){
+			if (item != null && typeof item == 'object' && item.type == 'bullet'){
 				for (iParts++; iParts < parts.length; iParts++){
 					item.parts.push(parts[iParts]); // repackage the remaining parts under the indent object 
 				}
@@ -1162,13 +1175,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let bReplaceIndent = !!indent && indent.includes('\0x01{.}') && !indentInTheOutput.includes('\0x01{.}') && indentInTheOutput.length > 0;
 				this.doCompose(item, output, bReplaceIndent ? indentInTheOutput : indent);
 			} else if (typeof item == 'object' && item != null){
-				if (item.type == 'indent'){
+				if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
 					if (item.parts == null) {
 					} else if (typeof item.parts == 'string' || typeof item.parts == 'number'){
 						this.addToOutput(item.parts.toString(), output);
 					} else if (typeof item.parts == 'object' && item.parts != null){
-						if (Array.isArray(item.parts) || item.parts.type == 'indent' || item.parts.type == 'missing'){
+						if (Array.isArray(item.parts) || item.parts.type == 'bullet' || item.parts.type == 'missing'){
 							this.doCompose([item.parts], output, item.bullet);
 						} else {
 							// list
@@ -1193,7 +1206,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let indentObject = itemResult;
 							// let the next level handle an array of items that aren't lists or indents
 							if (!this.containsIndent(indentObject)){
-								indentObject = {type:'indent', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
+								indentObject = {type:'bullet', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
 								let doComposeParm = [indentObject];
@@ -1251,7 +1264,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return false;
 	}
 	isIndent(item : any){
-		if (typeof item != 'object' || item == null || item.type != 'indent'){
+		if (typeof item != 'object' || item == null || item.type != 'bullet'){
 			return false;
 		}
 		return true;
@@ -1287,7 +1300,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return result.join('');
 		}
 		if (typeof value == 'object' && value != null){
-			if (value.type == 'indent'){
+			if (value.type == 'bullet'){
 				return value.bullet + this.valueAsString(value.parts);
 			} else if (value.type == 'missing'){
 				return value.missingValue;
@@ -1330,7 +1343,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						} else {
 							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level);
 						}
-						text = text.replace(/[ \t]*\0x01\{\.\}/, indent + this.bulletIndent.getBullet());
+						text = text.replace(/[ \t]*\0x01\{\.\}/, indent + (this.bulletIndent != null ? this.bulletIndent.getBullet() : ''));
 					} else if (this.bulletIndent != null) {
 						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
 						let nextLineIndent = text.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
@@ -1440,6 +1453,27 @@ export function createLexer(input: String) {
     lexer.strictMode = false;
 	window.ParserFacade = this;
     return lexer;
+}
+
+export function parseTemplate(input, listeners? : ConsoleErrorListener[]){
+	const lexer = createLexer(input);
+	if (listeners != null){
+		lexer.removeErrorListeners();
+		lexer.addErrorListener(listeners[0]);
+	}
+	const parser = createParserFromLexer(lexer);
+	if (listeners != null){
+		parser.removeErrorListeners();
+		parser.addErrorListener(listeners[1]);
+	}
+	parser._errHandler = new TextTemplateErrorStrategy();
+	let tree = parser.compilationUnit();
+	if (/^[ \t]*\/\//.test(input) && tree.children[0].getText() == '\n'){
+		// this is a HACK to remove the new line resulting from a comment at the beginning of a template
+		// it would not be necessary if ANTLR had a BOF condition like the EOF
+		tree.children.splice(0, 1); // remove the comment element
+	}
+	return tree;
 }
 
 // processSubtemplates uses the lexer to tokenize a template string in order to find and extract subtemplates from the subtemplate section
@@ -1651,21 +1685,19 @@ export function inputChanged(input ,mode) : void {
 		}
 	}, mode != 1 || invocation == 1 ? 0 : 2000); // if delay (other than the first time), wait 2 seconds after last keystroke to allow typing in the editor to continue
 }
-function tokensAsString(input, ctx){
+function tokensAsString(ctx){
 	let treeTokens : CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
 	let symbolicNames : string[] = ctx.parser.symbolicNames
 	let parsed = '';
-	if (input){
-		try{
-			for (let e of treeTokens){
-				if (e.type != -1) {
-					parsed += symbolicNames[e.type] + '(' + input.substring(e.start, e.stop + 1) + ') ';
-				}
+	try{
+		for (let e of treeTokens){
+			if (e.type != -1) {
+				parsed += symbolicNames[e.type] + '(' + e.text + ') ';
 			}
-		} catch(err) {
-			console.error('Error in tokensAsString: ' + err);
-			parsed = '*****ERROR*****';
 		}
+	} catch(err) {
+		console.error('Error in tokensAsString: ' + err);
+		parsed = '*****ERROR*****';
 	}
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
@@ -1688,16 +1720,9 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			input = processed.input;
 			let tree = parsedTemplates[input];
 			if (!tree){
-				const lexer = createLexer(input);
-				lexer.removeErrorListeners();
-				lexer.addErrorListener(new ConsoleErrorListener());
-				const parser = createParserFromLexer(lexer);
-				parser.removeErrorListeners();
-				parser.addErrorListener(new CollectorErrorListener(errors));
-				parser._errHandler = new TextTemplateErrorStrategy();
-				tree = parser.compilationUnit();
+				tree = parseTemplate(input, [new ConsoleErrorListener(), new CollectorErrorListener(errors)])
 				parsedTemplates[input] = tree;
-				parsedTokens[input] = tokensAsString(input, tree);
+				parsedTokens[input] = tokensAsString(tree);
 			}
 			/* used to get json representation of tree for debugging
 			const getCircularReplacer = () => {
@@ -1722,7 +1747,6 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					return;
 				}
 				var visitor = new TextTemplateVisitor();
-				visitor.annotations['Tokens'] = parsedTokens[input];
 				visitor.errors = errors;
 				visitor.model = model;
 				visitor.input = input;

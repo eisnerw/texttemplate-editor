@@ -1,9 +1,11 @@
 lexer grammar TextTemplateLexer;
 
-BULLET: '\n' [ \t]* '{.}';
-NONGREEDY: ([ \t]*  '///' ~[\n]* ('\n' | EOF) | [ \t]* '//' ~[\n]* '\n' ([ t]* '//' ~[\n]* ('\n' | EOF))+) ->skip;
-COMMENT: [ \t]*  '//' ~[/\n]+ ('\n' | EOF) [ \t]*;
-COMMENT_NL: [ \t]*  '//' ('\n' | EOF)	 [ \t]* ->type(COMMENT);   // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
+COMMENT_LINE: '\n' [ \t]* '//' ~[\n]*  ->skip;
+COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
+CONTINUATION: [ \t]*  '`' [ \t]* '\n' [ \t]*;
+CONTINUE_BULLET: [ \t]*  '`' [ \t]* '\n' [ \t]* '{.}' ->type(BULLET);
+CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]* ->type(CONTINUATION);
+BULLET: [ \t]* '{.}';
 TEXT: ~[{}/ \n]+ ;
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
@@ -25,6 +27,7 @@ LP: '(' ->pushMode(NESTED);
 BRACED_RP: ')' ->type(RP)	;
 BRACED_COMMA: ',' ->type(COMMA);
 COLON : ':';
+LBRACKET_WHITE_SPACE: '['  [ \t]*  '\n' [ \t]* ->type(LBRACKET),pushMode(BRACKETED);
 LBRACKET: '[' ->pushMode(BRACKETED);
 BRACED_QUOTE: '"' ->type(QUOTE),pushMode(QUOTED);
 BRACED_APOSTROPHE: '\'' ->type(APOSTROPHE),pushMode(APOSTROPHED);
@@ -65,10 +68,13 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
+BRACKETED_COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->skip;
 BRACKETED_BULLET: [ \t]* '{.}' ->type(BULLET);
-BRACKETED_NONGREEDY: ([ \t]*  '///' ~[\n]* ('\n' | EOF) | [ \t]* '//' ~[\n]* '\n' ([ t]* '//' ~[\n]* ('\n' | EOF))+) ->skip;
-BRACKETED_COMMENT: [ \t]*  '//' ~[/\n] ~[\n]* ('\n' | EOF) [ \t]* ->type(COMMENT);
-BRACKETED_COMMENT_NL: [ \t]*  '//' ('\n' | EOF) [ \t]* ->type(COMMENT);  // needed for an edge case from previous rule where '//' ~[/] ~[\n]* (\n | EOF) won't match \\ + new line
+BRACKETED_COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
+BRACKETED_CONTINUE_BULLET: [ \t]*  '`' [ \t]* '\n' [ \t]* '{.}' ->type(BULLET);  // special case to recognize bullet at the beginning of a template no preceded by a new line
+BRACKETED_CONTINUE: [ \t]*  '`' [ \t]* '\n' [ \t]* ->type(CONTINUATION);
+BRACKETED_CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]*  ->type(CONTINUATION);
+RBRACKET_WHITE_SPACE: [ \t]* '\n' [ \t]* ']' ->type(RBRACKET),popMode;
 RBRACKETLP: '](' ->mode(PARENED);
 RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket

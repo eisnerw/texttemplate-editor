@@ -3,7 +3,7 @@ parser grammar TextTemplateParser;
 options { tokenVocab=TextTemplateLexer; }
 
 compilationUnit:
-	beginningIndent?
+	beginningBullet?
     templateContents+ 
     EOF
     ;
@@ -14,15 +14,15 @@ subtemplateSpecs: subtemplateSpec*;
 
 subtemplateSpec: templateContextToken text*;
 
-templateContents: comment? (subtemplateSection | indent | templateToken | templateContextToken | text+);
+templateContents: (subtemplateSection | bullet | templateToken | templateContextToken | text+);
 
-indent: (NL | COMMENT) BULLET SPACES?;
+bullet: NL BULLET SPACES?;
 
-beginningIndent: BULLET SPACES?;
+beginningBullet: BULLET SPACES?;
 
-comment: COMMENT+;
+text: TEXT | NL | SPACES | continuation;
 
-text: TEXT | NL | SPACES;
+continuation: CONTINUATION;
 
 templateToken: LBRACE bracedOptions RBRACE;
 
@@ -36,9 +36,9 @@ templateContextToken: LBRACE ((namedSubtemplate | optionallyInvoked) COLON | COL
 
 templateSpec: namedSubtemplate | bracketedTemplateSpec;
 
-bracketedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMMENT* subtemplateSection? COMMENT* RBRACKET;
+bracketedTemplateSpec: LBRACKET beginningBullet? templateContents* subtemplateSection? RBRACKET;
 
-invokedTemplateSpec: LBRACKET COMMENT? beginningIndent? templateContents* COMMENT* RBRACKETLP;
+invokedTemplateSpec: LBRACKET beginningBullet? templateContents* RBRACKETLP;
 
 bracedArrow: predicateExpression ARROW bracedArrowTemplateSpec;
 
