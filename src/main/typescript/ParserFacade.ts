@@ -1762,6 +1762,9 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 				if (invocation != invocations){
 					return;
 				}
+				if (result != null && !Array.isArray(result) && typeof result == 'object'){
+					result = [result];
+				}
 				if (Array.isArray(result)){
 					result = visitor.compose(result, 1);
 				}
