@@ -20,11 +20,13 @@ class BulletIndent {
 	public indent : string;
 	public parent : BulletIndent;
 	public lastBullet = '';
-	constructor(indent : string = null, currentBulletIndent : BulletIndent = null, level = null){
+	public bulletStyles = null;
+	constructor(indent : string = null, currentBulletIndent : BulletIndent = null, level = null, bulletStyles = null){
 		if (indent == null){
 			// indicates an empty BulletIndent
 			return;
 		}
+		this.bulletStyles = bulletStyles;
 		let currentIndent = currentBulletIndent == null ? '' : currentBulletIndent.indent;
 		this.indent = indent;
 		if (currentBulletIndent == null ){
@@ -67,14 +69,94 @@ class BulletIndent {
 		cloneBulletIndent.indent = this.indent;
 		cloneBulletIndent.parent = this.parent;
 		cloneBulletIndent.lastBullet = this.lastBullet;
+		cloneBulletIndent.bulletStyles = this.bulletStyles;
 		return cloneBulletIndent;
 	}
 	getBullet(){
-		let bullet = '(' + this.level + '.' + this.index + ')'; // TODO: bullet style
+		let bullet;
+		let bulletStyles = this.bulletStyles;
+		if (bulletStyles == null || bulletStyles.length == 0){
+			bullet = '(' + this.level + '.' + this.index + ')'; // TODO: bullet style
+		} else {
+			let bulletStyle = bulletStyles[this.level < bulletStyles.length ? this.level : bulletStyles.length - 1];
+			let padding = '';
+			if (/^ +/.test(bulletStyle)){
+				padding = bulletStyle.replace(/^( +).*$/, '$1');
+				bulletStyle = bulletStyle.substr(padding.length);
+			}
+			let prefix = '';
+			let postfix = '';
+			if (/^.*%[Ii1Aa].*$/.test(bulletStyle)){
+				prefix = bulletStyle.replace(/^(.*)%[Ii1Aa].*$/,'$1');
+				postfix = bulletStyle.replace(/^.*%[Ii1Aa](.*)$/,'$1');
+				bulletStyle = bulletStyle.replace(/^.*%([Ii1Aa]).*$/,'$1');
+			} else if (bulletStyle.length > 1){
+				if ('(<#$%*.-=+`~[{_=+|\'"'.includes(bulletStyle.substr(0,1))){
+					prefix = bulletStyle[0];
+					bulletStyle = bulletStyle.substr(1);
+				}
+				if (')>*]}.`~*-_=+|:\'"'.includes(bulletStyle.substr(bulletStyle.length - 1, 1))){
+					postfix = bulletStyle[bulletStyle.length - 1];
+					bulletStyle = bulletStyle.substr(0, bulletStyle.length - 1);
+				}
+			}
+			bullet = bulletStyle;
+			if (bulletStyle.length == 1){
+				switch (bulletStyle){
+					case 'I':
+						bullet = this.numberToRoman(this.index + 1);
+						break;
+					
+					case 'i':
+						bullet = this.numberToRoman(this.index + 1).toLowerCase();
+						break;
+					
+					case '1':
+						bullet = (this.index + 1).toString();
+						break;
+					
+					case 'A':
+					case 'a':
+						bullet = this.numberToAlphabet(this.index + 1);
+						if (bulletStyle == 'a'){
+							bullet = bullet.toLowerCase();
+						}
+						break;
+				}
+				if (padding.length > 0 && bullet.length < (padding.length + 1)){
+					prefix = padding.substr(0, padding.length - bullet.length + 1) + prefix;
+				}
+				bullet = prefix + bullet + postfix;
+			}
+		}
 		this.lastBullet = this.indent + bullet.replace('\0x01', '');
-		return bullet;
+		return bullet;	
+	}
+	numberToRoman(n : number) : string{
+		// from vetalperko via Brendon Shaw
+		let b = 0;
+		let s = '';
+		for (let a = 5; n != 0; b++,a ^= 7){
+			let o = n % a;
+			for(n = n/a^0; o--;){
+				s = 'IVXLCDM'[o > 2 ? b + n - (n &= -2) + (o = 1) : b] + s;
+			}
+		}
+		return s;
+	}
+	numberToAlphabet (num : number) {
+		// from Chris West
+		let ret = '';
+		let b = 26;
+		for (let a = 1; (num -a) >= 0; b *= 26) {
+			num -= a;
+			ret = String.fromCharCode(((num % b) / a) + 65) + ret;
+			a = b;
+		}
+		return ret;
 	}
 }
+
 class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
@@ -200,7 +282,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	input;
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
-	annotations = {};
+	annotations = {bulletStyles: null};
 	
 	visitText = function(ctx){
 		if (ctx.children[0].constructor.name == 'ContinuationContext'){
@@ -237,7 +319,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let value = this.context.getValue(key);
 		if (value === undefined){
 			console.debug('Missing value for ' + key);
-			return {type: 'missing', missingValue: this.annotations.MissingValue, key: key};
+			return {type: 'missing', missingValue: this.annotations.missingValue, key: key};
 		}
 		return this.context.getValue(key);
 	};
@@ -350,6 +432,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (bTargetIsTemplate){ // TODO: flag annotations on non-templates as errors
 				invocations.forEach((child) => {
 					let method : string = child.children[0].accept(this);
+					if (method == null){
+						this.syntaxError('Invalid method syntax', child);
+						return;  // bad syntax; don't proceed
+					}
 					if (method.startsWith('@') && bTargetIsTemplate){
 						let args : any = child.children[1];
 						this.callMethod(method, this.annotations, args); // modify the current annotations so that old annotations are inherited
@@ -362,7 +448,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				if (bAggregatedResult){
 					invocations.forEach((child) => {
 						let method = child.children[0].accept(this);
-						if (!method.startsWith('@')){ // TODO: add other tests
+						if (method != null && !method.startsWith('@')){ // TODO: add other tests
 							bAggregatedResult = false; 
 						}						
 					});
@@ -387,13 +473,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			value = this.context;
 		}
-		// process non-annotactions by calling each method serially
+		// process non-annotations by calling each method serially
 		invocations.forEach((child) => {
 			// Each child is a method and an argument(s) tree
 			let method : string = child.children[0].accept(this);
-			if (!method.startsWith('@')){ // annotations have already been processed
-				let args : any = child.children[1]; // passing the argument tree to CallMethod
-				value = this.callMethod(method, this.compose(value, 0), args);
+			if (method == null){
+				this.syntaxError('Invalid method syntax', child);
+			} else {
+				if (!method.startsWith('@')){ // annotations have already been processed
+					let args : any = child.children[1]; // passing the argument tree to CallMethod
+					value = this.callMethod(method, this.compose(value, 0), args);
+				}
 			}
 		});
 		return value;
@@ -430,10 +520,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ctx.getText().trim();
 	};
 	visitBracedThinArrow = function(ctx) {
-		let oldMissingValue = this.annotations.MissingValue;
-		delete this.annotations.MissingValue; // predicates need to see the absense of a value
+		let oldMissingValue = this.annotations.missingValue;
+		delete this.annotations.missingValue; // predicates need to see the absense of a value
 		let result : any = ctx.children[0].accept(this);
-		this.annotations.MissingValue = oldMissingValue;
+		this.annotations.missingValue = oldMissingValue;
 		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
 			return this.visitChildren(ctx.children[2].children[0]); // true
 		}
@@ -443,10 +533,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return ''; // false means ignore this token
 	};
 	visitBracedArrow = function(ctx) {
-		let oldMissingValue = this.annotations.MissingValue;
-		delete this.annotations.MissingValue; // predicates need to see the absense of a value
+		let oldMissingValue = this.annotations.missingValue;
+		delete this.annotations.missingValue; // predicates need to see the absense of a value
 		let result : boolean = ctx.children[0].accept(this);
-		this.annotations.MissingValue = oldMissingValue;
+		this.annotations.missingValue = oldMissingValue;
 			if (Array.isArray(result)){
 			result = result[0]; // TODO:why is this one level deep????
 		}
@@ -699,30 +789,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else if (this.valueIsMissing(value) && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
-			let msg = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
-			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
-			value = msg;
-			console.error(msg);
+			value = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
+			this.syntaxError(value, parentCtx);
 		} else if (args.children && (method == 'ToUpper' || method == 'ToLower')){
-			let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
-			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
-			value = msg;
-			console.error(msg);
+			value = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
+			this.syntaxError(value, parentCtx);
 		} else if (!args.children && (method == 'GreaterThan' || method == 'LessThan')){
-			let msg = 'ERROR: missing argument for ' + method + ': ' + args.getText();
-			this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
-			value = msg;
-			console.error(msg);
+			let value = 'ERROR: missing argument for ' + method + ': ' + args.getText();
+			this.syntaxError(value, parentCtx);
 		} else if (args.children && args.children.length > 1 && (method == 'GreaterThan' || method == 'LessThan')){
-			let msg = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
-			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
-			value = msg;
-			console.error(msg);
+			value = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
+			this.syntaxError(value, parentCtx);
 		} else if (args.children && args.children.length < 3 && method == 'Case'){
-			let msg = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
-			this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
-			value = msg;
-			console.error(msg);
+			value = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
+			this.syntaxError(value, parentCtx);
 		} else {
 			switch (method){
 				case 'ToUpper':
@@ -836,11 +916,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (!args.children){
 						// no arguments
 						if (method == 'Where'){
-							let msg : string = 'ERROR: no condition specified for .Where()';
-							let parentCtx : any = args.parentCtx;
-							this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
-							value = msg;
-							console.error(msg);
+							value = 'ERROR: no condition specified for .Where()';
+							this.syntaxError(value, args.parentCtx);
 						} else if (method == 'Count'){
 							if (value == undefined){
 								value = 0;
@@ -857,10 +934,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}
 					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotPredicateContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedPredicateContext')){
-						let msg = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
-						this.errors.push(new Error(args.start.line, args.stop.line, args.start.column, args.stop.column, msg));
-						value = msg;
-						console.error(msg);
+						value = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
+						this.syntaxError(value, args);
 					} else {
 						if (value instanceof TemplateData){
 							let oldContext : TemplateData = this.context;
@@ -937,15 +1012,23 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case '@MissingValue':
-					value['MissingValue'] = argValues[0];
+					value['missingValue'] = argValues[0];
+					break;
+					
+				case '@BulletStyle':
+					for (let i = 0; i < argValues.length; i++){
+						if (typeof argValues[i] == 'object'){
+							this.syntaxError('ERROR: invalid argument for bullet style', args.parentCtx);
+							argValues = null;
+							break;
+						}
+					}
+					value['bulletStyles'] = argValues;
 					break;
 					
 				default:
 					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
-					let parentCtx : any = args.parentCtx;
-					let msg = 'ERROR: unknown function: .' + method + '(' + argValues.join(', ') + ')';
-					console.error(msg);
-					this.errors.push(new Error(parentCtx.start.line, parentCtx.stop.line, parentCtx.start.column, parentCtx.stop.column, msg));
+					this.syntaxError('ERROR: unknown function: .' + method + '(' + argValues.join(', ') + ')', args.parentCtx);
 					break;
 			}
 		}
@@ -1163,7 +1246,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 			if (item != null && typeof item == 'object' && item.type == 'missing'){
-				item = item.missingValuecocc
+				item = item.missingValue;
 			}
 			if (item == null){
 				console.debug('Skipping line containing ' + lines[lines.length - 1] + ' because of a null in the composition input');
@@ -1172,10 +1255,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else if (this.isScalar(item)){
 				this.addToOutput(item.toString(), output);
 			} else if (Array.isArray(item)){
-				let indentInTheOutput = lines[lines.length - 1].replace(/^([ \t]*(\0x01\{\.\})?).*/s,'$1'); 
+				let bulletInTheOutput = lines[lines.length - 1].replace(/^([ \t]*(\0x01\{\.\})?).*/s,'$1'); 
 				// determine if the current bulleted indent is being overridden by a plain indent
-				let bReplaceIndent = !!indent && indent.includes('\0x01{.}') && !indentInTheOutput.includes('\0x01{.}') && indentInTheOutput.length > 0;
-				this.doCompose(item, output, bReplaceIndent ? indentInTheOutput : indent);
+				let bReplaceIndent = !!indent && indent.includes('\0x01{.}') && !bulletInTheOutput.includes('\0x01{.}') && bulletInTheOutput.length > 0;
+				this.doCompose(item, output, bReplaceIndent ? bulletInTheOutput : indent);
 			} else if (typeof item == 'object' && item != null){
 				if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
@@ -1207,8 +1290,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let itemResult = item.list[i];
 							let indentObject = itemResult;
 							// let the next level handle an array of items that aren't lists or indents
-							if (!this.containsIndent(indentObject)){
-								indentObject = {type:'bullet', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
+							if (!this.containsBullet(indentObject)){
+								indentObject = {type:'bullet', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet, styles: this.annotations.bulletStyles};
 							}
 							if (i == 0){
 								let doComposeParm = [indentObject];
@@ -1239,7 +1322,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 						let bFirst = true;
 						item.list.forEach((listItem)=>{
-							let bWillBeIndented = this.isIndent(listItem) || this.containsIndent(listItem);
+							let bWillBeIndented = this.isBullet(listItem) || this.containsBullet(listItem);
 							if (bWillBeIndented){
 								newIndent = indent;
 							}
@@ -1265,22 +1348,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return false;
 	}
-	isIndent(item : any){
+	isBullet(item : any){
 		if (typeof item != 'object' || item == null || item.type != 'bullet'){
 			return false;
 		}
 		return true;
 	}
-	containsIndent(value : any){
+	containsBullet(value : any){
 		if (typeof value == 'object' && value != null && value.type == 'list'){
 			value = value.list;
 		}
 		if (Array.isArray(value)){
-			let bContainsIndent = false;
+			let bContainsBullet = false;
 			for (let i = 0; i < value.length; i++){
 				let val = value[i];
-				if (this.isIndent(val)){
-					bContainsIndent = true;
+				if (this.isBullet(val)){
+					bContainsBullet = true;
 					break;
 				}
 				if (typeof val != 'string' || !/^[ \t]*$/s.test(val)){
@@ -1288,9 +1371,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 				}
 			}
-			return bContainsIndent;
+			return bContainsBullet;
 		} else {
-			return this.isIndent(value);
+			return this.isBullet(value);
 		}
 	}
 	valueAsString(value : any){
@@ -1343,7 +1426,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (bulletObject == null){
 							lines.push('ERROR computing bullet'); // should never happen TODO: raise exception?
 						} else {
-							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level);
+							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level, this.annotations.bulletStyles);
 						}
 						text = text.replace(/[ \t]*\0x01\{\.\}/, indent + (this.bulletIndent != null ? this.bulletIndent.getBullet() : ''));
 					} else if (this.bulletIndent != null) {
@@ -1388,6 +1471,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// using the JSON parser to unescape the string
 		let tempJson = JSON.parse('{"data":"' + value + '"}');
 		return tempJson.data;
+	}
+	syntaxError(msg, ctx){
+		console.error(msg);
+		this.errors.push(new Error(ctx.start.line, ctx.stop.line, ctx.start.column, ctx.stop.column, msg));
 	}
 }
 
