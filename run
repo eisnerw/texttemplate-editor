@@ -1,4 +1,9 @@
 #!/bin/bash
+if ./gradlew generateColorizeLexer; then 
+	echo "generating parser..."
+else
+	exit 1
+fi
 if ./gradlew generateParser; then
 	echo "compiling typescript..."
 else

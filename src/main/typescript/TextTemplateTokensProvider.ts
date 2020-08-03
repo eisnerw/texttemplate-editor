@@ -1,28 +1,32 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
-import {createLexer} from './ParserFacade'
+import {createColorizeLexer} from './ParserFacade'
 import {CommonTokenStream, error, InputStream} from '../../../node_modules/antlr4/index.js'
 import ILineTokens = monaco.languages.ILineTokens;
 import IToken = monaco.languages.IToken;
 
 export class TextTemplateState implements monaco.languages.IState {
+	public bMultilineComment = false;
     clone(): monaco.languages.IState {
-        return new TextTemplateState();
+        return new TextTemplateState(this.bMultilineComment);
     }
 
-    equals(other: monaco.languages.IState): boolean {
-        return true;
+    equals(other: TextTemplateState): boolean {
+        return this.bMultilineComment == other.bMultilineComment;
+    }
+
+    constructor(bMultilineComment : boolean) {
+        this.bMultilineComment = bMultilineComment;
     }
 
 }
 
 export class TextTemplateTokensProvider implements monaco.languages.TokensProvider {
     getInitialState(): monaco.languages.IState {
-        return new TextTemplateState();
+        return new TextTemplateState(false);
     }
 
-    tokenize(line: string, state: monaco.languages.IState): monaco.languages.ILineTokens {
-        // So far we ignore the state, which is not great for performance reasons
-        return tokensForLine(line);
+    tokenize(line: string, state: TextTemplateState): monaco.languages.ILineTokens {
+        return tokensForLine(line, state.bMultilineComment);
     }
 
 }
@@ -40,16 +44,16 @@ class TextTemplateToken implements IToken {
 }
 
 class TextTemplateLineTokens implements ILineTokens {
-    endState: monaco.languages.IState;
+    endState: TextTemplateState;
     tokens: monaco.languages.IToken[];
 
-    constructor(tokens: monaco.languages.IToken[]) {
-        this.endState = new TextTemplateState();
+    constructor(tokens: monaco.languages.IToken[], bMultilineComment : boolean) {
+        this.endState = new TextTemplateState(bMultilineComment);
         this.tokens = tokens;
     }
 }
 
-export function tokensForLine(input: string): monaco.languages.ILineTokens {
+export function tokensForLine(input: string, bMultilineComment : boolean): monaco.languages.ILineTokens {
     let errorStartingPoints: number[] = [];
 
     class ErrorCollectorListener extends error.ErrorListener {
@@ -57,8 +61,8 @@ export function tokensForLine(input: string): monaco.languages.ILineTokens {
             errorStartingPoints.push(column)
         }
     }
-
-    const lexer = createLexer(input);
+	let relocate = bMultilineComment ? 2 : 0;
+    const lexer = createColorizeLexer((bMultilineComment ? '/*' : '') + input);
     lexer.removeErrorListeners();
     let errorListener = new ErrorCollectorListener();
     lexer.addErrorListener(errorListener);
@@ -74,8 +78,11 @@ export function tokensForLine(input: string): monaco.languages.ILineTokens {
                 done = true;
             } else {
                 let tokenTypeName = lexer.symbolicNames[token.type];
-                let myToken = new TextTemplateToken(tokenTypeName, token.column);
+                let myToken = new TextTemplateToken(tokenTypeName, token.column < 2 ? token.column : (token.column - relocate));
                 myTokens.push(myToken);
+				if (myToken.scopes == 'slashstar.texttemplate'){
+					done = true; // don't go past the slash star because everything else is part of the comment (a completed pair is a 'comment')
+				} 
             }
         }
     } while (!done);
@@ -85,6 +92,9 @@ export function tokensForLine(input: string): monaco.languages.ILineTokens {
         myTokens.push(new TextTemplateToken("error.texttemplate", e));
     }
     myTokens.sort((a, b) => (a.startIndex > b.startIndex) ? 1 : -1)
-
-    return new TextTemplateLineTokens(myTokens);
+	bMultilineComment = myTokens.length > 0 && myTokens[myTokens.length - 1].scopes == 'slashstar.texttemplate';
+	if (bMultilineComment){
+		myTokens[myTokens.length - 1].scopes = 'comment.texttemplate';
+	}
+    return new TextTemplateLineTokens(myTokens, bMultilineComment);
 }

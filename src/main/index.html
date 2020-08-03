@@ -53,18 +53,34 @@
 		let parserFacade;
 
 		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());
-		let config = {"surroundingPairs": [{ "open": "{", "close": "}" }], "autoClosingPairs": [{ "open": "{", "close": "}" }], "brackets": [["{", "}"]] };
+		let config = {
+			"surroundingPairs": [
+				{ "open": "{", "close": "}" }
+				,{ "open": "[", "close": "]" }
+				,{ "open": '(', "close": ')' }
+			], 
+			"autoClosingPairs": [
+				{ "open": "{", "close": "}" }
+				,{ "open": "[", "close": "]" }
+				,{ "open": '(', "close": ')' }
+			], 
+			"brackets": [
+				["{", "}"]
+				,["[", "]"]
+				,["(", ")"]
+			}
+		};
 		monaco.languages.setLanguageConfiguration("texttemplate", config);
 		monaco.languages.registerFoldingRangeProvider("texttemplate", {
 			provideFoldingRanges: function(model, context, token) {
 				return parserFacade.provideFoldingRanges(model, context, token);
 			}
 		});
-
+				
 		let literalFg = '3b8737';
 		let idFg = '344482';
-		let symbolsFg = '000000';
-		let keywordFg = '7132a8';
+		let symbolsFg = '0000ff';
+		let keywordFg = '00ff00';   //'7132a8';
 		let errorFg = 'ff0000';
 
 		monaco.editor.defineTheme('myCoolTheme', {
@@ -72,21 +88,26 @@
 			inherit: false,
 			rules: [
 				{ token: 'number_lit.texttemplate',   foreground: literalFg },
+				{ token: 'text.texttemplate',   foreground: literalFg, fontStyle: 'italic' },
 
 				{ token: 'id.texttemplate',           foreground: idFg,       fontStyle: 'italic' },
 
-				{ token: 'lparen.texttemplate',       foreground: symbolsFg },
-				{ token: 'rparen.texttemplate',       foreground: symbolsFg },
+				{ token: 'rp.texttemplate',       foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'rbrace.texttemplate',       foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'thinarrow.texttemplate',       foreground: symbolsFg,  fontStyle: 'bold' },
 
-				{ token: 'equal.texttemplate',        foreground: symbolsFg },
-				{ token: 'minus.texttemplate',        foreground: symbolsFg },
-				{ token: 'plus.texttemplate',         foreground: symbolsFg },
-				{ token: 'div.texttemplate',          foreground: symbolsFg },
-				{ token: 'mul.texttemplate',          foreground: symbolsFg },
+				{ token: 'rbracket.texttemplate',        foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'lp.texttemplate',        foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'lbrace.texttemplate',         foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'lbracket.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'arrow.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'colon.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
+				{ token: 'comma.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
 
-				{ token: 'input_kw.texttemplate',     foreground: keywordFg,  fontStyle: 'bold' },
-				{ token: 'output_kw.texttemplate',    foreground: keywordFg,  fontStyle: 'bold' },
-
+				{ token: 'methodname.texttemplate',     foreground: keywordFg },
+				{ token: 'pound.texttemplate',     foreground: keywordFg},
+				{ token: 'identifier.texttemplate',    foreground: keywordFg},
+				{ token: 'comment.texttemplate',    foreground: errorFg},
 				{ token: 'unrecognized.texttemplate', foreground: errorFg }
 			]
 		});

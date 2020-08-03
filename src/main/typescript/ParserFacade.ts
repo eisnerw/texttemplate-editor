@@ -3,6 +3,7 @@
 import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
 import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
 import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
+import {TextTemplateColorizeLexer} from "../../main-generated/javascript/TextTemplateColorizeLexer.js"
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
 import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
 
@@ -1535,12 +1536,20 @@ declare global {
   }
 }
 
+export function createColorizeLexer(input: String) {
+    const chars = new InputStream(input);
+    const lexer = new TextTemplateColorizeLexer(chars);
+
+    lexer.strictMode = false;
+	window.ParserFacade = this;
+    return lexer;
+}
+
 export function createLexer(input: String) {
     const chars = new InputStream(input);
     const lexer = new TextTemplateLexer(chars);
 
     lexer.strictMode = false;
-	window.ParserFacade = this;
     return lexer;
 }
 

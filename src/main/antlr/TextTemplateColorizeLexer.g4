@@ -1,8 +1,9 @@
-lexer grammar TextTemplateLexer;
+lexer grammar TextTemplateColorizeLexer;
 
-SLASH_STAR: '/*' .*? '*/' -> skip;
-COMMENT_LINE: '\n' [ \t]* '//' ~[\n]*  ->skip;
-COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
+COMMENT: '\n' [ \t]* '//' ~[\n]*;
+SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
+SLASHSTAR: '/*';
+COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->type(COMMENT);
 CONTINUATION: [ \t]*  '`' [ \t]* '\n' [ \t]*;
 CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]* ->type(CONTINUATION);
 BULLET: [ \t]* '{.}';
@@ -15,9 +16,10 @@ NL: '\n';
 SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+;
 
 mode BRACED;
-BRACED_SLASH_STAR: '/*' .*? '*/' -> skip;
+BRACED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
+BRACED_SLASH_STAR: '/*'->type(SLASHSTAR);
 LBRACKET_CONTINUE: '[' ' '* '`' ~'\n'* '\n' ->type(LBRACKET),pushMode(BRACKETED);
-BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->skip;
+BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
 DOT: '.';
@@ -40,8 +42,10 @@ POUND: '#';
 BRACED_ILLEGAL: ([%*-={;<>?\\+] | ']')+;
 
 mode PARENED;
-PARENED_SLASH_STAR: '/*' .*? '*/' -> skip;
-PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
+PARENED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
+PARENED_SLASH_STAR: '/*' ->type(SLASHSTAR);
+
+PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 PARENED_WS: [ \t\n]+ ->skip; // allow white space in braced
 PARENED_BRACKET: '[' ->type(LBRACKET),pushMode(BRACKETED);	
 ARGUMENTTEXT: ~[(),{}&|!.'"\t\n\u005b]+ ->type(TEXT); // u005b left bracket
@@ -71,10 +75,11 @@ APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
 APOSTROPHED_TEXT: ~[']* ->type(TEXT);
 
 mode BRACKETED;
-BRACKETED_SLASH_STAR: '/*' .*? '*/' -> skip;
-BRACKETED_COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->skip;
+BRACKETED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
+BRACKETED_SLASH_STAR: '/*' ->type(SLASHSTAR);
+BRACKETED_COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->type(COMMENT);
 BRACKETED_BULLET: [ \t]* '{.}' ->type(BULLET);
-BRACKETED_COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
+BRACKETED_COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->type(COMMENT);
 BRACKETED_CONTINUE: [ \t]*  '`' [ \t]* '\n' [ \t]* ->type(CONTINUATION);
 BRACKETED_CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]*  ->type(CONTINUATION);
 RBRACKET_WHITE_SPACE: [ \t]* '\n' [ \t]* ']' ->type(RBRACKET),popMode;
@@ -89,8 +94,8 @@ BRACKETED_NL: '\n' ->type(NL);
 BRACKETED_SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+ ->type(SUBTEMPLATES);
 
 mode NESTED;
-NESTED_SLASH_STAR: '/*' .*? '*/' -> skip;
-NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
+NESTED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
+NESTED_SLASH_STAR: '/*' ->type(SLASHSTAR);
 NESTED_IDENTIFIER: [$a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> type(METHODNAME),pushMode(PARENED);
 NESTED_DOT: '.' ->type(DOT);
