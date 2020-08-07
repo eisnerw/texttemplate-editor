@@ -76,38 +76,53 @@
 				return parserFacade.provideFoldingRanges(model, context, token);
 			}
 		});
-				
-		let literalFg = '3b8737';
-		let idFg = '344482';
-		let symbolsFg = '0000ff';
-		let keywordFg = '00ff00';   //'7132a8';
-		let errorFg = 'ff0000';
+		let commentFg= '008000'; //  green
+		let textFg = 'A9A9A9'; // greyish
+		let symbolsFg = '0000ff'; // blue
+		let methodFg = 'ff0000'; // red
+		let errorFg = 'ff0000'; // red
+		let quoteFg = '32cd32'; // lime green
+		let subtemplateFg = 'E6B794'; // pinkish
+		let literalFg = '070D0D'; // almost black
+		let bracketsFg = '000000'; // black
+		let subtemplatesFg = '800080' // purple
+		//green = #008000
+		//purple = #800080
 
 		monaco.editor.defineTheme('myCoolTheme', {
 			base: 'vs',
 			inherit: false,
 			rules: [
-				{ token: 'number_lit.texttemplate',   foreground: literalFg },
-				{ token: 'text.texttemplate',   foreground: literalFg, fontStyle: 'italic' },
-
-				{ token: 'id.texttemplate',           foreground: idFg,       fontStyle: 'italic' },
-
-				{ token: 'rp.texttemplate',       foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'rbrace.texttemplate',       foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'thinarrow.texttemplate',       foreground: symbolsFg,  fontStyle: 'bold' },
-
-				{ token: 'rbracket.texttemplate',        foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'lp.texttemplate',        foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'lbrace.texttemplate',         foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'lbracket.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'arrow.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'colon.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
-				{ token: 'comma.texttemplate',          foreground: symbolsFg,  fontStyle: 'bold' },
-
-				{ token: 'methodname.texttemplate',     foreground: keywordFg },
-				{ token: 'pound.texttemplate',     foreground: keywordFg},
-				{ token: 'identifier.texttemplate',    foreground: keywordFg},
-				{ token: 'comment.texttemplate',    foreground: errorFg},
+				{ token: 'text.texttemplate', foreground: literalFg},
+				{ token: 'rp.texttemplate', foreground: methodFg},
+				{ token: 'bullet.texttemplate', foreground: bracketsFg, fontStyle: 'bold'},
+				{ token: 'rbrace.texttemplate', foreground: bracketsFg, fontStyle: 'bold'},
+				{ token: 'thinarrow.texttemplate', foreground: bracketsFg, fontStyle: 'bold'},
+				{ token: 'rbracket.texttemplate', foreground: bracketsFg , fontStyle: 'bold'},
+				{ token: 'lp.texttemplate', foreground: methodFg },
+				{ token: 'lbrace.texttemplate', foreground: bracketsFg , fontStyle: 'bold'},
+				{ token: 'lbracket.texttemplate', foreground: bracketsFg, fontStyle: 'bold'},
+				{ token: 'arrow.texttemplate', foreground: bracketsFg, fontStyle: 'bold'},
+				{ token: 'colon.texttemplate', foreground: bracketsFg , fontStyle: 'bold'},
+				{ token: 'comma.texttemplate', foreground: bracketsFg, fontStyle: 'bold' },
+				{ token: 'methodname.texttemplate', foreground: methodFg },
+				{ token: 'keyword.texttemplate', foreground: methodFg },
+				{ token: 'pound.texttemplate', foreground: subtemplateFg},
+				{ token: 'identifier.texttemplate', foreground: symbolsFg, fontStyle: 'italic'},
+				{ token: 'comment.texttemplate', foreground: commentFg},
+				{ token: 'quoted.texttemplate', foreground: literalFg},
+				{ token: 'subtemplates.texttemplate', foreground: subtemplatesFg, fontStyle: 'bold' },
+				{ token: 'error.texttemplate', foreground: errorFg, fontStyle: 'bold' },
+				{ token: 'dot.texttemplate', foreground: methodFg },
+				{ token: 'and.texttemplate', foreground: bracketsFg },
+				{ token: 'or.texttemplate', foreground: bracketsFg},
+				{ token: 'not.texttemplate', foreground: bracketsFg},
+				{ token: 'tick.texttemplate', foreground: bracketsFg },
+				{ token: 'lquote.texttemplate', foreground: quoteFg, fontStyle: 'bold' },
+				{ token: 'rquote.texttemplate', foreground: quoteFg , fontStyle: 'bold' },
+				{ token: 'lapostrophe.texttemplate', foreground: quoteFg , fontStyle: 'bold' },
+				{ token: 'rapostrophe.texttemplate', foreground: quoteFg , fontStyle: 'bold' },
+				{ token: 'poundidentifier.texttemplate', foreground: subtemplatesFg },
 				{ token: 'unrecognized.texttemplate', foreground: errorFg }
 			]
 		});
