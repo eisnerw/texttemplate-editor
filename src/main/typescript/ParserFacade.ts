@@ -497,6 +497,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let value = ctx.getText();
 		return this.decodeApostrophe(value.substr(1, value.length - 2));
 	};
+	visitRegex = function(ctx) {
+		let value = ctx.getText();
+		let expression = value.substring(1, value.lastIndexOf('/'));
+		let modifier = value.substr(value.lastIndexOf('/') + 1);
+		try{
+			value = new RegExp(expression, modifier);
+		} catch(e){
+			this.syntaxError('invalid regular expression', ctx);
+		}
+		return value;
+	}
 	visitMethodInvocation = function(ctx) {
 		let children : any = this.visitChildren(ctx);
 		let methodName : string = children[0]
@@ -626,7 +637,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (data.substr(0 ,1) != '['){
 				let msg = 'Error loading subtemplate "' + subtemplateName + '": ' + data;
 				console.error(msg);
-				this.errors.push(new Error(ctx.start.line, ctx.stop.line, ctx.start.column, ctx.stop.column, msg));
+				this.syntaxError(msg, ctx);
 				return '';
 			}
 			let processed : any = processSubtemplates(data.substr(1, data.length - 2)); // remove brackets for processSubTemplates
@@ -769,7 +780,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (argResults){
 				argResults.forEach((arg) =>{
 					if (arg !== undefined){ // remove result of commas
-						argValues.push(this.compose(arg, 0));
+						if (arg.constructor.name == 'RegExp'){
+							argValues.push(arg);
+						} else {
+							argValues.push(this.compose(arg, 0));
+						}
 					}
 				});
 			}
@@ -853,7 +868,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// special case for matching the output of bullet templates
 						value = this.compose([value], 1); // compose with bulleting
 					}
-					let matches : boolean = false;
+					let matches : any = false;
 					if (argValues.length == 0 || this.valueIsMissing(value)){
 						if (argValues.length == 0 && this.valueIsMissing(value)){
 							matches = true; //TODO: is it appropriate to match nulls?
@@ -862,7 +877,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						let bFirst = true;
 						argValues.forEach((arg)=>{
 							if (method != 'Assert' || bFirst){ // Assert only matches the first argument
-								if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
+								if (arg.constructor.name == 'RegExp'){
+									matches = matches || arg.test(value);
+								} else if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
 									matches = true;
 								} else if (typeof arg == 'string' && arg.includes('\0x01{.}') && value == this.compose([arg], 1)){
 									matches = true;

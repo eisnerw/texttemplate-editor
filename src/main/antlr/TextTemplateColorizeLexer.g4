@@ -38,6 +38,7 @@ BRACED_ILLEGAL: ([%*-={;<>?\\+] | ']')+ ->type(ERROR);
 
 mode PARENED;
 PARENED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
+REGEX: '/' REGEXFIRSTCHAR REGEXCHAR* '/' ('g' | 'i' | 'm' | 's')*;
 PARENED_SLASH_STAR: '/*' ->type(SLASHSTAR);
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 PARENED_WS: [ \t\n]+ ->skip; // allow white space in braced
@@ -55,6 +56,10 @@ PARENED_NOT: '!' ->type(NOT);
 PARENED_LP: '(' -> type(LP),pushMode(NESTED);
 PARENED_DOT: '.' ->type(DOT);
 PARENED_ILLEGAL: [.] ->type(ERROR);
+fragment REGEXFIRSTCHAR : ~[*\r\n\u2028\u2029\\/[] | REGEXBACKSLASH | '[' REGEXCLASSCHAR* ']';
+fragment REGEXCHAR : ~[\r\n\u2028\u2029\\/[] | REGEXBACKSLASH | '[' REGEXCLASSCHAR* ']';
+fragment REGEXCLASSCHAR : ~[\r\n\u2028\u2029\]\\] | REGEXBACKSLASH;
+fragment REGEXBACKSLASH: '\\' ~[\r\n\u2028\u2029];
 
 mode QUOTEDMODE;
 RQUOTE: '"' ->popMode;

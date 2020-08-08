@@ -58,6 +58,6 @@ arguments: argument (COMMA argument)*;
 
 optionallyInvoked: (methodInvoked | methodable);
 
-argument: QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templateToken #tokenedArgument | bracketedTemplateSpec #bracketedArgument | TEXT+ #textedArgument;
+argument: REGEX #regex | QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templateToken #tokenedArgument | bracketedTemplateSpec #bracketedArgument | TEXT+ #textedArgument;
 
 namedSubtemplate: POUND IDENTIFIER;
