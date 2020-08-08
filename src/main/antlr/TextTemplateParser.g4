@@ -30,7 +30,9 @@ bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optio
 
 methodInvoked: methodable methodInvocation+;
 
-predicateExpression: LP predicateExpression RP #nestedPredicate | NOT predicateExpression #notPredicate | predicateExpression (AND|OR) predicateExpression #logicalOperator | (methodInvoked | namedSubtemplate) #condition;
+predicateExpression: LP predicateExpression RP #nestedPredicate | NOT predicateExpression #notPredicate | predicateExpression (AND|OR) predicateExpression #logicalOperator | (methodInvoked | namedSubtemplate | identifierCondition) #condition;
+
+identifierCondition: IDENTIFIER;
 
 templateContextToken: LBRACE ((namedSubtemplate | optionallyInvoked) COLON | COLON) (namedSubtemplate | optionallyInvoked) RBRACE;
 

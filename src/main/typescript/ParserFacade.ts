@@ -549,6 +549,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return this.visitChildren(ctx.children[2].children[2]) // false
 	};
+	visitIdentifierCondition = function(ctx) {
+		// testing to see if the identifier has a value
+		let value = this.visitIdentifier(ctx.children[0]);
+		if (!this.valueIsMissing(value)){
+			return true;
+		}
+		return false;
+	}
 	visitLogicalOperator = function(ctx) {
 		let operator : string = ctx.children[1].getText() 
 		let leftCondition : boolean = ctx.children[0].accept(this);
@@ -787,7 +795,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 			this.context = oldContext;
-		} else if (this.valueIsMissing(value) && !(method == 'Exists' || method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
+		} else if (this.valueIsMissing(value) && !(method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
 			value = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
@@ -911,7 +919,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 					
-				case 'Exists':
 				case 'Count':
 				case 'Where':
 					if (!args.children){
@@ -926,12 +933,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = value.count();
 							} else {
 								value = 1;
-							}
-						} else { // Exists
-							if (this.valueIsMissing(value)){
-								value = false;
-							} else {
-								value = true;
 							}
 						}
 					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotPredicateContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedPredicateContext')){
@@ -976,12 +977,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = value.count();
 							} else {
 								value = 1;
-							}
-						} else if (method == 'Exists'){
-							if (!this.valueIsMissing(value)){
-								value = true;
-							} else {
-								value = false;
 							}
 						}
 					}
