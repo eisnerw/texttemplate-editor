@@ -612,8 +612,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	}
-	visitNamedSubtemplate = function(ctx) {
-		let subtemplateName : string = typeof ctx == 'string' ? ctx : ctx.getText();
+	visitNamedSubtemplate = function(ctx, method = null) {
+		let subtemplateName : string = method != null ? method : ctx.getText();
 		if (!this.subtemplates[subtemplateName]){
 			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
 			if (!urls[subtemplateUrl]){
@@ -624,7 +624,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			let data = urls[subtemplateUrl].data;
 			if (data.substr(0 ,1) != '['){
-				return 'Error loading subtemplate "' + subtemplateName + '": ' + data;
+				let msg = 'Error loading subtemplate "' + subtemplateName + '": ' + data;
+				console.error(msg);
+				this.errors.push(new Error(ctx.start.line, ctx.stop.line, ctx.start.column, ctx.stop.column, msg));
+				return '';
 			}
 			let processed : any = processSubtemplates(data.substr(1, data.length - 2)); // remove brackets for processSubTemplates
 			this.subtemplates[subtemplateName] = '[' + processed.input + ']'; // replace the brackets around the extracted input when storing the subtemplate
@@ -774,6 +777,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let parentCtx : any = args.parentCtx;
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "InvokedTemplateSpecContext";
+		let error : string = null;
 		if (bTemplate || method.startsWith('#')){
 			if (Array.isArray(value)){
 				value = value.join('');
@@ -786,7 +790,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				this.context.add('$' + (i + 1), argValues[i]);
 			}
 			if (!bTemplate){
-				value = this.visitNamedSubtemplate(method);
+				value = this.visitNamedSubtemplate(args.parentCtx, method); // using subtemplate as a meth
 			} else {
 				let result = parentCtx.children[1].accept(this);
 				value = ''; 
@@ -798,20 +802,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else if (this.valueIsMissing(value) && !(method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
-			value = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
-			this.syntaxError(value, parentCtx);
+			error = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
 		} else if (args.children && (method == 'ToUpper' || method == 'ToLower')){
-			value = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
-			this.syntaxError(value, parentCtx);
+			error = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 		} else if (!args.children && (method == 'GreaterThan' || method == 'LessThan')){
-			let value = 'ERROR: missing argument for ' + method + ': ' + args.getText();
-			this.syntaxError(value, parentCtx);
+			error = 'ERROR: missing argument for ' + method + ': ' + args.getText();
 		} else if (args.children && args.children.length > 1 && (method == 'GreaterThan' || method == 'LessThan')){
-			value = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
-			this.syntaxError(value, parentCtx);
+			error = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
 		} else if (args.children && args.children.length < 3 && method == 'Case'){
-			value = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
-			this.syntaxError(value, parentCtx);
+			error = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
 		} else {
 			switch (method){
 				case 'ToUpper':
@@ -1027,6 +1026,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.syntaxError('ERROR: unknown function: .' + method + '(' + argValues.join(', ') + ')', args.parentCtx);
 					break;
 			}
+		}
+		if (error != null){
+			this.syntaxError(error, parentCtx);
+			return '';
 		}
 		return value;
 	}
