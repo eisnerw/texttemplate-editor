@@ -22,6 +22,7 @@ IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
 METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';
+RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>');
 THINARROW: '->';
 RBRACE: '}' -> popMode;
 WS: [ \t\n]+ ->skip; // allow white space in braced
@@ -37,7 +38,8 @@ AND: '&';
 OR: '|';
 NOT: '!';
 POUND: '#';
-BRACED_ILLEGAL: ([%*-={;<>?\\+] | ']')+;
+DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+;
+BRACED_ILLEGAL: ('%' | '*' | '-' | '=' | '{' | ';' | '<' | '>' | '?' | '\\' | ']')+;
 
 mode PARENED;
 PARENED_SLASH_STAR: '/*' .*? '*/' -> skip;
@@ -57,6 +59,7 @@ PARENED_OR: '|' ->type(OR);
 PARENED_NOT: '!' ->type(NOT);
 PARENED_LP: '(' -> type(LP),pushMode(NESTED);
 PARENED_DOT: '.' ->type(DOT);
+PARENED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
 PARENED_ILLEGAL: [}];
 fragment REGEXFIRSTCHAR : ~[*\r\n\u2028\u2029\\/[] | REGEXBACKSLASH | '[' REGEXCLASSCHAR* ']';
 fragment REGEXCHAR : ~[\r\n\u2028\u2029\\/[] | REGEXBACKSLASH | '[' REGEXCLASSCHAR* ']';
@@ -99,6 +102,7 @@ NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
 NESTED_IDENTIFIER: [$a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> type(METHODNAME),pushMode(PARENED);
 NESTED_DOT: '.' ->type(DOT);
+NESTED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
 NESTED_WS: [ \t\n]+ ->skip; // allow white space in braced
 NESTED_LP: '(' -> type(LP),pushMode(NESTED);
 NESTED_RP: ')' ->type(RP),popMode;

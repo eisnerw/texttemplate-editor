@@ -315,6 +315,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		if (!this.context || !(this.context instanceof TemplateData)){
 			console.warn('Attempting to look up "' + key + '" with no context');
+			this.syntaxError('No context', ctx.parentCtx);
 			return undefined; // attempt to look up a variable without a context returns undefined
 		}
 		let value = this.context.getValue(key);
@@ -578,7 +579,52 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			return true;
 		}
 		return ctx.children[2].accept(this);
-	};	
+	};
+	visitIdentifierOperand = function(ctx){
+		return this.visitIdentifier(ctx);
+	}
+	visitQuoteOperand = function(ctx){
+		return this.visitQuotedArgument(ctx);
+	}
+	visitApostropheOperand = function(ctx){
+		return this.visitApostrophedArgument(ctx);
+	}
+	visitDigits = function(ctx){
+		return parseInt(ctx.getText());
+	}
+	visitRelationalOperand = function(ctx){
+		return ctx.children[0].accept(this);
+	}
+	visitRelationalOperation = function(ctx) {
+		let leftValue = ctx.children[0].accept(this);
+		let rightValue = ctx.children[2].accept(this);
+		let operator = ctx.children[1].getText();
+		if (leftValue == null || rightValue == null){
+			return false; // null always yields false
+		}
+		if (!isNaN(leftValue) && !isNaN(rightValue)){
+			leftValue = parseInt(leftValue);
+			rightValue = parseInt(rightValue)
+		} else {
+			leftValue = leftValue.toString();
+			rightValue = rightValue.toString();
+		}
+		switch (operator){
+			case '=':
+			case '==':
+				return leftValue ==rightValue
+			case '>':
+				return leftValue > rightValue;
+			case '<':
+				return leftValue < rightValue;
+			case '>=':
+				return leftValue >= rightValue;
+			case '<=':
+				return leftValue <= rightValue;
+			case '!=':
+				return leftValue != rightValue;
+		}
+	}
 	visitBracketedTemplateSpec = function(ctx) {
 		let oldSubtemplates = []; // only needed if this spec contains subtemplates
 		let lastChildIndex = ctx.getChildCount() - 2;
@@ -596,6 +642,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		for (let i : number = 1; i <= lastChildIndex; i++){
 			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
 				let childResult = ctx.children[i].accept(this);
+				if (lastChildIndex != 1 && typeof childResult == 'object' && childResult != null && childResult.constructor.name == 'TemplateData'){
+					this.syntaxError('Invalid data type', ctx.children[i]);
+					childResult = 'ERROR: Invalid data type';
+				}
 				result.push(childResult);
 			}
 		}
@@ -1281,7 +1331,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (item.parts == null) {
 					} else if (typeof item.parts == 'string' || typeof item.parts == 'number'){
 						this.addToOutput(item.parts.toString(), output);
-					} else if (typeof item.parts == 'object' && item.parts != null){
+					} else if (typeof item.parts == 'object' && item.parts != null && item.constructor.name != ''){
 						if (Array.isArray(item.parts) || item.parts.type == 'bullet' || item.parts.type == 'missing'){
 							this.doCompose([item.parts], output, item.bullet);
 						} else {
@@ -1490,7 +1540,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	syntaxError(msg, ctx){
 		console.error(msg);
-		this.errors.push(new Error(ctx.start.line, ctx.stop.line, ctx.start.column, ctx.stop.column, msg));
+		this.errors.push(new Error(ctx.start.line, ctx.stop.line, ctx.start.column + 1, ctx.stop.column, msg));
 	}
 }
 

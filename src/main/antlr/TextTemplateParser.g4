@@ -30,7 +30,17 @@ bracedOptions: bracedArrow #braceArrow | bracedThinArrow #braceThinArrow | optio
 
 methodInvoked: methodable methodInvocation+;
 
-predicateExpression: LP predicateExpression RP #nestedPredicate | NOT predicateExpression #notPredicate | predicateExpression (AND|OR) predicateExpression #logicalOperator | (methodInvoked | namedSubtemplate | identifierCondition) #condition;
+predicateExpression: LP predicateExpression RP #nestedPredicate | relationalOperand RELATIONAL relationalOperand #relationalOperation | NOT predicateExpression #notPredicate | predicateExpression (AND|OR) predicateExpression #logicalOperator | (methodInvoked | namedSubtemplate | identifierCondition) #condition;
+
+relationalOperand: methodInvoked | quoteOperand | apostropheOperand | namedSubtemplate | identifierOperand | digits;
+
+digits: DIGITS;
+
+quoteOperand: QUOTE TEXT? QUOTE;
+
+apostropheOperand: APOSTROPHE TEXT? APOSTROPHE;
+
+identifierOperand: IDENTIFIER;
 
 identifierCondition: IDENTIFIER;
 
