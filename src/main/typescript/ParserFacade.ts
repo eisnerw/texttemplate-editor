@@ -674,8 +674,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	}
-	visitNamedSubtemplate = function(ctx, method = null) {
-		let subtemplateName : string = method != null ? method : ctx.getText();
+	visitNamedSubtemplate = function(ctx, name = null, preserve = false){
+		let subtemplateName : string = name != null ? name : ctx.getText();
 		if (!this.subtemplates[subtemplateName]){
 			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
 			if (!urls[subtemplateUrl]){
@@ -727,7 +727,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
 		// restore (pop) old states
-		this.subtemplates = oldSubtemplates;
+		if (!preserve){
+			this.subtemplates = oldSubtemplates;
+		}
 		this.input = oldInput;
 		if (typeof result == 'string'){
 			result = [result]; // return in an array for consistency
@@ -851,6 +853,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let oldContext : TemplateData = this.context;
 			// TODO: consider a clean context as a child of the context
 			this.context = new TemplateData({}, this.context);
+			// add the current value as $0 and each argument as $1...n
 			this.context.add('$0', value);
 			for (let i = 0; i < argValues.length; i++){
 				this.context.add('$' + (i + 1), argValues[i]);
@@ -861,7 +864,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let result = parentCtx.children[1].accept(this);
 				value = ''; 
 				if (result){ // needed to protect against bad syntax
-					value = result[1]; // ignore the brackets when callling a bracketed template
+					value = result[1]; // ignore the brackets when calling a bracketed template
 				}
 			}
 			this.context = oldContext;
@@ -1074,6 +1077,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 
+				case '@Include':
+					let templateName = argValues[0];
+					this.visitNamedSubtemplate(args, templateName, true); // run the named subtemplate, preserving the loaded subtemplates
+					break;
+					
 				case '@MissingValue':
 					value['missingValue'] = argValues[0];
 					break;
@@ -1645,7 +1653,7 @@ export function parseTemplate(input, listeners? : ConsoleErrorListener[]){
 // containing the text plus the line/column where the subtemplate was found
 // The routine calls itself recursively to find subtemplates with the subtemplates
 export function processSubtemplates(input: String) : {} {
-	if (!input.includes('\nSubtemplates:')){
+	if (!(input).includes('\nSubtemplates:')){
 		return {input: input, subtemplates: {}}
 	}
 	let subtemplates = {};
