@@ -674,7 +674,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	}
-	visitNamedSubtemplate = function(ctx, name = null, preserve = false){
+	visitNamedSubtemplate = function(ctx, name = null, bInclude = false){
 		let subtemplateName : string = name != null ? name : ctx.getText();
 		if (!this.subtemplates[subtemplateName]){
 			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
@@ -691,8 +691,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				this.syntaxError(msg, ctx);
 				return '';
 			}
-			let processed : any = processSubtemplates(data.substr(1, data.length - 2)); // remove brackets for processSubTemplates
-			this.subtemplates[subtemplateName] = '[' + processed.input + ']'; // replace the brackets around the extracted input when storing the subtemplate
+			// process info between brackets adding an extra nl so "included" subtemplates can start with "Subtemplates:"
+			let processed : any = processSubtemplates((bInclude ? '\n' : '') + data.substr(1, data.lastIndexOf(']') - 1));
+			// replace the brackets around the extracted input when storing the subtemplate and add any methods on the template
+			this.subtemplates[subtemplateName] = '[' + processed.input + ']' + data.substr(data.lastIndexOf(']') + 1); 
 			Object.keys(processed.subtemplates).forEach((key)=>{
 				let subtemplate = processed.subtemplates[key];
 				this.parseSubtemplates(processed.subtemplates[key], key, subtemplate.line - 1, subtemplate.column);
@@ -727,9 +729,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
 		// restore (pop) old states
-		if (!preserve){
-			this.subtemplates = oldSubtemplates;
-		}
+		this.subtemplates = oldSubtemplates;
 		this.input = oldInput;
 		if (typeof result == 'string'){
 			result = [result]; // return in an array for consistency
