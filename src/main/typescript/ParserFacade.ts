@@ -294,6 +294,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitIdentifier = function(ctx) {
 		var key = ctx.getText();
+		let value = undefined; 
 		if (key.startsWith('@.')){
 			if (key == '@.Tokens' || key == '@.Tree'){
 				let parentName;
@@ -311,19 +312,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					return this.getParseTree(parent);
 				}
 			}
-			return this.annotations[key.substr(2)];
+			value = this.annotations[key.substr(2)];
+		} else if (!this.context || !(this.context instanceof TemplateData)){
+			let msg = 'Attempting to look up "' + key + '" without a data context';
+			console.warn(msg);
+			this.syntaxError(msg, ctx.parentCtx);
+		} else {
+			value = this.context.getValue(key);
 		}
-		if (!this.context || !(this.context instanceof TemplateData)){
-			console.warn('Attempting to look up "' + key + '" with no context');
-			this.syntaxError('No context', ctx.parentCtx);
-			return undefined; // attempt to look up a variable without a context returns undefined
-		}
-		let value = this.context.getValue(key);
 		if (value === undefined){
 			console.debug('Missing value for ' + key);
 			return {type: 'missing', missingValue: this.annotations.missingValue, key: key};
 		}
-		return this.context.getValue(key);
+		return value;
 	};
 	visitTemplateToken = function(ctx) {
 		// there are three children, the left brace, the token, and the right brace
@@ -650,7 +651,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		if (bHasSubtemplates){
-			this.subtemplates = oldSubtemplates; // subtemplates are scoped so remove the ones we found
+			this.subtemplates = oldSubtemplates; // subtemplates are scoped, so remove the ones we found
 		}
 		if (result.length == 1){
 			return result[0];
