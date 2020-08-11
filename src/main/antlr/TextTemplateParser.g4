@@ -60,7 +60,7 @@ bracedArrowTemplateSpec: optionallyInvoked COMMA optionallyInvoked | optionallyI
 
 methodable: QUOTE TEXT? QUOTE #quoteLiteral | APOSTROPHE TEXT? APOSTROPHE #apostropheLiteral | templateSpec #methodableTemplateSpec | (IDENTIFIER|TEXT) (DOT (IDENTIFIER|TEXT))* #identifier;
 
-methodInvocation: (method|DOT invokedTemplateSpec) (predicateExpression | arguments*) RP;
+methodInvocation: (method|DOT invokedTemplateSpec) arguments* RP;
 
 method: METHODNAME;
 
@@ -68,6 +68,6 @@ arguments: argument (COMMA argument)*;
 
 optionallyInvoked: (methodInvoked | methodable);
 
-argument: REGEX #regex | QUOTE TEXT* QUOTE #quotedArgument | APOSTROPHE TEXT* APOSTROPHE #apostrophedArgument | templateToken #tokenedArgument | bracketedTemplateSpec #bracketedArgument | TEXT+ #textedArgument;
+argument: REGEX #regex | optionallyInvoked #optionallyInvokedArgument | predicateExpression #predicateArgument | digits #digitsArgument;
 
 namedSubtemplate: POUND IDENTIFIER;

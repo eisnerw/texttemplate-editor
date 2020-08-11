@@ -81,7 +81,7 @@ export function tokensForLine(input: string, bMultilineComment : boolean, sOpenB
             } else {
  				if (token.column >= relocate || bMultilineComment){ // only look at tokens after the artificial tokens created by text in front of the input
 					let tokenTypeName = lexer.symbolicNames[token.type];
-					let myToken = new TextTemplateToken(tokenTypeName, token.column < 2 ? token.column : (token.column - relocate));
+					let myToken = new TextTemplateToken(tokenTypeName, bMultilineComment && token.column < 2 ? token.column : (token.column - relocate));
 					myTokens.push(myToken);
 					let lastOpenBracket = sOpenBrackets.length == 0 ? '' : sOpenBrackets[sOpenBrackets.length - 1];
 					switch (myToken.scopes.replace('.texttemplate', '')){

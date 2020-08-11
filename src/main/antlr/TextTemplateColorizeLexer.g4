@@ -44,8 +44,11 @@ PARENED_SLASH_STAR: '/*' ->type(SLASHSTAR);
 PARENED_COMMENT: [ ]+  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 PARENED_WS: [ \t\n]+ ->skip; // allow white space in braced
 PARENED_BRACKET: '[' ->type(LBRACKET),pushMode(BRACKETED);	
-ARGUMENTTEXT: ~[(),{}&|!.'"\t\n\u005b]+ ->type(TEXT); // u005b left bracket
-PARENED_KEYWORD: ('ToUpper'|'GreaterThan'|'LessThan'|'Where');
+PARENED_POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(POUNDIDENTIFIER);
+PARENED_IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(IDENTIFIER);
+PARENED_KEYWORD: '.' ('ToUpper'|'GreaterThan'|'LessThan'|'Where'|'Exists' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include') ->type(KEYWORD);
+PARENED_DOT: '.' ->type(DOT);
+PARENED_DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+ ->type(DIGITS);
 RP: ')' -> popMode;
 LQUOTE: '"' -> pushMode(QUOTEDMODE);
 PARENED_APOSTROPHE: '\'' ->type(LAPOSTROPHE),pushMode(APOSTROPHED);
@@ -55,9 +58,8 @@ PARENED_AND: '&' ->type(AND);
 PARENED_OR: '|' ->type(OR);
 PARENED_NOT: '!' ->type(NOT);
 PARENED_LP: '(' -> type(LP),pushMode(NESTED);
-PARENED_DOT: '.' ->type(DOT);
 PARENED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
-PARENED_ILLEGAL: [.] ->type(ERROR);
+PARENED_ILLEGAL: . ->type(ERROR);
 fragment REGEXFIRSTCHAR : ~[*\r\n\u2028\u2029\\/[] | REGEXBACKSLASH | '[' REGEXCLASSCHAR* ']';
 fragment REGEXCHAR : ~[\r\n\u2028\u2029\\/[] | REGEXBACKSLASH | '[' REGEXCLASSCHAR* ']';
 fragment REGEXCLASSCHAR : ~[\r\n\u2028\u2029\]\\] | REGEXBACKSLASH;
@@ -93,8 +95,9 @@ BRACKETED_SUBTEMPLATES: 'Subtemplates:' [ \t\n]+ EOF->type(SUBTEMPLATES);
 mode NESTED;
 NESTED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
 NESTED_SLASH_STAR: '/*' ->type(SLASHSTAR);
-NESTED_IDENTIFIER: [$a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
-NESTED_KEYWORD: ('ToUpper'|'GreaterThan'|'LessThan'|'Where') ->type(KEYWORD);
+NESTED_POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(POUNDIDENTIFIER);
+NESTED_IDENTIFIER: [$@a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
+NESTED_KEYWORD: '.' ('ToUpper'|'GreaterThan'|'LessThan'|'Where'|'Exists' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include') ->type(KEYWORD);
 NESTED_DOT: '.' ->type(DOT);
 NESTED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
 NESTED_WS: [ \t\n]+ ->skip; // allow white space in braced
@@ -103,5 +106,8 @@ NESTED_RP: ')' ->type(RP),popMode;
 NESTED_AND: '&' ->type(AND);
 NESTED_OR: '|' ->type(OR);
 NESTED_NOT: '!' ->type(NOT);
+NESTED_DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+ ->type(DIGITS);
+NESTED_QUOTE: '"' ->type(LQUOTE),pushMode(QUOTEDMODE);
+NESTED_APOSTROPHE: '\'' ->type(LAPOSTROPHE),pushMode(APOSTROPHED);
 NESTED_ILLEGAL: . ->type(ERROR);
 

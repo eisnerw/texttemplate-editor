@@ -1005,9 +1005,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = 1;
 							}
 						}
-					} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotPredicateContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedPredicateContext')){
-						value = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
-						this.syntaxError(value, args);
+					//} else if (!(args.constructor.name == 'ConditionContext' || args.constructor.name == 'NotPredicateContext' || args.constructor.name == 'LogicalOperatorContext' || args.constructor.name == 'NestedPredicateContext')){
+						//value = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
+						//this.syntaxError(value, args);
 					} else {
 						if (value instanceof TemplateData){
 							let oldContext : TemplateData = this.context;
@@ -1018,7 +1018,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								this.context.iterateList((newContext)=>{
 									let oldContext : TemplateData = this.context;
 									this.context = newContext;
-									if (args.accept(this)){
+									if (args.children[0].accept(this)[0]){
 										// the condition returned true; add a clone of the iteration 
 										result.push(new TemplateData(this.context)); 
 									}
