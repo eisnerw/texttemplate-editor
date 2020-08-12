@@ -83,14 +83,14 @@ BRACKETED_SLASH_STAR: '/*' ->type(SLASHSTAR);
 BRACKETED_COMMENT_LINE: '\n' [ \t]* '//' ~[\n]* ->type(COMMENT);
 BULLET: [ \t]* '{.}' ;
 BRACKETED_COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->type(COMMENT);
-BRACKETED_TICK: '`';
+BRACKETED_TICK: '`' [ \t]* EOF;
 RBRACKET_WHITE_SPACE: [ \t]* '\n' [ \t]* ']' ->type(RBRACKET),popMode;
 RBRACKET: ']' -> popMode;
 BRACKETED_TEXT: ~[{}/\n\u005d]+ ->type(TEXT); // u005d right bracket
 BRACKETED_LBRACE: 	'{' -> type(LBRACE),pushMode(BRACED);
 BRACKETED_RBRACE: '}' -> type(RBRACE);
 BRACKETED_SLASH: '/' ->type(TEXT);
-BRACKETED_SUBTEMPLATES: 'Subtemplates:' [ \t\n]+ EOF->type(SUBTEMPLATES);
+BRACKETED_SUBTEMPLATES: 'Subtemplates:' [ \t]* EOF->type(SUBTEMPLATES);
 
 mode NESTED;
 NESTED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);

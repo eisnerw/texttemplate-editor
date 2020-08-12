@@ -210,6 +210,9 @@ class TemplateData {
 			this.parent = parent;
 		}
 	}
+	getKeys() : string[] {
+		return Object.keys(this.dictionary);
+	}
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
 		let value = this.dictionary[keySplit[0]];
@@ -1026,13 +1029,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let oldContext : TemplateData = this.context;
 							// temporarily set the context to the value being evaluated
 							this.context = <TemplateData>value;
+							let dollarVariables = {};
+							oldContext.getKeys().forEach((key)=>{
+								if (key.startsWith('$')){
+									dollarVariables[key] = oldContext.getValue(key);
+								}
+							});
 							let result = [];
 							if (this.context.type == 'list'){
 								this.context.iterateList((newContext)=>{
 									let oldContext : TemplateData = this.context;
 									this.context = newContext;
+									Object.keys(dollarVariables).forEach((key)=>{
+										newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables
+									});
 									if (args.children[0].accept(this)[0]){
 										// the condition returned true; add a clone of the iteration 
+										Object.keys(dollarVariables).forEach((key)=>{
+											delete newContext.dictionary[key];  // remove the added $ variables
+										});
 										result.push(new TemplateData(this.context)); 
 									}
 									this.context = oldContext;
