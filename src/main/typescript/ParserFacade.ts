@@ -368,7 +368,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				try{
 					if (context.toLowerCase().startsWith('http') || context.startsWith('/')){
 						if (urls[context] && urls[context].data){
-							this.context = new TemplateData(urls[context].data, this.context);
+							if (urls[context].error){
+								this.syntaxError(urls[context].data, ctx);
+								this.context = new TemplateData('{}', this.context);
+							} else {
+								this.context = new TemplateData(urls[context].data, this.context);
+							}
 						} else {
 							if (!urls[context]){
 								urls[context] = {};
@@ -1965,6 +1970,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 									success: function (data) {
 										if (data.error){
 											urls[key].data = data.error
+											urls[key].error = true;
 											console.error(data.error);
 										} else {
 											if (typeof data != 'string'){
