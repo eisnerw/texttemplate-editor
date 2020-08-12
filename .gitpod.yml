@@ -1,3 +1,3 @@
 tasks:
-  - init: yarn install && ./gradlew build
+  - init: yarn install && npm i -g webpack webpack-cli && ./gradlew build
     command: yarn run start
