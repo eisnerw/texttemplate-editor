@@ -6,7 +6,8 @@ COMMENT_SKIP: [ \t]*  '//' ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* ->skip;
 CONTINUATION: [ \t]*  '`' [ \t]* '\n' [ \t]*;
 CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//' ~[\n]*)* '\n' [ \t]* ->type(CONTINUATION);
 BULLET: [ \t]* '{.}';
-TEXT: ~[{}/ \n]+ ;
+TEXT: ~[{}/ \n`]+ ;
+TICK: '`' ->type(TEXT);
 LBRACE: '{' -> pushMode(BRACED);
 E_RBRACE: '}' -> type(RBRACE);
 SPACES: ' '+;
@@ -89,7 +90,8 @@ BRACKETED_CONTINUATION_COMMENT: [ \t]*  '`' [ \t]* '//'  ~[\n]* ('\n' [ \t]* '//
 RBRACKET_WHITE_SPACE: [ \t]* '\n' [ \t]* ']' ->type(RBRACKET),popMode;
 RBRACKETLP: '](' ->mode(PARENED);
 RBRACKET: ']' -> popMode;
-BRACKETED_TEXT: ~[{}/ \n\u005d]+ ->type(TEXT); // u005d right bracket
+BRACKETED_TEXT: ~[{}/ `\n\u005d]+ ->type(TEXT); // u005d right bracket
+BRACKETED_TICK: '`' ->type(TEXT);
 BRACKETED_LBRACE: 	'{' -> type(LBRACE),pushMode(BRACED);
 BRACKETED_RBRACE: '}' -> type(RBRACE);
 BRACKETED_SP: ' '+ ->type(SPACES);
