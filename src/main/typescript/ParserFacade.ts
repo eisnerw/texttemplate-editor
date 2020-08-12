@@ -349,6 +349,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
 		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
 			let context : any;
+			let oldErrors = [];
+			// make a shallow copy so we can undo any errors while acquiring a context url
+			this.errors.forEach((error)=>{
+				oldErrors.push(error);
+			});
 			if (ctx.children[1].constructor.name == 'NamedSubtemplateContext'){
 				context = ctx.children[1].accept(this);
 			} else {
@@ -359,6 +364,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				context = context[0]; // support templates as contexts
 			}
 			if (typeof context === 'string'){
+				this.errors = oldErrors; // wipe out errors acquiring the url string
 				try{
 					if (context.toLowerCase().startsWith('http') || context.startsWith('/')){
 						if (urls[context] && urls[context].data){
@@ -377,8 +383,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 				} catch(e){
 					this.context = oldContext;
-					console.error('Error loading context: ' + e.message);
-					return 'Error loading context: ' + e.message;
+					let msg = 'Error loading context: ' + e.message;
+					console.error(msg);
+					this.syntaxError(msg, ctx);
+					return msg;
 				}
 				if (ctx.children.length > 1 && ctx.children[1].children && ctx.children[1].children[0].constructor.name == 'MethodInvokedContext'){
 					// there is a method invocation on a context that was created here.  We need to rerun the method(s)
@@ -1919,7 +1927,10 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					return;
 				}
 				var visitor = new TextTemplateVisitor();
-				visitor.errors = errors;
+				// clone to allow interpreter errors to be undone
+				errors.forEach((error)=>{
+					visitor.errors.push(error);
+				});
 				visitor.model = model;
 				visitor.input = input;
 				visitor.bulletIndent = null; // start bulleting from 0,0
@@ -1982,7 +1993,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					document.getElementById('interpolated').innerHTML = (result == null ? 'null' : result.toString());
 				}
 				let monacoErrors = [];
-				for (let e of errors) {
+				for (let e of visitor.errors) {
 					monacoErrors.push({
 						startLineNumber: e.startLine,
 						startColumn: e.startCol,

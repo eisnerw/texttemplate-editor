@@ -17,7 +17,7 @@ TICK: '`';
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]*;
 IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
-KEYWORD: '.' ('ToUpper'|'GreaterThan'|'LessThan'|'Where'|'Exists' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include');
+KEYWORD: '.' ('ToUpper' | 'GreaterThan' | 'LessThan' | 'Where' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include');
 LP: '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';
