@@ -7,10 +7,10 @@
   "license": "Apache-2.0",
   "repository": "https://github.com/Strumenta/calc-monaco-editor",
   "dependencies": {
-    "express": "^4.17.1",
-    "morgan": "^1.9.0",
     "@webpack-cli/init": "^0.3.0",
     "antlr4": "^4.7.2",
+    "express": "^4.17.1",
+    "morgan": "^1.9.0",
     "webpack": "^4.39.2"
   },
   "devDependencies": {
