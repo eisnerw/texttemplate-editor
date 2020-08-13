@@ -8,7 +8,7 @@ router.get('/:name', (req, res) => {
 	if (templates[name]){
 		let template = templates[name];
 		if (Array.isArray(template)){
-			template = template.join('');
+			template = template.join('\n');
 		}
 		res.send(template);
 	} else {

@@ -6,7 +6,11 @@ const subtemplates = require('../subtemplates.json');
 router.get('/:name', (req, res) => {
 	const { name } = req.params 
 	if (subtemplates[name]){
-		res.send(subtemplates[name]);
+		let subtemplate = subtemplates[name];
+		if (Array.isArray(subtemplate)){
+			subtemplate = subtemplate.join('\n');
+		}
+		res.send(subtemplate);
 	} else {
 		res.json({"error": 'ERROR: Subtemplate #' + name + ' not found'})
 	}
