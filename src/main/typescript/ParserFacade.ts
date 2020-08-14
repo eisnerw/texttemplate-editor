@@ -384,6 +384,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						} else {
 							if (!urls[context]){
 								urls[context] = {};
+								this.context = new TemplateData('{}', this.context); // provide an empty context to prevent lookup errors
 							}
 						}
 					} else if (context.substr(0,1) == '[' || context.substr(0,1) == '{'){
