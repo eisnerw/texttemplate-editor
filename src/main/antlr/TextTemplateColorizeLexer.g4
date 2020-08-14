@@ -9,7 +9,7 @@ TEXT: ~[{/`]+ ;
 TICK_TEXT: '`' ->type(TEXT);
 LBRACE: '{' -> pushMode(BRACED);
 TEXT_SLASH: '/' ->type(TEXT);
-SUBTEMPLATES: 'Subtemplates:' [ \t\n]+ EOF;
+SUBTEMPLATES: 'Subtemplates:' [ \t\n]* EOF;
 ERROR: .;
 
 
@@ -19,7 +19,7 @@ BRACED_SLASH_STAR: '/*'->type(SLASHSTAR);
 BRACED_COMMENT:  '//' ~[\n]* ('\n' | EOF) ->type(COMMENT);
 POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]*;
 IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ;
-KEYWORD: '.' ('ToUpper' | 'GreaterThan' | 'LessThan' | 'Where' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include');
+KEYWORD: '.' KEYWORDS;
 LP: '(' -> pushMode(PARENED);
 DOT: '.';
 ARROW: '=>';
@@ -48,7 +48,7 @@ PARENED_WS: [ \t\n]+ ->skip; // allow white space in braced
 PARENED_BRACKET: '[' ->type(LBRACKET),pushMode(BRACKETED);	
 PARENED_POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(POUNDIDENTIFIER);
 PARENED_IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(IDENTIFIER);
-PARENED_KEYWORD: '.' ('ToUpper'|'GreaterThan'|'LessThan'|'Where'|'Exists' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include') ->type(KEYWORD);
+PARENED_KEYWORD: '.' KEYWORDS ->type(KEYWORD);
 PARENED_DOT: '.' ->type(DOT);
 PARENED_DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+ ->type(DIGITS);
 RP: ')' -> popMode;
@@ -101,7 +101,7 @@ NESTED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
 NESTED_SLASH_STAR: '/*' ->type(SLASHSTAR);
 NESTED_POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(POUNDIDENTIFIER);
 NESTED_IDENTIFIER: [$@a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
-NESTED_KEYWORD: '.' ('ToUpper'|'GreaterThan'|'LessThan'|'Where'|'Exists' | '@BulletStyle' | '@MissingValue' | 'Anded' | 'Assert' | 'Case' | 'Count' | 'IfMissing' | 'Matches' | 'ToJson' | 'ToLower' | '@Include') ->type(KEYWORD);
+NESTED_KEYWORD: '.' KEYWORDS ->type(KEYWORD);
 NESTED_DOT: '.' ->type(DOT);
 NESTED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
 NESTED_WS: [ \t\n]+ ->skip; // allow white space in braced
@@ -114,4 +114,24 @@ NESTED_DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+ ->ty
 NESTED_QUOTE: '"' ->type(LQUOTE),pushMode(QUOTEDMODE);
 NESTED_APOSTROPHE: '\'' ->type(LAPOSTROPHE),pushMode(APOSTROPHED);
 NESTED_ILLEGAL: . ->type(ERROR);
-
+fragment KEYWORDS: (
+	'ToUpper'
+	| 'GreaterThan'
+	| 'LessThan'
+	| 'Where'
+	| 'Exists'
+	| '@BulletStyle'
+	| '@MissingValue'
+	| 'Anded'
+	| 'Assert'
+	| 'Case'
+	| 'Count'
+	| 'IfMissing'
+	| 'Matches'
+	| 'ToJson'
+	| 'ToLower'
+	| '@Include'
+	| 'ToDate'
+	| '@DateFormat'
+	| '@DateTest'
+);

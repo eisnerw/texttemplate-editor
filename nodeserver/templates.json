@@ -67,7 +67,7 @@
 		"         {.} Non-domesticated{#ndpetcnt > 1->[({#ndpetcnt})]} : {pets.#NonDomesticated():[{#formatPet}]}",
 		"   ],[no pets]",
 		"   } //",
-		"].@MissingValue('No Information Provided').@BulletStyle('I.','(a)',\"•\",'1.')}",
+		"].@MissingValue('No Information Provided').@BulletStyle('I.','(a)','•','1.')}",
 		" ",
 		"Subtemplates:  ",
 		"",
@@ -537,5 +537,18 @@
 		"Test 14 passed",
 		"]}",
 		"{#data:[/data/people]}"
+	]
+	,"events":[
+		"// {'/data/events':[{^.ToJson()}]} /* uncomment this line to see the data */",
+		"{'/data/events':[ `",
+		"{start.ToUpper()} {summary}",
+		"   {.} Starts: {start.ToDate('h:mm a')}",
+		"   {.} Ends: {!end.#SameDay(start)->[{end} at ]}{end.ToDate('h:mm a')}",
+		"   {.} Notes: {description}",
+		"   {.} Location {location}",
+		"",
+		"].@DateTest(/(star|end)/i).@BulletStyle('•').@DateFormat('dddd MMM d')}",
+		"Subtemplates:",
+		"{#SameDay:[{$0.ToDate('YYYYMMDD') = $1.ToDate('YYYYMMDD')}]}"
 	]
 }

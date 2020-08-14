@@ -5,11 +5,12 @@
   "main": "index.js",
   "description": "Software to perform generalized string interpolation",
   "license": "Apache-2.0",
-  "repository": "https://github.com/Strumenta/calc-monaco-editor",
+  "repository": "https://github.com/eisnerw/texttemplate-editor",
   "dependencies": {
     "@webpack-cli/init": "^0.3.0",
     "antlr4": "^4.7.2",
     "express": "^4.17.1",
+    "moment": "^2.27.0",
     "morgan": "^1.9.0",
     "webpack": "^4.39.2"
   },

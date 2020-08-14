@@ -6,6 +6,7 @@ import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLex
 import {TextTemplateColorizeLexer} from "../../main-generated/javascript/TextTemplateColorizeLexer.js"
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
 import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
+import moment = require('moment');
 
 var parsedTemplates = {};
 var parsedTokens = {};
@@ -317,15 +318,18 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			value = this.annotations[key.substr(2)];
 		} else if (!this.context || !(this.context instanceof TemplateData)){
-			let msg = 'Attempting to look up "' + key + '" without a data context';
-			console.warn(msg);
-			this.syntaxError(msg, ctx.parentCtx);
+			this.syntaxError('Attempting to look up "' + key + '" without a data context', ctx.parentCtx);
 		} else {
 			value = this.context.getValue(key);
 		}
 		if (value === undefined){
 			console.debug('Missing value for ' + key);
 			return {type: 'missing', missingValue: this.annotations.missingValue, key: key};
+		} else if (this.annotations.dateTest != null && this.annotations.dateTest.test(key)){
+			value = {type: 'date', moment: moment(value), string: value, format: this.annotations['dateFormat']};
+			if (!value.moment.isValid()){
+				this.syntaxError('Invalid date', ctx);
+			}
 		}
 		return value;
 	};
@@ -455,7 +459,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.syntaxError('Invalid method syntax', child);
 						return;  // bad syntax; don't proceed
 					}
-					if (method.startsWith('@') && bTargetIsTemplate){
+					if (method.startsWith('@')){
 						let args : any = child.children[1];
 						this.callMethod(method, this.annotations, args); // modify the current annotations so that old annotations are inherited
 					}
@@ -467,9 +471,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				if (bAggregatedResult){
 					invocations.forEach((child) => {
 						let method = child.children[0].accept(this);
-						if (method != null && !method.startsWith('@')){ // TODO: add other tests
-							bAggregatedResult = false; 
-						}						
+						if (method != null){
+							if (method.startsWith('@')){
+								if (!bTargetIsTemplate){
+									this.syntaxError('@ methods can only be applied to subtemplates', child);
+								}
+							} else {
+								bAggregatedResult = false; 
+							}
+						}
 					});
 				}
 				if (bAggregatedResult){
@@ -868,12 +878,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			let oldContext : TemplateData = this.context;
 			// TODO: consider a clean context as a child of the context
-			this.context = new TemplateData({}, this.context);
+			let newContext = new TemplateData({}, this.context);
 			// add the current value as $0 and each argument as $1...n
-			this.context.add('$0', value);
+			newContext.add('$0', value);
 			for (let i = 0; i < argValues.length; i++){
-				this.context.add('$' + (i + 1), argValues[i]);
+				let argObject = args.children[i].accept(this);
+				if (Array.isArray(argObject) && argObject.length == 1){
+					argObject = argObject[0];
+				}
+				if (argObject != null && typeof argObject == 'object'){
+					if (argObject.type == 'date'){
+						newContext.add('$' + (i + 1), argObject.string); // provide the original string value
+					}
+					// if the type is 'missing', don't add it
+				} else {
+					newContext.add('$' + (i + 1), argValues[i]);
+				}
 			}
+			this.context = newContext;
 			if (!bTemplate){
 				value = this.visitNamedSubtemplate(args.parentCtx, method); // using subtemplate as a meth
 			} else {
@@ -886,7 +908,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			this.context = oldContext;
 		} else if (this.valueIsMissing(value) && !(method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
 			value = value; // null with most methods returns null
-		} else if (typeof value != 'string' && (method == 'ToUpper' || method == 'ToLower')){
+		} else if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (method == 'ToUpper' || method == 'ToLower')){
 			error = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
 		} else if (args.children && (method == 'ToUpper' || method == 'ToLower')){
 			error = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
@@ -899,11 +921,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			switch (method){
 				case 'ToUpper':
-					value = <string>value.toUpperCase();
+					value = this.valueAsString(value).toUpperCase();
 					break;
 
 				case 'ToLower':
-					value = <string>value.toLowerCase();
+					value = this.valueAsString(value).toLowerCase();
 					break;
 
 				case 'GreaterThan':
@@ -1104,6 +1126,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value = value.toString();
 					}
 					break;
+					
+				case 'ToDate':
+					if (value != null && typeof value == 'object' && value.type == 'date'){
+						value = value.moment.toObject();
+					}
+					let date = moment(value);
+					if (date.isValid){
+						if (argValues.length == 0){
+							value = date.toDate().toLocaleDateString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric' }); // puts out local format
+						} else {
+							value = date.format(argValues[0]);
+						}
+					}
+					break;		
 
 				case '@Include':
 					let templateName = argValues[0];
@@ -1112,6 +1148,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					
 				case '@MissingValue':
 					value['missingValue'] = argValues[0];
+					break;
+					
+				case '@DateFormat':
+					value['dateFormat'] = argValues[0];
+					break;
+
+				case '@DateTest':
+					if (argValues.length == 0){
+						// remove the date test
+						delete value['dateTest'];
+					} else if (argValues.length != 1 || argValues[0].constructor.name != 'RegExp'){
+						this.syntaxError('@DateTest takes a single regular expression', args.parentCtx)
+					} else {
+						value['dateTest'] = argValues[0];
+					}
 					break;
 					
 				case '@BulletStyle':
@@ -1297,7 +1348,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	compose = function(parts, mode){
 		if (typeof parts == 'object' && parts != null && !Array.isArray(parts)){
-			if (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing'){
+			if (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing' || parts.type == 'date'){
 				return parts; // don't compose if not appropriate
 			}
 			parts = [parts];  // do compose expects arrays
@@ -1343,13 +1394,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let lines = output.lines;
 		for (let iParts = 0; iParts < parts.length; iParts++){
 			let item = parts[iParts];
-			if (item != null && typeof item == 'object' && item.type == 'bullet'){
-				for (iParts++; iParts < parts.length; iParts++){
-					item.parts.push(parts[iParts]); // repackage the remaining parts under the indent object 
+			if (item != null && typeof item == 'object'){
+				switch (item.type){
+					case 'bullet':
+						for (iParts++; iParts < parts.length; iParts++){
+							item.parts.push(parts[iParts]); // repackage the remaining parts under the indent object 
+						}
+						break;
+					case 'missing':
+						item = item.missingValue;
+						break;
+					case 'date':
+						item = this.valueAsString(item);
+						break;
 				}
-			}
-			if (item != null && typeof item == 'object' && item.type == 'missing'){
-				item = item.missingValue;
 			}
 			if (item == null){
 				console.debug('Skipping line containing ' + lines[lines.length - 1] + ' because of a null in the composition input');
@@ -1487,18 +1545,31 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			});
 			return result.join('');
 		}
-		if (typeof value == 'object' && value != null){
-			if (value.type == 'bullet'){
-				return value.bullet + this.valueAsString(value.parts);
-			} else if (value.type == 'missing'){
-				return value.missingValue;
-			} else {
-				// list; return the value of the first item
-				return this.valueAsString(value.list[0]);
-			}
-		}
 		if (value == null){
 			return '';
+		}
+		if (typeof value == 'object'){
+			switch (value.type){
+				case 'bullet':
+					return value.bullet + this.valueAsString(value.parts);
+					break;
+				case 'missing':
+					return value.missingValue;
+					break;
+				case 'list':
+					// return the value of the first item
+					return this.valueAsString(value.list[0]);
+					break;
+				case 'date':
+					if (!value.moment.isValid()){
+						return value.string; // put out the original value
+					} else if (value.format == null){
+						return value.moment.toDate().toLocaleDateString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric' }); // put out local format
+					} else {
+						return value.moment.format(value.format);
+					}
+					break;
+			}
 		}
 		return value.toString();
 	}
@@ -1905,7 +1976,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 	setTimeout(()=>{
 		if (invocation != invocations){
 			return;
-		}
+		}	
 		input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
 		let errors : Error[] = [];
 		if (mode != 2){
