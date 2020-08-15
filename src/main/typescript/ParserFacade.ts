@@ -787,20 +787,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitSubtemplateSection = function(ctx) {
 		// report any subtemplates that take more than one line for folding
-		folds = [];
 		if (ctx.children[1].children == null){
 			// protect against invalid section
 			return '';
 		}
-		ctx.children[1].children.forEach((child)=>{
-			if (child.constructor.name != 'TerminalNodeImpl' && child.start.line != child.stop.line){
-				folds.push({
-					start: child.start.line,
-					end: child.stop.line,
-					kind: monaco.languages.FoldingRangeKind.Region
-				});
-			}
-		});
 		// visit the children to load the subtemplates dictionary, but don't output anything
 		this.visitChildren(ctx);
 		return '';
@@ -887,9 +877,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				if (Array.isArray(argObject) && argObject.length == 1){
 					argObject = argObject[0];
 				}
-				if (argObject != null && typeof argObject == 'object'){
+				if (argObject != null && typeof argObject == 'object' && !Array.isArray(argObject)){
 					if (argObject.type == 'date'){
 						newContext.add('$' + (i + 1), argObject.string); // provide the original string value
+					} else if (argObject.type == 'list'){
+						newContext.add('$' + (i + 1), argValues[i]);
 					}
 					// if the type is 'missing', don't add it
 				} else {
@@ -1779,6 +1771,12 @@ export function processSubtemplates(input: String) : {} {
 		let tokenObject =tokenArray[iToken];
 		let tokenName = tokenObject.name;
 		if (tokenName == 'SUBTEMPLATES'){
+			let lineRelocate = tokenObject.text.split('\nSubtemplates:')[0].split('\n').length; // computes the number of new lines before 'Subtemplates::';
+			folds.push({
+				start: tokenObject.line + lineRelocate,
+				end: tokenArray[tokenArray.length - 1].line,
+				kind: monaco.languages.FoldingRangeKind.Region
+			});
 			bFound = true;
 			newInput = input.substr(0, tokenObject.start);
 			let bExtractingSubtemplates = true;
@@ -1941,7 +1939,9 @@ class TextTemplateErrorStrategy extends DefaultErrorStrategy {
 }
 let model;
 export function provideFoldingRanges(monacoModel, context, token) {
+	folds = [];
 	model = monacoModel; // note: this is a convenient way to capture the model
+	processSubtemplates(monacoModel.getValue()); // collect folds
 	return folds;
 }
 
@@ -2031,7 +2031,6 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 					let subtemplate = processed.subtemplates[key];
 					visitor.parseSubtemplates(processed.subtemplates[key], key, subtemplate.line - 1, subtemplate.column);
 				});
-				folds = []; // folds will be computed while visiting
 				var result = visitor.visitCompilationUnit(tree);
 				if (invocation != invocations){
 					return;
