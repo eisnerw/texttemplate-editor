@@ -97,7 +97,7 @@
 		"         ,'Click this to load a simple script'",
 		"         , 'link','italic' // style attributes",
 		"      )",
-		"} you can hover over.",
+		"} you can hover over and click.",
 		"",
 		"{#external}",
 		"Subtemplates:",

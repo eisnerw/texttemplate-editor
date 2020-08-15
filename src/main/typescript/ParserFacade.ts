@@ -1805,6 +1805,14 @@ export function processSubtemplates(input: String, lineOffset: number) : {} {
 							text = '[' + processed.input + input.substring(parts[5].start, parts[6].start); 
 							subSubtemplates = processed.subtemplates;
 						}
+						if (parts[0].line != parts[6].line){
+							// fold any multi-line subtemplates
+							folds.push({
+								start: parts[0].line + lineOffset,
+								end: parts[6].line + lineOffset,
+								kind: monaco.languages.FoldingRangeKind.Region
+							});
+						}
 						subtemplates['#' + parts[2].text] = {text: text, line: parts[0].line, column:parts[4].column, subtemplates: subSubtemplates};
 					} else {
 						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace';

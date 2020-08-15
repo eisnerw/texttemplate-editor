@@ -158,6 +158,7 @@
 					arrowSize: 30
 				}			
 			});
+			editor.getAction('editor.foldAll').run(); // start by folding subtemplates
 			editorChanged = function (e) {
 				let bButtonPressed = typeof e == 'string' && e == 'button';
 				let bAutoRun = document.getElementById('autorun').checked;
