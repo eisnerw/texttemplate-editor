@@ -719,7 +719,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				return '';
 			}
 			// process info between brackets adding an extra nl so "included" subtemplates can start with "Subtemplates:"
-			let processed : any = processSubtemplates((bInclude ? '\n' : '') + data.substr(1, data.lastIndexOf(']') - 1));
+			let processed : any = processSubtemplates((bInclude ? '\n' : '') + data.substr(1, data.lastIndexOf(']') - 1), 0);
 			// replace the brackets around the extracted input when storing the subtemplate and add any methods on the template
 			this.subtemplates[subtemplateName] = '[' + processed.input + ']' + data.substr(data.lastIndexOf(']') + 1); 
 			Object.keys(processed.subtemplates).forEach((key)=>{
@@ -1744,7 +1744,7 @@ export function parseTemplate(input, listeners? : ConsoleErrorListener[]){
 // It returns an object containing the input without the subtemplate section and a map of the subtemplate objects keyed by the name and 
 // containing the text plus the line/column where the subtemplate was found
 // The routine calls itself recursively to find subtemplates with the subtemplates
-export function processSubtemplates(input: String) : {} {
+export function processSubtemplates(input: String, lineOffset: number) : {} {
 	if (!(input).includes('\nSubtemplates:')){
 		return {input: input, subtemplates: {}}
 	}
@@ -1771,10 +1771,10 @@ export function processSubtemplates(input: String) : {} {
 		let tokenObject =tokenArray[iToken];
 		let tokenName = tokenObject.name;
 		if (tokenName == 'SUBTEMPLATES'){
-			let lineRelocate = tokenObject.text.split('\nSubtemplates:')[0].split('\n').length; // computes the number of new lines before 'Subtemplates::';
+			let numberBlankLines = tokenObject.text.split('\nSubtemplates:')[0].split('\n').length; // computes the number of new lines before 'Subtemplates::';
 			folds.push({
-				start: tokenObject.line + lineRelocate,
-				end: tokenArray[tokenArray.length - 1].line,
+				start: tokenObject.line + numberBlankLines + lineOffset,
+				end: tokenArray[tokenArray.length - 1].line + lineOffset,
 				kind: monaco.languages.FoldingRangeKind.Region
 			});
 			bFound = true;
@@ -1800,7 +1800,7 @@ export function processSubtemplates(input: String) : {} {
 						let text = input.substring(parts[4].start, parts[6].start);
 						let subSubtemplates = null; // subtemplates in the subtemplate
 						if (text.includes('\nSubtemplates:')){
-							let processed : any = processSubtemplates(input.substring(parts[4].start + 1, parts[5].start)); // process the text between the brackets
+							let processed : any = processSubtemplates(input.substring(parts[4].start + 1, parts[5].start), parts[4].line + lineOffset - 1); // process the text between the brackets
 							// reconstruct the text without the subtemplates
 							text = '[' + processed.input + input.substring(parts[5].start, parts[6].start); 
 							subSubtemplates = processed.subtemplates;
@@ -1941,7 +1941,7 @@ let model;
 export function provideFoldingRanges(monacoModel, context, token) {
 	folds = [];
 	model = monacoModel; // note: this is a convenient way to capture the model
-	processSubtemplates(monacoModel.getValue()); // collect folds
+	processSubtemplates(monacoModel.getValue(), 0); // collect folds
 	return folds;
 }
 
@@ -1988,7 +1988,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			if (invocation != invocations){
 				return;
 			}
-			let processed : any = processSubtemplates(input);
+			let processed : any = processSubtemplates(input, 0); 
 			input = processed.input;
 			let tree = parsedTemplates[input];
 			if (!tree){
