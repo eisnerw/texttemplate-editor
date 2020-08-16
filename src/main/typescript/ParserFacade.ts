@@ -283,7 +283,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
 	subtemplates = {};
 	errors = [];
-	model;
 	input;
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
@@ -785,8 +784,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		//}
 		//return result;
 	};
+	/* we SHOULD be collecting subtemplate info here, but processSubtemplates is used for performance reasons
 	visitSubtemplateSection = function(ctx) {
-		// report any subtemplates that take more than one line for folding
 		if (ctx.children[1].children == null){
 			// protect against invalid section
 			return '';
@@ -795,6 +794,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.visitChildren(ctx);
 		return '';
 	};
+	*/
 	visitOptionallyInvoked = function(ctx) {
 		let result = this.visitChildren(ctx);
 		//if (result.length == 1){
@@ -1127,7 +1127,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let date = moment(value);
 					if (date.isValid){
 						if (argValues.length == 0){
-							value = date.toDate().toLocaleDateString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric' }); // puts out local format
+							if (this.annotations.dateFormat != null){
+								value = date.format(this.annotations.dateFormat);
+							} else {
+								value = date.toDate().toLocaleDateString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric' }); // puts out local format
+							}
 						} else {
 							value = date.format(argValues[0]);
 						}
@@ -1615,6 +1619,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 	}
+	/*
 	loadSubtemplates(ctx){
 		if (ctx.constructor.name == 'SubtemplateSectionContext'){
 			this.visitSubtemplateSection(ctx);
@@ -1630,6 +1635,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		});
 		return false;
 	}
+	*/
 	decodeApostrophe(value){
 		//return value.replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\b/g,'\b').replace(/\\f/g,'\f').replace(/\\r/g,'\r').replace(/\\t/g,'\t').replace(/\\\//g,'\/'); 
 		return value.replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\\//g,'\/'); 
@@ -1744,28 +1750,13 @@ export function parseTemplate(input, listeners? : ConsoleErrorListener[]){
 // It returns an object containing the input without the subtemplate section and a map of the subtemplate objects keyed by the name and 
 // containing the text plus the line/column where the subtemplate was found
 // The routine calls itself recursively to find subtemplates with the subtemplates
-export function processSubtemplates(input: String, lineOffset: number) : {} {
+export function processSubtemplates(input: string, lineOffset: number) : {} {
 	if (!(input).includes('\nSubtemplates:')){
 		return {input: input, subtemplates: {}}
 	}
 	let subtemplates = {};
 	let newInput : string;
-	const chars = new InputStream(input);
-	const lexer = new TextTemplateLexer(chars);
-	lexer.strictMode = false;
-	const tokens = new CommonTokenStream(lexer);
-	tokens.fill();
-	let treeTokens : CommonToken[] = tokens.tokens;
-	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
-	let tokenArray = [];
-	if (input.length == 0){
-		return input;
-	}
-	for (let e of treeTokens){
-		if (e.type != -1) {
-			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop, column: e.column, line: e.line});
-		}
-	}
+	let tokenArray = getTokensWithSymbols(input);
 	let bFound = false;
 	for (let iToken = 0; iToken < tokenArray.length; iToken++){
 		let tokenObject =tokenArray[iToken];
@@ -1846,8 +1837,27 @@ export function processSubtemplates(input: String, lineOffset: number) : {} {
 	}
 	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
 }
+export function getTokensWithSymbols(input : string){
+	const chars = new InputStream(input);
+	const lexer = new TextTemplateLexer(chars);
+	lexer.strictMode = false;
+	const tokens = new CommonTokenStream(lexer);
+	tokens.fill();
+	let treeTokens : CommonToken[] = tokens.tokens;
+	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
+	let tokenArray = [];
+	if (input.length == 0){
+		return input;
+	}
+	for (let e of treeTokens){
+		if (e.type != -1) {
+			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop, column: e.column, line: e.line});
+		}
+	}
+	return tokenArray;
+}
 
-function findMatching(tokenName : string, tokenArray : any[], iTokenIn: number){
+function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	let match : string;
 	switch (tokenName){
 		case 'LBRACE':
@@ -1945,12 +1955,19 @@ class TextTemplateErrorStrategy extends DefaultErrorStrategy {
     };
 
 }
-let model;
-export function provideFoldingRanges(monacoModel, context, token) {
+export function provideFoldingRanges(model, context, token) {
 	folds = [];
-	model = monacoModel; // note: this is a convenient way to capture the model
-	processSubtemplates(monacoModel.getValue(), 0); // collect folds
+	processSubtemplates(model.getValue(), 0); // collect folds
 	return folds;
+}
+
+export function provideDefinition(model, position, token){
+	let currentLine : string = model.getLinesContent()[position.lineNumber - 1];
+	let tokenArray = getTokensWithSymbols(currentLine);
+	return {
+        range: new monaco.Range(17, 1, 19, 15),
+        uri: model.uri
+    };
 }
 
 export let folds = [];
@@ -2031,7 +2048,6 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 				errors.forEach((error)=>{
 					visitor.errors.push(error);
 				});
-				visitor.model = model;
 				visitor.input = input;
 				visitor.bulletIndent = null; // start bulleting from 0,0
 				// add subtemplates found by processSubtemplates to visitor
@@ -2075,7 +2091,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 										let invocation = ++invocations;
 										setTimeout(()=>{
 											if (invocation == invocations){
-												validate(visitor.model.getValue(), invocation, 0);
+												validate(monaco.editor.getModels()[0].getValue(), invocation, 0);
 											}
 										}, 0);
 									}
@@ -2103,7 +2119,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 						severity: monaco.MarkerSeverity.Error
 					});
 				};
-				monaco.editor.setModelMarkers(model, "owner", monacoErrors);
+				monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
 			}, 1);
 		}, 1);
 	}, 1);

@@ -179,7 +179,7 @@
 			editor.onDidChangeModelContent(editorChanged);
 			monaco.languages.registerDefinitionProvider('texttemplate', {
 				provideDefinition: function(model,position, token){
-					console.log("got here");
+					return parserFacade.provideDefinition(model, position, token);
 				}
 			});
 			setTimeout(function(){

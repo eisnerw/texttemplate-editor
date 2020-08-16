@@ -94,7 +94,7 @@
 		"{",
 		"   'Link'.#Click(",
 		"         'simple'  // the link name",
-		"         ,'Click this to load a simple script'",
+		"         ,'Click this to load a simple template'",
 		"         , 'link','italic' // style attributes",
 		"      )",
 		"} you can hover over and click.",
@@ -541,14 +541,23 @@
 	,"events":[
 		"// {'/data/events':[{^.ToJson()}]} /* uncomment this line to see the data */",
 		"{'/data/events':[ `",
-		"{start.ToUpper()} {summary}",
-		"   {.} Starts: {start.ToDate('h:mm a')}",
-		"   {.} Ends: {!end.#SameDay(start)->[{end} at ]}{end.ToDate('h:mm a')}",
+		"{start.ToUpper()} ",
+		"  {start.#formatTimes(end)}: {summary} ",
 		"   {.} Notes: {description}",
 		"   {.} Location {location}",
 		"",
-		"].@DateTest(/(star|end)/i).@BulletStyle('•').@DateFormat('dddd MMM d')}",
+		"].@DateTest(/(star|end)/i).@BulletStyle('•').@DateFormat('dddd MMM D')}",
 		"Subtemplates:",
-		"{#SameDay:[{$0.ToDate('YYYYMMDD') = $1.ToDate('YYYYMMDD')}]}"
+		"{#SameDay:[{$0.ToDate('YYYYMMDD') = $1.ToDate('YYYYMMDD')}]}",
+		"{#SameAMPM:[{$0.ToDate('a') = $1.ToDate('a') & $0.#SameDay($1)}]}",
+		"{#onHour:[{$0.ToDate('mm') = '00'}]}",
+		"{#formatTimes:[",
+		"   {",
+		"   // Don't put am/pm for the start time if on the hour and same as end",
+		"   $0.ToDate([h{!$0.#onHour()->[:mm]}{!$0.#SameAMPM($1)->[a]}])",
+		"   }-{",
+		"   !$1.#SameDay($0)->[{$1.ToDate().ToUpper()} at ]}{$1.ToDate('h:mma')",
+		"   }",
+		"]}"
 	]
 }
