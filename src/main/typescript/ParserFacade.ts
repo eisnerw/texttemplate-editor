@@ -1806,7 +1806,7 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 								kind: monaco.languages.FoldingRangeKind.Region
 							});
 						}
-						subtemplates['#' + parts[2].text] = {text: text, line: parts[0].line, column:parts[4].column, subtemplates: subSubtemplates};
+						subtemplates['#' + parts[2].text] = {text: text, line: parts[0].line, column:parts[4].column, endLine: parts[6].line, endColumn: parts[6].column, subtemplates: subSubtemplates};
 					} else {
 						newInput += '\nERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace';
 						console.error('ERROR extracting subtemplate "' + parts[2].text + '"' + ' missing right bracket or brace');
@@ -1965,14 +1965,59 @@ export function provideFoldingRanges(model, context, token) {
 
 export function provideDefinition(model, position, token){
 	let currentLine : string = model.getLinesContent()[position.lineNumber - 1];
-	let tokenArray = getTokensWithSymbols(currentLine);
+	let tokenArray = getTokensWithSymbols(model.getValue());
+	let column = position.column - 1;  // position uses 1 origin and tokens use 0 origin
+	let definitionName = '';
+	for (let iToken = 0; iToken < tokenArray.length; iToken++){
+		if (tokenArray[iToken].line == position.lineNumber && column >= tokenArray[iToken].column && (((iToken + 1) == tokenArray.length) || tokenArray[iToken + 1].line > position.lineNumber || column < tokenArray[iToken + 1].column)){
+			if (tokenArray[iToken].name == 'IDENTIFIER' && iToken > 0 && tokenArray[iToken - 1].name == 'POUND'){
+				definitionName = '#' + tokenArray[iToken].text;
+			} else if (tokenArray[iToken].name == 'POUND' && (iToken + 1) < tokenArray.length && tokenArray[iToken].name == 'IDENTIFIER'){
+				definitionName = '#' + tokenArray[iToken + 1].text;
+			} else if (tokenArray[iToken].name == 'METHODNAME' && tokenArray[iToken].text.startsWith('.#')){
+				definitionName = tokenArray[iToken].text.substr(1, tokenArray[iToken].text.length - 2);
+			}
+			break;
+		}
+	}
+	if (definitionName == ''){
+		return; // not pointing to an identifier
+	}
+	let subtemplatePositions : any[] = [];
+	getSubtemplatePositions(subtemplatePositions, processedSubtemplates, 0, '');
+	subtemplatePositions.sort((a, b) => (a.line > b.line) ? 1 : -1);
+	let subtemplateMap = {};
+	let level = '';
+	for (let i = 0; i < subtemplatePositions.length; i++){
+		let subtemplate = subtemplatePositions[i];
+		subtemplateMap[subtemplate.name] = subtemplate;
+		if (position.lineNumber >= subtemplate.line && ((i + 1) == subtemplatePositions.length || position.lineNumber < subtemplatePositions[i + 1].line)){
+			level = subtemplate.name + '.';
+		}
+	}
+	let definition = null;
+	let keyArray = (level + definitionName).split('.');
+	for (let i = 0; definition == null && i < keyArray.length; i++){
+		definition = subtemplateMap[keyArray.slice(i).join('.')];
+	}
+	if (definition == null){
+		return;
+	}
 	return {
-        range: new monaco.Range(17, 1, 19, 15),
+        range: new monaco.Range(definition.line, definition.column + 1, definition.endLine, definition.endColumn + 1),
         uri: model.uri
     };
 }
-
-export let folds = [];
+function getSubtemplatePositions(positions : any[], processed, lineOffset : number, level : string){
+	if (processed.subtemplates != null){
+		Object.keys(processed.subtemplates).forEach((key)=>{
+			let subtemplate = processed.subtemplates[key];
+		positions.push({name: level + key, line: subtemplate.line + lineOffset, column: subtemplate.column, endLine:subtemplate.endLine + lineOffset, endColumn: subtemplate.endColumn});
+			getSubtemplatePositions(positions, subtemplate, lineOffset + subtemplate.line - 1, key + '.' + level);
+		});
+	}
+}
+let folds = [];
 let urls = {};
 let invocations = 0;
 
