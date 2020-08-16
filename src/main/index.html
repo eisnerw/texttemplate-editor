@@ -37,7 +37,7 @@
 	<span style='font-size: 1.5em;font-weight: bold;'>TextTemplate Editor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
 	<input type="checkbox" checked=true id="autorun"><label for="vehicle1">Run automatically when editor content changes:</label>
 	<span style='font-size: 1.5em;font-weight: bold;'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-	<button id='run' class='button' onclick='return window.editorChanged("button");'>Run</button>
+	<button id='run' class='button' onclick='return window.runValidation("button");'>Run</button>
 </div>
 <div id="container" style="width:800px;height:600px;border:1px solid grey; float:left"></div>
 <div><pre id="interpolated"></pre></div>
@@ -159,11 +159,11 @@
 				}			
 			});
 			editor.getAction('editor.foldAll').run(); // start by folding subtemplates
-			editorChanged = function (e) {
+			runValidation = function (e) {
 				let bButtonPressed = typeof e == 'string' && e == 'button';
 				let bAutoRun = document.getElementById('autorun').checked;
-				let mode = bAutoRun ? 1  : bButtonPressed ? 0 : 2;  // mode 0 = button; 1 = autorun; 2 = skip
-				let code = bButtonPressed || bAutoRun ? editor.getValue() : ''; 
+				let mode = bButtonPressed ? 0 : bAutoRun ? 1 : 2;  // mode 0 = button; 1 = autorun; 2 = skip
+				let input = bButtonPressed || bAutoRun ? editor.getValue() : ''; 
 				let model = monaco.editor.getModels()[0];
 				if (!ParserFacade && !parserFacade){
 					return; // protect against an unknown error that can occur during editing if keystrokes are frequent
@@ -173,17 +173,17 @@
 					}
 				}
 				setTimeout(function(){
-					parserFacade.inputChanged(code, mode);
+					parserFacade.runValidation(input, mode);
 				},0);
 			}
-			editor.onDidChangeModelContent(editorChanged);
+			editor.onDidChangeModelContent(runValidation);
 			monaco.languages.registerDefinitionProvider('texttemplate', {
 				provideDefinition: function(model,position, token){
 					return parserFacade.provideDefinition(model, position, token);
 				}
 			});
 			setTimeout(function(){
-				editorChanged();
+				runValidation();
 			},100);
 		}
 		let urlSplit = window.location.href.split('#');

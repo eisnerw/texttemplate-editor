@@ -10,6 +10,8 @@ import moment = require('moment');
 
 var parsedTemplates = {};
 var parsedTokens = {};
+var processedSubtemplates = null;
+
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
@@ -1957,7 +1959,7 @@ class TextTemplateErrorStrategy extends DefaultErrorStrategy {
 }
 export function provideFoldingRanges(model, context, token) {
 	folds = [];
-	processSubtemplates(model.getValue(), 0); // collect folds
+	processedSubtemplates = processSubtemplates(model.getValue(), 0); // collect folds
 	return folds;
 }
 
@@ -1974,7 +1976,7 @@ export let folds = [];
 let urls = {};
 let invocations = 0;
 
-export function inputChanged(input ,mode) : void {
+export function runValidation(input ,mode) : void {
 	let invocation = ++invocations;
 	setTimeout(()=>{
 		if (invocation == invocations){
@@ -1998,11 +2000,11 @@ function tokensAsString(ctx){
 	}
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
-function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = delay (autorun), 2 = skip
+function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip
 	setTimeout(()=>{
 		if (invocation != invocations){
 			return;
-		}	
+		}
 		input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
 		let errors : Error[] = [];
 		if (mode != 2){
@@ -2013,8 +2015,10 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			if (invocation != invocations){
 				return;
 			}
-			let processed : any = processSubtemplates(input, 0); 
-			input = processed.input;
+			if (processedSubtemplates == null){
+				processedSubtemplates = processSubtemplates(input, 0); 
+			}
+			input = processedSubtemplates.input;
 			let tree = parsedTemplates[input];
 			if (!tree){
 				tree = parseTemplate(input, [new ConsoleErrorListener(), new CollectorErrorListener(errors)])
@@ -2051,9 +2055,9 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 				visitor.input = input;
 				visitor.bulletIndent = null; // start bulleting from 0,0
 				// add subtemplates found by processSubtemplates to visitor
-				Object.keys(processed.subtemplates).forEach((key)=>{
-					let subtemplate = processed.subtemplates[key];
-					visitor.parseSubtemplates(processed.subtemplates[key], key, subtemplate.line - 1, subtemplate.column);
+				Object.keys(processedSubtemplates.subtemplates).forEach((key)=>{
+					let subtemplate = processedSubtemplates.subtemplates[key];
+					visitor.parseSubtemplates(processedSubtemplates.subtemplates[key], key, subtemplate.line - 1, subtemplate.column);
 				});
 				var result = visitor.visitCompilationUnit(tree);
 				if (invocation != invocations){
