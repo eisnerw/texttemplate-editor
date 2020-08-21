@@ -240,6 +240,13 @@ class TemplateData {
 	count(){
 		return this.list.length;
 	}
+	asList() : TemplateData {
+		if (this.type == 'list'){
+			// already a list, so just clone it
+			return new TemplateData(this);
+		}
+		return new TemplateData([JSON.parse(this.toJson())]);
+	}
 	toJson(indentLevel? : number) : string {
 		let result : string = '';
 		let bComma = false;
@@ -257,6 +264,8 @@ class TemplateData {
 				result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
 				if (value instanceof TemplateData){
 					result += (<TemplateData>value).toJson(indentLevel + 1);
+				} else if (value == null) {
+					result += 'null';
 				} else if (typeof value == 'string') {
 					result += ('"' + value.replace(/\n/g,'\\n') + '"');
 				} else {
@@ -848,9 +857,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
 		} else if (args.constructor.name == 'ArgumentsContext'){
-			let argResults = args.accept(this);
-			if (argResults){
-				argResults.forEach((arg) =>{
+			for (let i = 0; i < args.children.length; i++){
+				if ((method == 'Group' || method == 'Order') && i == 0){
+					// defer evaluation of the first parameter of a Group
+					argValues.push(null); // placeholder
+				} else {
+					let arg = args.children[i].accept(this);
 					if (arg !== undefined){ // remove result of commas
 						if (arg.constructor.name == 'RegExp'){
 							argValues.push(arg);
@@ -858,7 +870,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							argValues.push(this.compose(arg, 0));
 						}
 					}
-				});
+				}
 			}
 		}
 		let parentCtx : any = args.parentCtx;
@@ -1097,6 +1109,78 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 
+				case 'Order':
+				case 'Group':
+					if (method == 'Order'){
+						if (argValues.length == 1){
+							argValues.push('A');
+						} else if (argValues.length == 2){
+							argValues[1] = argValues[1].toUpperCase().replace('ASC', 'A').replace('DESC','D');
+						}
+					}
+					let oldContext : TemplateData = this.context;
+					let groups = {};
+					if (!(<any>value instanceof TemplateData)){
+						this.syntaxError('Invalid data type for ' + method, args.parentCtx);
+					} else if ((method == 'Group' && argValues.length != 3) || (method == 'Order' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D')))){
+						this.syntaxError('Invalid arguments for ' + method, args.parentCtx);
+					} else {
+						// temporarily set the context to the value being ordered or grouped
+						this.context = <TemplateData>value;
+						let dollarVariables = {};
+						if (oldContext != null){
+							oldContext.getKeys().forEach((key)=>{
+								if (key.startsWith('$')){
+									dollarVariables[key] = oldContext.getValue(key);
+								}
+							});
+						}
+						this.context.asList().iterateList((newContext)=>{
+							this.context = newContext;
+							Object.keys(dollarVariables).forEach((key)=>{
+								newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables in case they are needed for a calculaton
+							});
+							let groupKey = args.children[0].accept(this)[0];
+							Object.keys(dollarVariables).forEach((key)=>{
+								delete newContext.dictionary[key];  // remove the added $ variables
+							});
+							if (groups[groupKey] == null){
+								groups[groupKey] = this.context;
+							} else {
+								if (!Array.isArray(groups[groupKey])){
+									groups[groupKey] = [groups[groupKey]];
+								}
+								groups[groupKey].push(this.context);
+							}
+						});
+						this.context = oldContext;
+						let result = [];
+						let keys = Object.keys(groups).sort();
+						if (method == 'Order' && argValues[1] == 'D'){
+							keys.reverse();
+						}
+						keys.forEach((key)=>{
+							let group = groups[key];
+							if (method == 'Order'){
+								if (Array.isArray(group)){
+									group.forEach((member)=>{
+										
+										result.push(member); // if there is more than one, they are key duplicates
+									});
+								} else {
+									result.push(group);
+								}
+							} else {
+								let data =  {};
+								data[argValues[1]] = key;
+								data[argValues[2]] = group;
+								result.push(new TemplateData(data));
+							}
+						});
+						value = new TemplateData(result, this.context);
+					}
+					break;
+					
 				case 'IfMissing':
 					if (!value || (typeof value == 'object' && value != null && value.type =='missing')) {
 						value = argValues[0];

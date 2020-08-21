@@ -53,6 +53,7 @@
 		{"gmt": "+02:00", "start": "2020-05-20T19:00:00", "end": "2020-05-20T22:30:00","summary": "Dinner with Mom", "description":"Dresscode: Elegant and ironed!", "location": "800 Howard St., San Francisco, CA 94103"}, 
 		{"gmt": "+02:00", "start": "2020-06-20T15:00:00", "end": "2020-06-22T15:30:00","summary": "Hotdog eating competition", "location": "43 Chapel Ave, Jersey City, NJ 07305"}, 
 		{"gmt": "+02:00", "start": "2020-05-28T10:00:00", "end": "2020-05-28T12:15:00","summary": "Vet", "description":"Brush the dog's teeth", "location": "3771 Van Dyke Ave San Diego, CA 92105"}, 
+		{"gmt": "+02:00", "start": "2020-05-28T08:30:00", "end": "2020-05-28T10:00:00","summary": "Meet with Paul", "description":"Discussion of future plans", "location": "1200 Railing St., Brunswick, Md."}, 
 		{"gmt": "+02:00", "start": "2020-06-30T10:00:00", "end": "2020-06-30T11:30:00","summary": "Jogging class", "description":"Bring your inhaler", "location": "3014 Rosalinda San Clemente, CA 92673"}
 	]
 }

@@ -540,12 +540,11 @@
 	]
 	,"events":[
 		"// {'/data/events':[{^.ToJson()}]} /* uncomment this line to see the data */",
-		"{'/data/events':[ `",
+		"{'/data/events'.Group(start.ToDate(), 'start', 'group'):[ `",
 		"{start.ToUpper()} ",
-		"  {start.#formatTimes(end)}: {summary} ",
-		"   {.} Notes: {description}",
-		"   {.} Location {location}",
-		"",
+		"   {group.Order(start.ToDate('HHmm')):[{start.#formatTimes(end)}: {summary} ",
+		"      {.} Notes: {description}",
+		"      {.} Location {location}]}",
 		"].@DateTest(/(star|end)/i).@BulletStyle('•').@DateFormat('dddd MMM D')}",
 		"Subtemplates:",
 		"{#SameDay:[{$0.ToDate('YYYYMMDD') = $1.ToDate('YYYYMMDD')}]}",
@@ -558,6 +557,6 @@
 		"   }-{",
 		"   !$1.#SameDay($0)->[{$1.ToDate().ToUpper()} at ]}{$1.ToDate('h:mma')",
 		"   }",
-		"]}"
+		"]}"	
 	]
 }

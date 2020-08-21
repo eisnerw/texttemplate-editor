@@ -134,4 +134,6 @@ fragment KEYWORDS: (
 	| 'ToDate'
 	| '@DateFormat'
 	| '@DateTest'
+	| 'Group'
+	| 'Order'
 );
