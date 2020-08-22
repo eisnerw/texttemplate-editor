@@ -1188,6 +1188,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 					
 				case 'ToJson':
+					if (value == null){
+						value = 'null';
+					} else {
+						if (typeof value == 'object' && value.type == 'argument'){
+							value = new TemplateData(value.list);
+						}
+					}
 					if (value instanceof TemplateData){
 						value = value.toJson(0);
 					} else if (args.parentCtx.parentCtx && args.parentCtx.parentCtx.children[0]){
