@@ -10,8 +10,7 @@ import moment = require('moment');
 
 var parsedTemplates = {};
 var parsedTokens = {};
-var processedSubtemplates = null;
-
+var processedSubtemplates = null; // keeps a tree of the latest subtemplates and any local subtemplates within them, including where they were found in the editor
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
@@ -298,6 +297,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
 	annotations = {bulletStyles: null};
+	lineOffset = 0;
 	
 	visitText = function(ctx){
 		if (ctx.children[0].constructor.name == 'ContinuationContext'){
@@ -714,6 +714,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitNamedSubtemplate = function(ctx, name = null, bInclude = false){
 		let subtemplateName : string = name != null ? name : ctx.getText();
 		if (!this.subtemplates[subtemplateName]){
+			// load the subtemplate from the server
 			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
 			if (!urls[subtemplateUrl]){
 				urls[subtemplateUrl] = {};
@@ -721,6 +722,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (!urls[subtemplateUrl].data){
 				return 'loading subtemplate "' + subtemplateName + '"';
 			}
+			// process the loaded subtemplate
 			let data = urls[subtemplateUrl].data;
 			if (data.substr(0 ,1) != '['){
 				let msg = 'Error loading subtemplate "' + subtemplateName + '": ' + data;
@@ -732,14 +734,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let processed : any = processSubtemplates((bInclude ? '\n' : '') + data.substr(1, data.lastIndexOf(']') - 1), 0);
 			// replace the brackets around the extracted input when storing the subtemplate and add any methods on the template
 			this.subtemplates[subtemplateName] = '[' + processed.input + ']' + data.substr(data.lastIndexOf(']') + 1); 
+			// parse and cache local subtemplates
 			Object.keys(processed.subtemplates).forEach((key)=>{
 				let subtemplate = processed.subtemplates[key];
 				this.parseSubtemplates(processed.subtemplates[key], key, subtemplate.line - 1, subtemplate.column);
 			});
 		}
 		let parserInput = '{:' + this.subtemplates[subtemplateName] + '}';
+		let oldLineOffset = this.lineOffset;
+		if (processedSubtemplates.subtemplates[subtemplateName] != null){
+			this.lineOffset = processedSubtemplates.subtemplates[subtemplateName].line - 1
+		}
 		let tree = parsedTemplates[parserInput];
 		if (!tree){
+			// cache the parsed tree and tokens
 			tree = parseTemplate(parserInput);
 			parsedTemplates[parserInput] = tree;
 			parsedTokens[parserInput] = tokensAsString(tree);
@@ -760,13 +768,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		// add local subtemplates
 		localSubtemplateNames.forEach((localSubtemplateName)=>{
-			this.subtemplates[localSubtemplateName.substring(subtemplateName.length + 1)] = this.subtemplates[localSubtemplateName];
+			// this will overwrite any global or higher level local subtemplate
+			this.subtemplates[localSubtemplateName.substring(subtemplateName.length + 1)] = this.subtemplates[localSubtemplateName]; 
 		});
 		this.input = parserInput;
 		let result : any = this.visitCompilationUnit(tree);
 		--this.recursionLevel;
 		// restore (pop) old states
 		this.subtemplates = oldSubtemplates;
+		this.lineOffset = oldLineOffset;
 		this.input = oldInput;
 		if (typeof result == 'string'){
 			result = [result]; // return in an array for consistency
@@ -1020,14 +1030,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 
-				case 'Anded':
+				case 'Join':
+					if (argValues.length > 2){
+						this.syntaxError('Too many arguments for the Join method', args);
+					}
 					if (typeof value == 'object' && value != null && value.type == 'argument'){
+						let joiner = ', ';
+						if (argValues.length > 0){
+							joiner = argValues[0];
+						}	
 						let list = value.list;
 						for (let i : number = 0; i < list.length - 1; i++){
-							if (i == (list.length - 2)){
-								list[i] += ' and ';
+							if (argValues.length > 1 && i == (list.length - 2)){
+								list[i] += argValues[1];
 							} else {
-								list[i] += ', ';
+								list[i] += joiner;
 							}
 						}
 						value = list.join('');
@@ -1341,21 +1358,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return templateParts.join('');
 	}
 	// NOTE: the following is only necessary because of a serious performance issue in the ANTLR4 parser (at least the Javascript version)
-	// It the issue is ultimately addressed, this code can be simplified by removing calls to parseSubtemplates and letting visitSubtemplates extract the subtemplates
+	// It the issue is ultimately addressed, this code can be simplified by removing calls to processSubtemplates and parseSubtemplates and letting visitSubtemplates extract the subtemplates
 	//
-	// parseSubtemplates receives a subtemplate object provided by processSubtemplates plus the key, if the subtemplate is global, and the line/column where the is specified in the editor
+	// parseSubtemplates receives a subtemplate object provided by processSubtemplates plus the key
 	// If the key is supplied, it saves the template text in the global subtemplates map.
-	// The routine parses template text, placing the resulting parse tree in the global map of parsed templates.
-	// Note that the parsedTemplates map is keyed by the text, not the template names, which can be scoped
+	// The routine parses the template text, caching the resulting parse tree in the global map of parsed templates.
+	// Note that the parsedTemplates map is keyed by the text, not the template names, which might be scoped and duplicated with different text
 	// After parsing the subtemplate text, the routine calls itself recursively to parse any subtemplates within 
 	parseSubtemplates = function(subtemplate, key, line, column){
 		let input = subtemplate.text;
-		// if key is null, the subtemplate was found in the editor within a subtemplate
 		this.subtemplates[key] = input; // global dictionary of loaded subtemplate
-		//RelocatingCollectorErrorListener relocates based on where the subtemplate is positioned in the editor
+		// The RelocatingCollectorErrorListener relocates errors based on where the subtemplate is positioned in the editor
 		let tree = parseTemplate(input, [new ConsoleErrorListener(), new RelocatingCollectorErrorListener(this.errors, line, column)])
-		parsedTemplates[input] = tree;
+		parsedTemplates[input] = tree; // cache the parsed text
 		if (subtemplate.subtemplates != null){
+			// recursively parse local subtemplates found in the subtemplates useing a key qualified by the template name in which it was found
 			Object.keys(subtemplate.subtemplates).forEach((subtemplateKey)=>{
 				this.parseSubtemplates(subtemplate.subtemplates[subtemplateKey], key + '.' + subtemplateKey, subtemplate.line - 1 + line, column, this);
 			});
@@ -1740,7 +1757,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	syntaxError(msg, ctx){
 		console.error(msg);
-		this.errors.push(new Error(ctx.start.line, ctx.stop.line, ctx.start.column + 1, ctx.stop.column, msg));
+		this.errors.push(new Error(ctx.start.line + this.lineOffset, ctx.stop.line + this.lineOffset, ctx.start.column + 1, ctx.stop.column, msg));
 	}
 }
 
@@ -2190,10 +2207,10 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 				});
 				visitor.input = input;
 				visitor.bulletIndent = null; // start bulleting from 0,0
-				// add subtemplates found by processSubtemplates to visitor
+				// parse and cache subtemplates found by processSubtemplates and add the text to the visitor (a TextTemplateVisitor instance)
 				Object.keys(processedSubtemplates.subtemplates).forEach((key)=>{
-					let subtemplate = processedSubtemplates.subtemplates[key];
-					visitor.parseSubtemplates(processedSubtemplates.subtemplates[key], key, subtemplate.line - 1, subtemplate.column);
+					let subtemplateObject = processedSubtemplates.subtemplates[key];
+					visitor.parseSubtemplates(subtemplateObject, key, subtemplateObject.line - 1, subtemplateObject.column);
 				});
 				var result = visitor.visitCompilationUnit(tree);
 				if (invocation != invocations){

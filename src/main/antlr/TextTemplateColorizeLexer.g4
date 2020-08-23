@@ -122,7 +122,7 @@ fragment KEYWORDS: (
 	| 'Exists'
 	| '@BulletStyle'
 	| '@MissingValue'
-	| 'Anded'
+	| 'Join'
 	| 'Assert'
 	| 'Case'
 	| 'Count'

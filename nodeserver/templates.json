@@ -1,5 +1,6 @@
 {
 	"simple": ["// data context:",
+		"// data context:",
 		"{'{\"firstName\": \"Robert\", \"lastName\": \"Smith\", \"pets\":[",
 		"{\"type\":\"dog\", \"name\": \"Toto\"}",
 		",{\"type\":\"cat\", \"name\": \"Dolly\"}",
@@ -7,16 +8,14 @@
 		"]}':",
 		"// Template:",
 		"[{\"Hello\"} {lastName}, {firstName} with {pets=>",
-		"   [{pets:#formatPet.Anded()}]",
+		"   [{pets:#formatPet.#anded()}]",
 		"   ,[no pets]",
 		"}!!]}",
-		" // external json data and an external subtemplate",
-		"// {'https://api.github.com/users/eisnerw/repos': #formatGitRepos}",
 		"",
 		"Subtemplates:",
 		"",
 		"{#formatPet:[a {type} named {name}]}",
-		"{#formatPets:[{pets:[a big {type} named {name}].Anded()}]}"
+		"{#anded:[{$0.Join(', ',' and ')}]}"		
 	],
 	"outline": [
 		"People:{#data:[",
