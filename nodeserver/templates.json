@@ -1,5 +1,5 @@
 {
-	"simple": ["// data context:",
+	"simple": [
 		"// data context:",
 		"{'{\"firstName\": \"Robert\", \"lastName\": \"Smith\", \"pets\":[",
 		"{\"type\":\"dog\", \"name\": \"Toto\"}",

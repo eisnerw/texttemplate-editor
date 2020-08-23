@@ -297,7 +297,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
 	annotations = {bulletStyles: null};
-	lineOffset = 0;
+	subtemplateLevel = ''; // keeps track of subtemplates with subtemplates
 	
 	visitText = function(ctx){
 		if (ctx.children[0].constructor.name == 'ContinuationContext'){
@@ -741,10 +741,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			});
 		}
 		let parserInput = '{:' + this.subtemplates[subtemplateName] + '}';
-		let oldLineOffset = this.lineOffset;
-		if (processedSubtemplates.subtemplates[subtemplateName] != null){
-			this.lineOffset = processedSubtemplates.subtemplates[subtemplateName].line - 1
-		}
+		let oldSubtemplateLevel = this.subtemplateLevel;
+		this.subtemplateLevel += ((this.subtemplateLevel != '' ? '.' : '') + subtemplateName);
 		let tree = parsedTemplates[parserInput];
 		if (!tree){
 			// cache the parsed tree and tokens
@@ -776,8 +774,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		--this.recursionLevel;
 		// restore (pop) old states
 		this.subtemplates = oldSubtemplates;
-		this.lineOffset = oldLineOffset;
 		this.input = oldInput;
+		this.subtemplateLevel = oldSubtemplateLevel;
 		if (typeof result == 'string'){
 			result = [result]; // return in an array for consistency
 		}
@@ -1757,7 +1755,42 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	syntaxError(msg, ctx){
 		console.error(msg);
-		this.errors.push(new Error(ctx.start.line + this.lineOffset, ctx.stop.line + this.lineOffset, ctx.start.column + 1, ctx.stop.column, msg));
+		let offset = this.getOffsetsFromProcessedSubtemplates(this.subtemplateLevel);
+		let startColumnOffset = ctx.start.line == 1 ? offset.columnOffset : 0;
+		let stopColumnOffset = ctx.stop.line == 1 ? offset.columnOffset : 0;
+		this.errors.push(new Error(ctx.start.line + offset.lineOffset, ctx.stop.line + offset.lineOffset, ctx.start.column + 1 + startColumnOffset, ctx.stop.column + stopColumnOffset, msg));
+	}
+	getOffsetsFromProcessedSubtemplates(subtemplateLevel){
+		// this routine navigates through the output of processSubtemplates to find the locations in the editor of subtemplates
+		// it tries to find the longest qualified level for which it can find the subtemplate named at the lowest level
+		let lineOffset = 0;
+		let columnOffset = 0;
+		let processed = processedSubtemplates;
+		if (subtemplateLevel != ''){
+			let levels = subtemplateLevel.split('.');
+			while (levels.length > 0){
+				for (let iLevel = 0; iLevel < levels.length; iLevel++){
+					processed = processed.subtemplates == null ? null : processed.subtemplates[levels[iLevel]];
+					if (processed != null){
+						lineOffset += (processed.line - 1);
+						columnOffset = processed.column;
+						if (iLevel == (levels.length - 1)){
+							levels = []; // all done
+						}
+					} else {
+						// this level was not found.  Eliminate the one level up and try again
+						levels.splice(levels.length - 2, 1);
+						if (levels.length != 0){
+							lineOffset = 0;
+							columnOffset = 0;
+							processed = processSubtemplates;
+						}
+						break;
+					}
+				}
+			}
+		}
+		return {lineOffset: lineOffset, columnOffset: columnOffset};
 	}
 }
 
