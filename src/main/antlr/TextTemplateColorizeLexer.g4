@@ -136,4 +136,13 @@ fragment KEYWORDS: (
 	| '@DateTest'
 	| 'Group'
 	| 'Order'
+	| 'Trim'
+	| 'StartsWith'
+	| 'EndsWith'
+	| 'Replace'
+	| 'Contains'
+	| 'Pad'
+	| 'Substr'
+	| 'IndexOf'
+	| 'LastIndexOf'
 );

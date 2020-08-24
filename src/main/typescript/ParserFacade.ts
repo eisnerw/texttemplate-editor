@@ -921,16 +921,41 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 			this.context = oldContext;
-		} else if (this.valueIsMissing(value) && !(method == 'Count' || method == 'Where' || method == 'ToJson' || method == 'Matches' || method == 'IfMissing')){
+		} else if (this.valueIsMissing(value) && !(
+			method == 'Count' 
+			|| method == 'Where' 
+			|| method == 'ToJson' 
+			|| method == 'Matches' 
+			|| method == 'IfMissing'
+		)){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (method == 'ToUpper' || method == 'ToLower')){
 			error = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
-		} else if (args.children && (method == 'ToUpper' || method == 'ToLower')){
+		} else if (args.children && (method == 'ToUpper' || method == 'ToLower' || method == 'Trim')){
 			error = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
-		} else if (!args.children && (method == 'GreaterThan' || method == 'LessThan')){
+		} else if (argValues.length != 2 && (method == 'Replace')){
+			error = 'ERROR: wrong number of arguments for ' + method + ': ' + args.getText();
+		} else if (!args.children && (
+			method == 'GreaterThan' 
+			|| method == 'LessThan' 
+			|| method == 'Pad' 
+			|| method == 'StartsWith' 
+			|| method == 'EndsWith' 
+			|| method == 'Replace' 
+			|| method == 'Contains' 
+			|| method == 'Substr' 
+			|| method == 'IndexOf'
+		)){
 			error = 'ERROR: missing argument for ' + method + ': ' + args.getText();
-		} else if (args.children && args.children.length > 1 && (method == 'GreaterThan' || method == 'LessThan')){
-			error = 'ERROR: too many arguments for ' + method + ': ' + args.getText();
+		} else if ((args.children && args.children.length > 1 || argValues[0] == null) && (
+			method == 'GreaterThan' 
+			|| method == 'LessThan' 
+			|| method == 'StartsWith' 
+			|| method == 'EndsWith' 
+			|| method == 'Contains' 
+			|| method == 'IndexOf'
+		)){
+			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
 		} else if (args.children && args.children.length < 3 && method == 'Case'){
 			error = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
 		} else {
@@ -1122,6 +1147,73 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}
 					}
+					break;
+
+				case 'Pad':
+					if (argValues.length > 3 || argValues.length == 0 || isNaN(argValues[0]) 
+						   || (argValues.length > 1 && !(argValues[1] == 'L' || argValues[1] == 'R' || argValues[1] == 'C'))){
+						this.syntaxError('Incorrect arguments for ' + method, args);
+					} else {
+						let paddingType = argValues.length == 1 ? 'L' : argValues[1];
+						let padding = (argValues.length == 3 && argValues[2] != '') ? argValues[2].toString() : ' ';
+						let paddingLength = parseInt(argValues[0]);
+						value = value.toString();
+						while (value.length < paddingLength){
+							if (paddingType == 'L' || paddingType == 'C'){
+								value = (value + padding).substr(0, paddingLength);
+							}
+							if (paddingType == 'R' || paddingType == 'C'){
+								let newLength = padding.length + value.length;
+								// insure that multi character padding doesn't cause the actual value to be cut and the value is not larger than padding length
+								value = ((padding.substr(newLength > paddingLength ? newLength - paddingLength : 0)) + value).substr(0, paddingLength);
+							}
+						}
+					}
+					break;
+
+				case 'Trim':
+					value = value.trim();
+					break;
+
+				case 'StartsWith':
+					value = value.startsWith(argValues[0]);
+					break;
+
+				case 'EndsWith':
+					value = value.endsWith(argValues[0]);
+					break;
+
+				case 'Replace':
+					if (typeof argValues[0] == "string"){
+						// this is a common "replaceAll" implementation which should change when javascript replaceAll becomes standard
+						value = value.split(argValues[0]).join(argValues[1]);
+					} else {
+						// presumably regex
+						value = value.replace(argValues[0], argValues[1]);
+					}
+					break;
+
+				case 'Contains':
+					value = value.includes(argValues[0]);
+					break;
+
+				case 'Substr':
+					if (argValues.length > 2 || isNaN(argValues[0]) || (argValues.length == 2 && isNaN(argValues[1]))){
+						this.syntaxError('Incorrect arguments for ' + method, args);
+					}
+					if (argValues.length == 1){
+						value = value.substr(parseInt(argValues[0]));
+					} else {
+						value = value.substr(parseInt(argValues[0]), parseInt(argValues[1]));
+					}
+					break;
+					
+				case 'LastIndexOf':
+					value = value.toString().lastIndexOf(argValues[0]);
+					break;
+
+				case 'IndexOf':
+					value = value.toString().indexOf(argValues[0])
 					break;
 
 				case 'Order':

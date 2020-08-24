@@ -34,7 +34,7 @@ predicateExpression: LP predicateExpression RP #nestedPredicate | relationalOper
 
 relationalOperand: methodInvoked | quoteOperand | apostropheOperand | namedSubtemplate | identifierOperand | digits;
 
-digits: DIGITS;
+digits: MINUS* DIGITS;
 
 quoteOperand: QUOTE TEXT? QUOTE;
 
