@@ -135,7 +135,7 @@ fragment KEYWORDS: (
 	| '@DateFormat'
 	| '@DateTest'
 	| 'Group'
-	| 'Order'
+	| 'OrderBy'
 	| 'Trim'
 	| 'StartsWith'
 	| 'EndsWith'

@@ -602,7 +602,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitIdentifierCondition = function(ctx) {
 		// testing to see if the identifier has a value
 		let value = this.visitIdentifier(ctx.children[0]);
-		if (!this.valueIsMissing(value)){
+		if (!this.valueIsMissing(value) && value != ''){
 			return true;
 		}
 		return false;
@@ -866,7 +866,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			argValues[0] = args.accept(this);
 		} else if (args.constructor.name == 'ArgumentsContext'){
 			for (let i = 0; i < args.children.length; i++){
-				if ((method == 'Group' || method == 'Order') && i == 0){
+				if ((method == 'Group' || method == 'OrderBy') && i == 0){
 					// defer evaluation of the first parameter of a Group
 					argValues.push(null); // placeholder
 				} else {
@@ -958,6 +958,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
 		} else if (args.children && args.children.length < 3 && method == 'Case'){
 			error = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
+		} else if (value == null || (typeof value == 'object' && (value.constructor.name == 'TemplateData' || value.type == 'argument') && (
+			method == ''
+			|| method == 'ToUpper'
+			|| method == 'ToLower'
+			|| method == 'GreaterThan'
+			|| method == 'LessThan'
+			|| method == 'Case'
+			|| method == 'Pad'
+			|| method == 'Trim'
+			|| method == 'StartsWith'
+			|| method == 'EndsWith'
+			|| method == 'Replace'
+			|| method == 'Contains'
+			|| method == 'Substr'
+			|| method == 'LastIndexOf'
+			|| method == 'IndexOf'
+		))){
+			value = null;
 		} else {
 			switch (method){
 				case 'ToUpper':
@@ -1216,9 +1234,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = value.toString().indexOf(argValues[0])
 					break;
 
-				case 'Order':
+				case 'OrderBy':
 				case 'Group':
-					if (method == 'Order'){
+					if (method == 'OrderBy'){
 						if (argValues.length == 1){
 							argValues.push('A');
 						} else if (argValues.length == 2){
@@ -1229,7 +1247,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let groups = {};
 					if (!(<any>value instanceof TemplateData)){
 						this.syntaxError('Invalid data type for ' + method, args.parentCtx);
-					} else if ((method == 'Group' && argValues.length != 3) || (method == 'Order' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D')))){
+					} else if ((method == 'Group' && argValues.length != 3) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D')))){
 						this.syntaxError('Invalid arguments for ' + method, args.parentCtx);
 					} else {
 						// temporarily set the context to the value being ordered or grouped
@@ -1263,12 +1281,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.context = oldContext;
 						let result = [];
 						let keys = Object.keys(groups).sort();
-						if (method == 'Order' && argValues[1] == 'D'){
+						if (method == 'OrderBy' && argValues[1] == 'D'){
 							keys.reverse();
 						}
 						keys.forEach((key)=>{
 							let group = groups[key];
-							if (method == 'Order'){
+							if (method == 'OrderBy'){
 								if (Array.isArray(group)){
 									group.forEach((member)=>{
 										
@@ -2283,7 +2301,6 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 		if (invocation != invocations){
 			return;
 		}
-		input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
 		let errors : Error[] = [];
 		if (mode != 2){
 			document.getElementById('interpolated').innerHTML = 'parsing...';
@@ -2297,6 +2314,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 				processedSubtemplates = processSubtemplates(input, 0); 
 			}
 			input = processedSubtemplates.input;
+			input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
 			let tree = parsedTemplates[input];
 			if (!tree){
 				tree = parseTemplate(input, [new ConsoleErrorListener(), new CollectorErrorListener(errors)])

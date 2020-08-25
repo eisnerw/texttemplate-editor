@@ -541,7 +541,7 @@
 		"// {'/data/events':[{^.ToJson()}]} /* uncomment this line to see the data */",
 		"{'/data/events'.Group(start.ToDate(), 'start', 'group'):[ `",
 		"{start.ToUpper()} ",
-		"   {group.Order(start.ToDate('HHmm')):[{start.#formatTimes(end)}: {summary} ",
+		"   {group.OrderBy(start.ToDate('HHmm')):[{start.#formatTimes(end)}: {summary} ",
 		"      {.} Notes: {description}",
 		"      {.} Location {location}]}",
 		"].@DateTest(/(star|end)/i).@BulletStyle('•').@DateFormat('dddd MMM D')}",
@@ -557,5 +557,11 @@
 		"   !$1.#SameDay($0)->[{$1.ToDate().ToUpper()} at ]}{$1.ToDate('h:mma')",
 		"   }",
 		"]}"	
+	]
+	,"birthdays":[
+		"{'/data/famousBirthdays'.Group(sign,'sign','group'):",
+		"     [{sign}{group.Group(dob.ToDate('yyyy'),'year','yeargroup')",
+		"          .OrderBy(year,'D'):[{year}",
+		"     {yeargroup.OrderBy(dob, 'A'):[{fname->[{fname} ]}{lname} ({dob.ToDate()})]}]}]}"
 	]
 }
