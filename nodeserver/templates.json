@@ -559,9 +559,27 @@
 		"]}"	
 	]
 	,"birthdays":[
-		"{'/data/famousBirthdays'.Group(sign,'sign','group'):",
+		"// change the '1' to '2' to see grouping by astrological sign and year",
+		"// '3' to see ungrouped data",
+		"{'1'.#grouping()} ",
+		"Subtemplates:",
+		"{#grouping:[{$0.Case(3,[{#ungrouped}],2,[{#bySign}],[{#byDate}])}]}",
+		"{#byDate:[{'/data/famousBirthdays'.Group(dob.ToDate('MM'),'month','group'):",
+		"     [{[2020-{month}-01].ToDate('MMMM')}{ // using the date formatter for the month",
+		"        group.Group(dob.ToDate('DD'),'day','daygroup')",
+		"          .OrderBy(day):[{day}",
+		"     {daygroup",
+		"          .OrderBy(dob, 'D'):",
+		"               [{#name} {#date}]}]}]}]}",
+		"{#bySign:[{'/data/famousBirthdays'.Group(sign,'sign','group'):",
 		"     [{sign}{group.Group(dob.ToDate('yyyy'),'year','yeargroup')",
 		"          .OrderBy(year,'D'):[{year}",
-		"     {yeargroup.OrderBy(dob, 'A'):[{fname->[{fname} ]}{lname} ({dob.ToDate()})]}]}]}"
+		"     {yeargroup",
+		"          .OrderBy(dob, 'A'):",
+		"               [{fname->[{fname} ]}{lname} {#date}]}]}]}]}",
+		"{#name:[{fname->[{fname} ]}{lname}]}               ",
+		"{#date:[({dob.ToDate()})]}",
+		"{#ungrouped:[{'/data/famousBirthdays'.OrderBy(lname.ToUpper()):",
+		"   [{#name} {#date} {sign}]}]}"
 	]
 }
