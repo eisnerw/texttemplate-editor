@@ -132,7 +132,7 @@ class BulletIndent {
 				bullet = prefix + bullet + postfix;
 			}
 		}
-		this.lastBullet = this.indent + bullet.replace('\0x01', '');
+		this.lastBullet = this.indent + bullet.replace('\x01', '');
 		return bullet;	
 	}
 	numberToRoman(n : number) : string{
@@ -854,7 +854,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 		}
-		return {type:'bullet', bullet: text.replace('{','\0x01{'), parts: []};
+		return {type:'bullet', bullet: text.replace('{','\x01{'), parts: []};
 	};
 	visitBeginningBullet = function(ctx) {
 		return this.visitBullet(ctx);
@@ -1014,7 +1014,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				case 'Assert':
 				case 'Matches':
 					let originalValue = value;
-					if (typeof value == 'string' && value.includes('\0x01{.}')){
+					if (typeof value == 'string' && value.includes('\x01{.}')){
 						// special case for matching the output of bullet templates
 						value = this.compose([value], 1); // compose with bulleting
 					}
@@ -1031,7 +1031,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									matches = matches || arg.test(value);
 								} else if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
 									matches = true;
-								} else if (typeof arg == 'string' && arg.includes('\0x01{.}') && value == this.compose([arg], 1)){
+								} else if (typeof arg == 'string' && arg.includes('\x01{.}') && value == this.compose([arg], 1)){
 									matches = true;
 								} 
 								bFirst = false;
@@ -1631,9 +1631,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else if (this.isScalar(item)){
 				this.addToOutput(item.toString(), output);
 			} else if (Array.isArray(item)){
-				let bulletInTheOutput = lines[lines.length - 1].replace(/^([ \t]*(\0x01\{\.\})?).*/s,'$1'); 
+				let bulletInTheOutput = lines[lines.length - 1].replace(/^([ \t]*(\x01\{\.\})?).*/s,'$1'); 
 				// determine if the current bulleted indent is being overridden by a plain indent
-				let bReplaceIndent = !!indent && indent.includes('\0x01{.}') && !bulletInTheOutput.includes('\0x01{.}') && bulletInTheOutput.length > 0;
+				let bReplaceIndent = !!indent && indent.includes('\x01{.}') && !bulletInTheOutput.includes('\x01{.}') && bulletInTheOutput.length > 0;
 				this.doCompose(item, output, bReplaceIndent ? bulletInTheOutput : indent);
 			} else if (typeof item == 'object' && item != null){
 				if (item.type == 'bullet'){
@@ -1658,10 +1658,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 				} else {
 					// list
-					if (!!indent && indent.includes('\0x01{.}')){
+					if (!!indent && indent.includes('\x01{.}')){
 						// This is an unbulleted list under a bullet, so we need to turn each list item into an indent object with an indented bullet
-						let bIncompleteBullet = /^[ \t]*\0x01\{\.\}[ \t]*$/.test(lines[lines.length - 1]);
-						let newBullet = indent.replace(/([ \t]*\0x01\{\.\})/,'   ' + '$1'); // TODO: allow override of default tab
+						let bIncompleteBullet = /^[ \t]*\x01\{\.\}[ \t]*$/.test(lines[lines.length - 1]);
+						let newBullet = indent.replace(/([ \t]*\x01\{\.\})/,'   ' + '$1'); // TODO: allow override of default tab
 						for (let i = 0; i < item.list.length; i++){
 							let itemResult = item.list[i];
 							let indentObject = itemResult;
@@ -1676,7 +1676,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								}
 								this.doCompose(doComposeParm, output, indent);
 							} else {
-								if (!indent.includes('\n')){
+								let firstItem = indentObject;
+								let firstItemIndent = '';
+								if (Array.isArray(firstItem)){
+									firstItem = firstItem[0];
+								}
+								if (firstItem != null && typeof firstItem == 'object' && firstItem.type == 'bullet'){
+									firstItemIndent = firstItem.bullet;
+								}
+								if (!indent.includes('\n') && !firstItemIndent.includes('\n')){
 									this.addToOutput('\n', output);
 								}
 								this.doCompose([indentObject], output, indent);
@@ -1807,17 +1815,24 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			} else {
 				if (output.mode == 1){ // only handle bullets on the final composition
-					if (/^[ \t]*\0x01\{\.\}/.test(text)){
+					if (/^[ \t]*\x01\{\.\}/.test(text)){
 						// there is a bullet in the text
 						let indent = text.replace(/^([ \t]*).*$/, '$1');
 						output.bulletIndent = this.bulletIndent == null ? null : this.bulletIndent.clone();
-						let bulletObject = output.bullets[text.replace(/^([ \t]*\0x01\{\.\}).*$/, '$1')];
+						let bulletObject = output.bullets[text.replace(/^([ \t]*\x01\{\.\}).*$/, '$1')];
+						if (bulletObject == null){
+							// this could be a strange case where the bullet is on the first line of a new indented subtemplate, so pick the shortest bullet
+							let keys = Object.keys(output.bullets).sort((a,b)=>(a.length > b.length) ? 1 : -1);
+							if (keys.length > 0){
+								bulletObject = output.bullets[keys[0]];
+							}
+						}
 						if (bulletObject == null){
 							lines.push('ERROR computing bullet'); // should never happen TODO: raise exception?
 						} else {
 							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level, this.annotations.bulletStyles);
 						}
-						text = text.replace(/[ \t]*\0x01\{\.\}/, indent + (this.bulletIndent != null ? this.bulletIndent.getBullet() : ''));
+						text = text.replace(/[ \t]*\x01\{\.\}/, indent + (this.bulletIndent != null ? this.bulletIndent.getBullet() : ''));
 					} else if (this.bulletIndent != null) {
 						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
 						let nextLineIndent = text.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
@@ -1825,9 +1840,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							this.bulletIndent = this.bulletIndent.parent;
 						}
 					}
-				} else if (/^[ \t]*\0x01\{\.\}/.test(text)){
+				} else if (/^[ \t]*\x01\{\.\}/.test(text)){
 					// during mode 0, capture the unique bullets
-					let bullet = text.replace(/^([ \t]*\0x01\{\.\}).*$/, '$1');
+					let bullet = text.replace(/^([ \t]*\x01\{\.\}).*$/, '$1');
 					output.bullets[bullet] = {bullet: bullet, length: bullet.length};
 				}
 				lines[lines.length - 1] += text;
