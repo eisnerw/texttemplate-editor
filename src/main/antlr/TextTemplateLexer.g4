@@ -78,8 +78,11 @@ QUOTED_TEXT: (ESC | ~["\\])* ->type(TEXT);
 QUOTED_BAD_BACKSLASH: '\\' ~["\\/bfnrt];
 
 mode APOSTROPHED;
+ESCAPED_APOSTROPHE: '\\\'' ->type(TEXT);
+ESCAPED_SLASH: '\\\\' ->type(TEXT);
+BAD_BACKSLASH: '\\';
 APOSTROPHED_APOSTROPHE: '\'' ->type(APOSTROPHE),popMode;
-APOSTROPHED_TEXT: ~[']* ->type(TEXT);
+APOSTROPHED_TEXT: ~['\\]* ->type(TEXT);
 
 mode BRACKETED;
 BRACKETED_SLASH_STAR: '/*' .*? '*/' -> skip;

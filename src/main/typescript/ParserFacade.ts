@@ -341,6 +341,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				this.syntaxError('Invalid date', ctx);
 			}
 		}
+		if (typeof value == 'string'){
+			if (this.annotations.encoding == 'html'){
+				value = this.encodeHTML(value);
+			} else if (this.annotations.encoding == 'xml') {
+				value = this.encodeXML(value);
+			} else if (this.annotations.encoding == 'uri') {
+				value = encodeURI(value);
+			}
+		}
 		return value;
 	};
 	visitTemplateToken = function(ctx) {
@@ -472,7 +481,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					if (method.startsWith('@')){
 						let args : any = child.children[1];
-						this.callMethod(method, this.annotations, args); // modify the current annotations so that old annotations are inherited
+						this.callMethod(method, this.annotations, args); // modify the current annotations so that existing annotations are inherited
 					}
 				});
 			}
@@ -797,7 +806,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0]; // remove a level of arrays
 	};
 	visitTemplateSpec = function(ctx) {
+		let oldAnnotations = {};
+		Object.keys(this.annotations).forEach((key)=>{
+			oldAnnotations[key] = this.annotations[key];
+		});
 		let result = this.visitChildren(ctx);
+		this.annotations = oldAnnotations;
 		//if (Array.isArray(result) && result.length == 1){
 			return result[0];
 		//}
@@ -929,7 +943,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'IfMissing'
 		)){
 			value = value; // null with most methods returns null
-		} else if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (method == 'ToUpper' || method == 'ToLower')){
+		} else if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (
+			method == 'ToUpper' 
+			|| method == 'ToLower'  
+			|| method == 'Trim' 
+			|| method == 'EncodeFor'
+		)){
 			error = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
 		} else if (args.children && (method == 'ToUpper' || method == 'ToLower' || method == 'Trim')){
 			error = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
@@ -945,6 +964,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'Contains' 
 			|| method == 'Substr' 
 			|| method == 'IndexOf'
+			|| method == 'EncodeFor'
 		)){
 			error = 'ERROR: missing argument for ' + method + ': ' + args.getText();
 		} else if ((args.children && args.children.length > 1 || argValues[0] == null) && (
@@ -954,6 +974,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'EndsWith' 
 			|| method == 'Contains' 
 			|| method == 'IndexOf'
+			|| method == 'EncodeFor'
+			|| method == '@EncodeDataFor'
 		)){
 			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
 		} else if (args.children && args.children.length < 3 && method == 'Case'){
@@ -974,6 +996,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'Substr'
 			|| method == 'LastIndexOf'
 			|| method == 'IndexOf'
+			|| method == 'EncodeFor'
 		))){
 			value = null;
 		} else {
@@ -984,6 +1007,23 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'ToLower':
 					value = this.valueAsString(value).toLowerCase();
+					break;
+					
+				case 'EncodeFor':
+					switch (argValues[0]){
+						case 'html':
+							value = this.encodeHTML(value);
+							break;
+						case 'xml':
+							value = this.encodeXML(value);
+							break;
+						case 'uri':
+							value = encodeURIComponent(value);
+							break;
+						default:
+							this.syntaxError("Parameter must be 'xml', 'html' or 'uri'", args);
+							break;
+					}
 					break;
 
 				case 'GreaterThan':
@@ -1389,6 +1429,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 					}
 					value['bulletStyles'] = argValues;
+					break;
+					
+				case '@EncodeDataFor':
+					let encoding = argValues[0];
+					if (argValues.length == 0){
+						delete this.annotations['encoding'];
+					} else if (encoding != 'html' && encoding != 'xml' && encoding != 'uri'){
+						this.syntaxError("Parameter must be 'xml', 'html' or 'uri'", args.parentCtx);
+					} else {
+						this.annotations['encoding'] = encoding;
+					}
 					break;
 					
 				default:
@@ -1916,6 +1967,33 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		return {lineOffset: lineOffset, columnOffset: columnOffset};
+	}
+	encodeHTML (str) {
+	  const replacements = {
+		  ' ' : '&nbsp;',
+		  '¢' : '&cent;',
+		  '£' : '&pound;',
+		  '¥' : '&yen;',
+		  '€' : '&euro;', 
+		  '©' : '&copy;',
+		  '®' : '&reg;',
+		  '<' : '&lt;', 
+		  '>' : '&gt;',  
+		  '"' : '&quot;', 
+		  '&' : '&amp;',
+		  '\'' : '&apos;'
+	  };
+	  return str.replace(/[\u00A0-\u9999<>\&''""]/gm, (c)=>replacements[c] ? replacements[c] : '&#' + c.charCodeAt(0) + ";");
+	}
+	encodeXML (str) {
+	  const replacements = {
+		  '<' : '&lt;', 
+		  '>' : '&gt;',  
+		  '"' : '&quot;', 
+		  '&' : '&amp;',
+		  '\'' : '&apos;'
+	  };
+	  return str.replace(/[<>=&']/gm, (c)=>replacements[c]);
 	}
 }
 

@@ -76,8 +76,11 @@ QUOTED: (ESC | ~["\\])*;
 QUOTED_BAD_BACKSLASH: '\\' ~["\\/bfnrt] ->type(ERROR);
 
 mode APOSTROPHED;
+ESCAPED_APOSTROPHE: '\\\'' ->type(QUOTED);
+ESCAPED_BACKSLASH: '\\\\' ->type(QUOTED);
+BAD_BACKSLASH: '\\';
 RAPOSTROPHE: '\'' ->popMode;
-APOSTROPHED_TEXT: ~[']* ->type(QUOTED);
+APOSTROPHED_TEXT: ~['\\]* ->type(QUOTED);
 
 mode BRACKETED;
 BRACKETED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
@@ -145,4 +148,6 @@ fragment KEYWORDS: (
 	| 'Substr'
 	| 'IndexOf'
 	| 'LastIndexOf'
+	| 'EncodeFor'
+	| '@EncodeDataFor'
 );
