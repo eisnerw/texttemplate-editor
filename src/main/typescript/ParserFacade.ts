@@ -884,7 +884,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			argValues[0] = args.accept(this);
 		} else if (args.constructor.name == 'ArgumentsContext'){
 			for (let i = 0; i < args.children.length; i++){
-				if ((method == 'Group' || method == 'OrderBy') && i == 0){
+				if ((method == 'GroupBy' || method == 'OrderBy') && i == 0){
 					// defer evaluation of the first parameter of a Group
 					argValues.push(null); // placeholder
 				} else {
@@ -1273,7 +1273,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'OrderBy':
-				case 'Group':
+				case 'GroupBy':
 					if (method == 'OrderBy'){
 						if (argValues.length == 1){
 							argValues.push('A');
@@ -1283,9 +1283,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					let oldContext : TemplateData = this.context;
 					let groups = {};
-					if (!(<any>value instanceof TemplateData)){
+					if (method == 'GroupBy' && argValues.length == 2 && !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(args.children[0].getText())){
+						// A formula or other non-identifier must be aliased
+						this.syntaxError('An alias (third parameter) must be provided for the GroupBy name', args.children[0]);
+					} else if (!(<any>value instanceof TemplateData)){
 						this.syntaxError('Invalid data type for ' + method, args.parentCtx);
-					} else if ((method == 'Group' && argValues.length != 3) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D')))){
+					} else if ((method == 'GroupBy' && argValues.length < 2) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D')))){
 						this.syntaxError('Invalid arguments for ' + method, args.parentCtx);
 					} else {
 						// temporarily set the context to the value being ordered or grouped
@@ -1322,6 +1325,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (method == 'OrderBy' && argValues[1] == 'D'){
 							keys.reverse();
 						}
+						let groupingName = argValues.length == 3 ? argValues[2] : args.children[0].getText(); // use an alias or the GroupBy identifier
 						keys.forEach((key)=>{
 							let group = groups[key];
 							if (method == 'OrderBy'){
@@ -1334,9 +1338,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									result.push(group);
 								}
 							} else {
+								// GroupBy
 								let data =  {};
-								data[argValues[1]] = key;
-								data[argValues[2]] = group;
+								data[groupingName] = key;
+								data[argValues[1]] = group;
 								result.push(new TemplateData(data));
 							}
 						});
@@ -1611,8 +1616,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result; 
 	}
 	compose = function(parts, mode){
+		// mode 0 is intermediate without resolving the bullets; mode 1 resolves bullets
 		if (typeof parts == 'object' && parts != null && !Array.isArray(parts)){
-			if (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing' || parts.type == 'date'){
+			if (mode == 0 && (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing' || parts.type == 'date')){
 				return parts; // don't compose if not appropriate
 			}
 			parts = [parts];  // do compose expects arrays

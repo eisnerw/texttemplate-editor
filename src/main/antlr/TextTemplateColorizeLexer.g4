@@ -137,7 +137,7 @@ fragment KEYWORDS: (
 	| 'ToDate'
 	| '@DateFormat'
 	| '@DateTest'
-	| 'Group'
+	| 'GroupBy'
 	| 'OrderBy'
 	| 'Trim'
 	| 'StartsWith'
