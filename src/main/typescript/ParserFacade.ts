@@ -469,6 +469,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	invokeMethods = function(valueContext, invocations){
 		let value : any = undefined;
+		let oldAnnotations : any = {};
+		Object.keys(this.annotations).forEach((key)=>{
+			oldAnnotations[key] = this.annotations[key];
+		});
 		if (valueContext != null){ // null implies that the value is the current context
 			let bTargetIsTemplate = valueContext.getText().startsWith('[') || valueContext.getText().startsWith('#'); // value will be obtained from a template
 			// process annotations first
@@ -535,6 +539,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 		});
+		if (JSON.stringify(this.annotations.bulletStyles) != JSON.stringify(oldAnnotations.bulletStyles)){
+			// the bullet style has changed, so compose the output before the styles get modified back
+			value = this.compose(value, 1);
+		}
+		this.annotations = oldAnnotations;
 		return value;
 	}
 	visitQuoteLiteral = function(ctx) {
@@ -700,7 +709,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			this.subtemplates = oldSubtemplates; // subtemplates are scoped, so remove the ones we found
 		}
 		if (result.length == 1){
-			return result[0];
+			result = result[0];
 		}
 		return result;
 	};
@@ -714,6 +723,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				listObject.list.push(this.visitChildren(ctx)[0]);
 				this.context = oldContext;
 			});
+			if (listObject.list.length == 1){
+				return listObject.list[0]; // no longer a list
+			}
 			return listObject;
 		} else {
 			value = this.visitChildren(ctx)[0];
@@ -806,16 +818,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx)[0]; // remove a level of arrays
 	};
 	visitTemplateSpec = function(ctx) {
-		let oldAnnotations = {};
-		Object.keys(this.annotations).forEach((key)=>{
-			oldAnnotations[key] = this.annotations[key];
-		});
-		let result = this.visitChildren(ctx);
-		this.annotations = oldAnnotations;
-		//if (Array.isArray(result) && result.length == 1){
-			return result[0];
-		//}
-		//return result;
+		let result = this.visitChildren(ctx)[0];
+		return result;
 	};
 	/* we SHOULD be collecting subtemplate info here, but processSubtemplates is used for performance reasons
 	visitSubtemplateSection = function(ctx) {
@@ -1183,16 +1187,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								result.push(this.context); // no filtering (or cloning) necessary 
 							}
 							this.context = oldContext; // restore old context
-							switch (result.length){
-								case 0:
-									value = undefined; // indication of missing value
-									break;
-								case 1:
-									value = result[0]; // single value is a dictionary
-									break;
-								default:
-									value = new TemplateData(result, this.context); // multivalues is a list
-									break;
+							if (result.length == 0){
+								value = undefined; // indication of missing value
+							} else {
+								value = new TemplateData(result, this.context);
 							}
 						}
 						if (method == 'Count'){
@@ -1663,8 +1661,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (item != null && typeof item == 'object'){
 				switch (item.type){
 					case 'bullet':
-						for (iParts++; iParts < parts.length; iParts++){
-							item.parts.push(parts[iParts]); // repackage the remaining parts under the indent object 
+						if (parts.length > 1){
+							// create a new bullet object to avoid a side effect
+							let bulletParts = [];
+							item.parts.forEach((part)=>{
+								bulletParts.push(part);
+							});
+							item = {type: 'bullet', bullet: item.bullet, parts: bulletParts}; 
+							for (iParts++; iParts < parts.length; iParts++){
+								item.parts.push(parts[iParts]); // repackage the remaining parts by adding them to the bullet object 
+							}
 						}
 						break;
 					case 'missing':
@@ -1705,7 +1711,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}	
 					} else {
-						let x = 'stop';
+						let x = 'stop'; // unexpected
 					}
 				} else {
 					// list
@@ -1718,7 +1724,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let indentObject = itemResult;
 							// let the next level handle an array of items that aren't lists or indents
 							if (!this.containsBullet(indentObject)){
-								indentObject = {type:'bullet', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet, styles: this.annotations.bulletStyles};
+								indentObject = {type:'bullet', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
 								let doComposeParm = [indentObject];
@@ -1884,7 +1890,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level, this.annotations.bulletStyles);
 						}
 						text = text.replace(/[ \t]*\x01\{\.\}/, indent + (this.bulletIndent != null ? this.bulletIndent.getBullet() : ''));
-					} else if (this.bulletIndent != null) {
+					} else if (this.bulletIndent != null && /\S/.test(text)) {
 						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
 						let nextLineIndent = text.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
 						while (this.bulletIndent != null && this.bulletIndent.indent.length >= nextLineIndent.length){
@@ -1895,6 +1901,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					// during mode 0, capture the unique bullets
 					let bullet = text.replace(/^([ \t]*\x01\{\.\}).*$/, '$1');
 					output.bullets[bullet] = {bullet: bullet, length: bullet.length};
+					if (lines[lines.length - 1] != ''){
+						// bullets must start on a new line
+						lines.push('');
+					}
 				}
 				lines[lines.length - 1] += text;
 				if (i < (arText.length - 1)){

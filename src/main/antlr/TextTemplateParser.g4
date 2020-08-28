@@ -14,7 +14,7 @@ subtemplateSpecs: subtemplateSpec*;
 
 subtemplateSpec: templateContextToken text*;
 
-templateContents: (subtemplateSection | bullet | templateToken | templateContextToken | text+);
+templateContents: beginningBullet? (subtemplateSection | bullet | templateToken | templateContextToken | text+);
 
 bullet: NL BULLET SPACES?;
 
@@ -48,7 +48,7 @@ templateContextToken: LBRACE ((namedSubtemplate | optionallyInvoked) COLON | COL
 
 templateSpec: namedSubtemplate | bracketedTemplateSpec;
 
-bracketedTemplateSpec: LBRACKET beginningBullet? templateContents* subtemplateSection? RBRACKET;
+bracketedTemplateSpec: LBRACKET templateContents* subtemplateSection? RBRACKET;
 
 invokedTemplateSpec: LBRACKET beginningBullet? templateContents* RBRACKETLP;
 

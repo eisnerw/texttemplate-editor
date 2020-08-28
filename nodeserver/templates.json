@@ -63,7 +63,7 @@
 		"      {.} FirstName: {firstName}  ",
 		"      {.} Pets {pets=>[({pets.Count()}):  ",
 		"         {.} Domesticated{#dpetcnt > 1->[ ({#dpetcnt})]}: {pets.#Domesticated():[{#formatPet}]}  ",
-		"         {.} Non-domesticated{#ndpetcnt > 1->[({#ndpetcnt})]} : {pets.#NonDomesticated():[{#formatPet}]}",
+		"         {.} Non-domesticated{#ndpetcnt > 1->[({#ndpetcnt})]}: {pets.#NonDomesticated():[{#formatPet}]}",
 		"   ],[no pets]",
 		"   } //",
 		"].@MissingValue('No Information Provided').@BulletStyle('I.','(a)','•','1.')}",
