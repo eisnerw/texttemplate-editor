@@ -11,6 +11,7 @@ import moment = require('moment');
 var parsedTemplates = {};
 var parsedTokens = {};
 var processedSubtemplates = null; // keeps a tree of the latest subtemplates and any local subtemplates within them, including where they were found in the editor
+declare let foundJsonObjects; // used by TemplateData to prevent loops
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
@@ -254,6 +255,11 @@ class TemplateData {
 	toJson(indentLevel? : number) : string {
 		let result : string = '';
 		let bComma = false;
+		if (indentLevel == null){
+			indentLevel = 0;
+			window.foundObjects = [];
+		}
+		window.foundObjects.push(this);
 		if (this.type == 'list'){
 			result += '[\n';
 			this.list.forEach((dict) =>{
@@ -268,21 +274,21 @@ class TemplateData {
 			} else {
 				result += '{\n';
 				keys.forEach((keyname) => {
-					if (!/(^\^|^\$\d+$)/.test(keyname)){ // avoid trying to stringify the parent or $ variables, which could point to itself
-						let value : any = this.dictionary[keyname];
-						result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
-						if (value instanceof TemplateData){
+					let value : any = this.dictionary[keyname];
+					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
+					if (value instanceof TemplateData){
+						if (!window.foundObjects.includes(value)){
 							result += (<TemplateData>value).toJson(indentLevel + 1);
-						} else if (value == null) {
-							result += 'null';
-						} else if (typeof value == 'string') {
-							result += ('"' + value.replace(/\n/g,'\\n') + '"');
-						} else {
-							result += value.toString();
 						}
-						result += '\n';
-						bComma = true;
+					} else if (value == null) {
+						result += 'null';
+					} else if (typeof value == 'string') {
+						result += ('"' + value.replace(/\n/g,'\\n') + '"');
+					} else {
+						result += value.toString();
 					}
+					result += '\n';
+					bComma = true;
 				});
 				result += (this.indent(indentLevel) + '}');
 			}
@@ -714,7 +720,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let childResult = ctx.children[i].accept(this);
 				if (lastChildIndex != 1 && typeof childResult == 'object' && childResult != null && childResult.constructor.name == 'TemplateData'){
 					this.syntaxError('Data needs to be interpolated with a subtemplate', ctx.children[i]);
-					childResult = childResult.toJson().replace(/\n/g,'');
+					childResult = childResult.toJson();
 				}
 				result.push(childResult);
 			}
@@ -2090,6 +2096,7 @@ class RelocatingCollectorErrorListener extends CollectorErrorListener {
 declare global {
   interface Window {
     ParserFacade: any;
+	foundObjects: any;
   }
 }
 
