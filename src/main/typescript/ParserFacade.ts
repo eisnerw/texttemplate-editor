@@ -268,19 +268,21 @@ class TemplateData {
 			} else {
 				result += '{\n';
 				keys.forEach((keyname) => {
-					let value : any = this.dictionary[keyname];
-					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
-					if (value instanceof TemplateData){
-						result += (<TemplateData>value).toJson(indentLevel + 1);
-					} else if (value == null) {
-						result += 'null';
-					} else if (typeof value == 'string') {
-						result += ('"' + value.replace(/\n/g,'\\n') + '"');
-					} else {
-						result += value.toString();
+					if (!/(^\^|^\$\d+$)/.test(keyname)){ // avoid trying to stringify the parent or $ variables, which could point to itself
+						let value : any = this.dictionary[keyname];
+						result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
+						if (value instanceof TemplateData){
+							result += (<TemplateData>value).toJson(indentLevel + 1);
+						} else if (value == null) {
+							result += 'null';
+						} else if (typeof value == 'string') {
+							result += ('"' + value.replace(/\n/g,'\\n') + '"');
+						} else {
+							result += value.toString();
+						}
+						result += '\n';
+						bComma = true;
 					}
-					result += '\n';
-					bComma = true;
 				});
 				result += (this.indent(indentLevel) + '}');
 			}
