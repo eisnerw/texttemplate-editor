@@ -165,6 +165,7 @@ class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
 	private parent : TemplateData;
+	static foundObjects : any; // used to protect against ToJson loops
 	type: string;
 	constructor(jsonData: string | {} | [], parent?: TemplateData) {
 		let json: {};
@@ -257,9 +258,9 @@ class TemplateData {
 		let bComma = false;
 		if (indentLevel == null){
 			indentLevel = 0;
-			window.foundObjects = [];
+			TemplateData.foundObjects = [];
 		}
-		window.foundObjects.push(this);
+		TemplateData.foundObjects.push(this);
 		if (this.type == 'list'){
 			result += '[\n';
 			this.list.forEach((dict) =>{
@@ -277,7 +278,7 @@ class TemplateData {
 					let value : any = this.dictionary[keyname];
 					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
 					if (value instanceof TemplateData){
-						if (!window.foundObjects.includes(value)){
+						if (!TemplateData.foundObjects.includes(value)){
 							result += (<TemplateData>value).toJson(indentLevel + 1);
 						}
 					} else if (value == null) {
@@ -2096,7 +2097,6 @@ class RelocatingCollectorErrorListener extends CollectorErrorListener {
 declare global {
   interface Window {
     ParserFacade: any;
-	foundObjects: any;
   }
 }
 
