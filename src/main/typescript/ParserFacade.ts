@@ -168,7 +168,12 @@ class TemplateData {
 	constructor(jsonData: string | {} | [], parent?: TemplateData) {
 		let json: {};
 		if (typeof jsonData == 'string') {
-			json = JSON.parse(jsonData);
+			if (jsonData.startsWith('{') || jsonData.startsWith('[')){
+				json = JSON.parse(jsonData);
+			} else {
+				// TemplateData supports arrays of strings by making them lists of dictionaries with a single 
+				json = JSON.parse('{"_": "' + jsonData.replace('"','\\"') + '"}');
+			}
 		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
 			let array: [] = jsonData;
@@ -252,28 +257,33 @@ class TemplateData {
 		if (this.type == 'list'){
 			result += '[\n';
 			this.list.forEach((dict) =>{
-				result += ((bComma ? ',' : this.indent(indentLevel + 1)) + dict.toJson(indentLevel + 1)); 
+				result = (result + ((bComma ? ',' : this.indent(indentLevel + 1)) + dict.toJson(indentLevel + 1))).replace(/\n\s*\n/,'\n');
 				bComma = true;
 			});
 			result += ('\n' + this.indent(indentLevel) + ']');
 		} else {
-			result += '{\n';
-			Object.keys(this.dictionary).forEach((keyname) => {
-				let value : any = this.dictionary[keyname];
-				result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
-				if (value instanceof TemplateData){
-					result += (<TemplateData>value).toJson(indentLevel + 1);
-				} else if (value == null) {
-					result += 'null';
-				} else if (typeof value == 'string') {
-					result += ('"' + value.replace(/\n/g,'\\n') + '"');
-				} else {
-					result += value.toString();
-				}
-				result += '\n';
-				bComma = true;
-			});
-			result += (this.indent(indentLevel) + '}');
+			let keys = Object.keys(this.dictionary);
+			if (keys.length == 1 && keys[0] == '_'){
+				result += ('\n' + this.indent(indentLevel) + '"' + this.dictionary[keys[0]].replace(/["]/g,"\\\"") + '"');
+			} else {
+				result += '{\n';
+				keys.forEach((keyname) => {
+					let value : any = this.dictionary[keyname];
+					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
+					if (value instanceof TemplateData){
+						result += (<TemplateData>value).toJson(indentLevel + 1);
+					} else if (value == null) {
+						result += 'null';
+					} else if (typeof value == 'string') {
+						result += ('"' + value.replace(/\n/g,'\\n') + '"');
+					} else {
+						result += value.toString();
+					}
+					result += '\n';
+					bComma = true;
+				});
+				result += (this.indent(indentLevel) + '}');
+			}
 		}
 		return result;
 	}
@@ -296,7 +306,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	input;
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
-	annotations = {bulletStyles: null};
+	annotations = {bulletStyles: null, bulletMode: 'implicit'};
 	subtemplateLevel = ''; // keeps track of subtemplates with subtemplates
 	
 	visitText = function(ctx){
@@ -308,8 +318,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitIdentifier = function(ctx) {
 		var key = ctx.getText();
-		let value = undefined; 
-		if (key.startsWith('@.')){
+		let value = undefined;
+		if (key == '@'){
+			return new TemplateData(JSON.stringify(this.annotations), this.context);
+		} else if (key.startsWith('@.')){
 			if (key == '@.Tokens' || key == '@.Tree'){
 				let parentName;
 				let parent = ctx;
@@ -699,8 +711,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
 				let childResult = ctx.children[i].accept(this);
 				if (lastChildIndex != 1 && typeof childResult == 'object' && childResult != null && childResult.constructor.name == 'TemplateData'){
-					this.syntaxError('Invalid data type', ctx.children[i]);
-					childResult = 'ERROR: Invalid data type';
+					this.syntaxError('Data needs to be interpolated with a subtemplate', ctx.children[i]);
+					childResult = childResult.toJson().replace(/\n/g,'');
 				}
 				result.push(childResult);
 			}
@@ -1408,6 +1420,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value['missingValue'] = argValues[0];
 					break;
 					
+				case '@BulletMode':
+					let mode = argValues[0].toLowerCase();
+					if (mode != 'explicit' && mode != 'implicit'){
+						this.syntaxError('Invalid Bullet Mode', args.children[0]);
+					} else {
+						value['bulletMode'] = mode;
+					}
+					break;
+					
 				case '@DateFormat':
 					value['dateFormat'] = argValues[0];
 					break;
@@ -1896,7 +1917,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							this.bulletIndent = new BulletIndent(indent, this.bulletIndent, bulletObject.level, this.annotations.bulletStyles);
 						}
 						text = text.replace(/[ \t]*\x01\{\.\}/, indent + (this.bulletIndent != null ? this.bulletIndent.getBullet() : ''));
-					} else if (this.bulletIndent != null && /\S/.test(text)) {
+					} else if (this.bulletIndent != null && /\S/.test(text) && this.annotations.bulletMode == 'implicit') {
 						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
 						let nextLineIndent = text.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
 						while (this.bulletIndent != null && this.bulletIndent.indent.length >= nextLineIndent.length){

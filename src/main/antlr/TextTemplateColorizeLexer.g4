@@ -150,4 +150,6 @@ fragment KEYWORDS: (
 	| 'LastIndexOf'
 	| 'EncodeFor'
 	| '@EncodeDataFor'
+	| '@BulletMode'
+	| '@Falsy'
 );
