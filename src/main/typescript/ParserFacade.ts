@@ -397,11 +397,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
 			let context : any;
 			// (Not sure why we were ignoring url errors)
-			//let oldErrors = [];
+			let oldErrors = [];
 			// make a shallow copy so we can undo any errors while acquiring a context url
-			//this.errors.forEach((error)=>{
-			//	oldErrors.push(error);
-			//});
+			this.errors.forEach((error)=>{
+				oldErrors.push(error);
+			});
 			if (ctx.children[1].constructor.name == 'NamedSubtemplateContext'){
 				context = ctx.children[1].accept(this);
 			} else {
@@ -412,7 +412,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				context = context[0]; // support templates as contexts
 			}
 			if (typeof context === 'string'){
-				//this.errors = oldErrors; // wipe out errors acquiring the url string
+				// wiping out errors acquiring the url string before the url has been resolved
+				this.errors.forEach((error)=>{
+					if (error.message.includes('Error loading subtemplate')){
+						oldErrors.push(error); // keep loading errors
+					}
+				});
+				this.errors = oldErrors; 
 				try{
 					if (context.toLowerCase().startsWith('http') || context.startsWith('/')){
 						if (urls[context] && urls[context].data){
