@@ -396,11 +396,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
 		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
 			let context : any;
-			let oldErrors = [];
+			// (Not sure why we were ignoring url errors)
+			//let oldErrors = [];
 			// make a shallow copy so we can undo any errors while acquiring a context url
-			this.errors.forEach((error)=>{
-				oldErrors.push(error);
-			});
+			//this.errors.forEach((error)=>{
+			//	oldErrors.push(error);
+			//});
 			if (ctx.children[1].constructor.name == 'NamedSubtemplateContext'){
 				context = ctx.children[1].accept(this);
 			} else {
@@ -411,7 +412,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				context = context[0]; // support templates as contexts
 			}
 			if (typeof context === 'string'){
-				this.errors = oldErrors; // wipe out errors acquiring the url string
+				//this.errors = oldErrors; // wipe out errors acquiring the url string
 				try{
 					if (context.toLowerCase().startsWith('http') || context.startsWith('/')){
 						if (urls[context] && urls[context].data){
@@ -494,6 +495,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		Object.keys(this.annotations).forEach((key)=>{
 			oldAnnotations[key] = this.annotations[key];
 		});
+		let oldSubtemplates = []; // only needed if this spec contains subtemplates
+		// clone the current subtemplates in case methods add new ones that overwrite more global ones
+		for (let key in this.subtemplates){
+			oldSubtemplates[key] = this.subtemplates[key];
+		}
 		if (valueContext != null){ // null implies that the value is the current context
 			let bTargetIsTemplate = valueContext.getText().startsWith('[') || valueContext.getText().startsWith('#'); // value will be obtained from a template
 			// process annotations first
@@ -506,7 +512,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					if (method.startsWith('@')){
 						let args : any = child.children[1];
-						this.callMethod(method, this.annotations, args); // modify the current annotations so that existing annotations are inherited
+						if (false && method == '@Include'){
+							this.callMethod(method, oldAnnotations, args); // let include modify the annotations that will be restored
+						} else {
+							this.callMethod(method, this.annotations, args); // modify the current annotations so that existing annotations are inherited
+						}
 					}
 				});
 			}
@@ -565,6 +575,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			value = this.compose(value, 1);
 		}
 		this.annotations = oldAnnotations;
+		this.subtemplates = oldSubtemplates;
 		return value;
 	}
 	visitQuoteLiteral = function(ctx) {
@@ -744,6 +755,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				listObject.list.push(this.visitChildren(ctx)[0]);
 				this.context = oldContext;
 			});
+			let refinedList = [];
+			listObject.list.forEach((item)=>{
+				if (this.compose(item, 0) != null){
+					refinedList.push(item);
+				}
+			});
+			if (refinedList.length == 0){
+				refinedList.push({type: 'missing', missingValue: this.annotations.missingValue, key: 'list'});
+			}
+			listObject.list = refinedList;
 			if (listObject.list.length == 1){
 				return listObject.list[0]; // no longer a list
 			}
@@ -1385,7 +1406,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 					}
 					if (value instanceof TemplateData){
-						value = value.toJson(0);
+						value = value.toJson();
 					} else if (args.parentCtx.parentCtx && args.parentCtx.parentCtx.children[0]){
 						let obj = {};
 						let templateText : string = args.parentCtx.parentCtx.children[0].getText();
@@ -1422,7 +1443,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case '@Include':
 					let templateName = argValues[0];
-					this.visitNamedSubtemplate(args, templateName, true); // run the named subtemplate, preserving the loaded subtemplates
+					let oldAnnotations = this.annotations;
+					this.annotations = value; // this method is called on higher level template's annotations, so let any @ methods modify it
+					this.visitNamedSubtemplate(args, templateName, true); // run the named subtemplate, preserving any loaded subtemplates
+					this.annotations = oldAnnotations;
 					break;
 					
 				case '@MissingValue':
@@ -1980,7 +2004,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let offset = this.getOffsetsFromProcessedSubtemplates(this.subtemplateLevel);
 		let startColumnOffset = ctx.start.line == 1 ? offset.columnOffset : 0;
 		let stopColumnOffset = ctx.stop.line == 1 ? offset.columnOffset : 0;
-		this.errors.push(new Error(ctx.start.line + offset.lineOffset, ctx.stop.line + offset.lineOffset, ctx.start.column + 1 + startColumnOffset, ctx.stop.column + stopColumnOffset, msg));
+		this.errors.push(new Error(ctx.start.line + offset.lineOffset, ctx.stop.line + offset.lineOffset, ctx.start.column + 1 + startColumnOffset, ctx.stop.column + 1 + stopColumnOffset, msg));
 	}
 	getOffsetsFromProcessedSubtemplates(subtemplateLevel){
 		// this routine navigates through the output of processSubtemplates to find the locations in the editor of subtemplates
