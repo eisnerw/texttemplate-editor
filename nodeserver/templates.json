@@ -563,8 +563,8 @@
 		"// '3' to see ungrouped data",
 		"{'1'.#grouping()} ",
 		"Subtemplates:",
-		"{#grouping:[{$0.Case(3,[{#ungrouped}],2,[{#bySign}],[{#byDate}])}]}",
-		"{#byDate:[{'/data/famousBirthdays'.GroupBy(dob.ToDate('MM'),'group','month'):",
+		"{#grouping:[{$0.Case(3,[{#ungrouped}],2,[{#bySign}],[{#byDate}])}].@Falsy(/^0$/)}",
+		"{#byDate:[{'/data/famousBirthdays'.Where(!isAlive).GroupBy(dob.ToDate('MM'),'group','month'):",
 		"     [{[2020-{month}-01].ToDate('MMMM')}{ // using the date formatter for the month",
 		"        group.GroupBy(dob.ToDate('DD'),'daygroup','day')",
 		"          .OrderBy(day):[{day}",
@@ -580,6 +580,6 @@
 		"{#name:[{fname->[{fname} ]}{lname}]}               ",
 		"{#date:[({dob.ToDate()})]}",
 		"{#ungrouped:[{'/data/famousBirthdays'.OrderBy(lname.ToUpper()):",
-		"   [{#name} {#date} {sign}]}]}"
+		"   [{#name} {#date} {sign}{!isAlive->[ (dead)]}]}]}"
 	]
 }

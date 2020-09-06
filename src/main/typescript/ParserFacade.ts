@@ -586,7 +586,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	}
 	visitQuoteLiteral = function(ctx) {
 		let value = ctx.getText()
-		return this.decodeQuote(value.substr(1, value.length - 2));
+		return this.decodeQuote(value.substr(1, value.length - 2),ctx);
 	};
 	visitApostropheLiteral = function(ctx) {
 		let value = ctx.getText();
@@ -617,7 +617,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitQuotedArgument = function(ctx) {
 		let value = ctx.getText();
-		return this.decodeQuote(value.substr(1, value.length - 2));
+		return this.decodeQuote(value.substr(1, value.length - 2),ctx);
 	};
 	visitApostrophedArgument = function(ctx) {
 		let value = ctx.getText();
@@ -659,6 +659,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		// testing to see if the identifier has a value
 		let value = this.visitIdentifier(ctx.children[0]);
 		if (!this.valueIsMissing(value) && value != ''){
+			if (this.annotations.falsy != null && this.annotations.falsy.test(value)){
+				return false;
+			}
 			return true;
 		}
 		return false;
@@ -1019,6 +1022,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'EncodeFor'
 		)){
 			error = 'ERROR: missing argument for ' + method + ': ' + args.getText();
+		} else if (args.children && args.children.length > 1 && (
+			method == '@DateTest'
+			|| method == '@Falsy'
+		)){
+			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
 		} else if ((args.children && args.children.length > 1 || argValues[0] == null) && (
 			method == 'GreaterThan' 
 			|| method == 'LessThan' 
@@ -1222,7 +1230,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									Object.keys(dollarVariables).forEach((key)=>{
 										newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables
 									});
-									if (args.children[0].accept(this)[0]){
+									let addToResult = args.children[0].accept(this)[0];
+									if (typeof addToResult == "string" && this.annotations.falsy && this.annotations.falsy.test(addToResult)){
+										addToResult = false;
+									}
+									if (addToResult){
 										// the condition returned true; add a clone of the iteration 
 										Object.keys(dollarVariables).forEach((key)=>{
 											delete newContext.dictionary[key];  // remove the added $ variables
@@ -1502,6 +1514,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.syntaxError("Parameter must be 'xml', 'html' or 'uri'", args.parentCtx);
 					} else {
 						this.annotations['encoding'] = encoding;
+					}
+					break;
+					
+				case '@Falsy':
+					if (argValues.length == 0){
+						delete this.annotations['falsy'];
+					} else if (argValues.length != 1 || argValues[0].constructor.name != 'RegExp'){
+						this.syntaxError('@Falsy takes a single regular expression', args.parentCtx)
+					} else {
+						value['falsy'] = argValues[0];
 					}
 					break;
 					
@@ -2000,10 +2022,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		//return value.replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\b/g,'\b').replace(/\\f/g,'\f').replace(/\\r/g,'\r').replace(/\\t/g,'\t').replace(/\\\//g,'\/'); 
 		return value.replace(/\\n/g,'\n').replace(/\\'/g,"'").replace(/\\\\/g,'\\').replace(/\\\//g,'\/'); 
 	}
-	decodeQuote(value){
+	decodeQuote(value, ctx){
 		// using the JSON parser to unescape the string
-		let tempJson = JSON.parse('{"data":"' + value + '"}');
-		return tempJson.data;
+		try {
+			let tempJson = JSON.parse('{"data":"' + value + '"}');
+			return tempJson.data;
+		} catch (e){
+			this.syntaxError('Invalid quote literal', ctx);
+			return '';
+		}
 	}
 	syntaxError(msg, ctx){
 		console.error(msg);
