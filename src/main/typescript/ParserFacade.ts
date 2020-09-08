@@ -951,6 +951,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		let parentCtx : any = args.parentCtx;
+		if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (
+			method == 'ToUpper' 
+			|| method == 'ToLower'  
+			|| method == 'Trim' 
+			|| method == 'EncodeFor'
+		)){
+			value = this.compose(value, 2); // turn the value into a string
+		}
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "InvokedTemplateSpecContext";
 		let error : string = null;
@@ -1191,6 +1199,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value = list.join('');
 					}
 					break;
+				
+				case 'Compose':
+					value = this.compose(value,1);
+					break
 					
 				case 'Count':
 				case 'Where':
@@ -1739,6 +1751,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let composed = output.lines.join('\n');
 			output = {lines: [""], skipping: false, mode: 1, bullets: bullets};
 			this.doCompose([composed], output, null);
+		}
+		if (mode == 1){
+			this.bulletIndent = null;
 		}
 		return output.lines.join('\n');
 	}

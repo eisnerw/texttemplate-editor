@@ -152,4 +152,5 @@ fragment KEYWORDS: (
 	| '@EncodeDataFor'
 	| '@BulletMode'
 	| '@Falsy'
+	| 'Compose'
 );
