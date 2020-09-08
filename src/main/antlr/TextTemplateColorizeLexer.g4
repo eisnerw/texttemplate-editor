@@ -153,4 +153,5 @@ fragment KEYWORDS: (
 	| '@BulletMode'
 	| '@Falsy'
 	| 'Compose'
+	| '@DefaultIndent'
 );

@@ -25,6 +25,9 @@ class BulletIndent {
 	public parent : BulletIndent;
 	public lastBullet = '';
 	public bulletStyles = null;
+	// the next is used to indicate that we've returned from a level where we could have honored a style 
+	// initializer (e.g., "I:IV") so don't do that the next time we visit levels above this one
+	public styleInitializerLevel : number = null; 
 	constructor(indent : string = null, currentBulletIndent : BulletIndent = null, level = null, bulletStyles = null){
 		if (indent == null){
 			// indicates an empty BulletIndent
@@ -43,6 +46,7 @@ class BulletIndent {
 			this.level = currentBulletIndent.level;
 			this.index = currentBulletIndent.index + 1;
 			this.parent = currentBulletIndent.parent;
+			this.styleInitializerLevel = currentBulletIndent.styleInitializerLevel;
 		} else {
 			// search for the same level
 			let matchingLevel : BulletIndent = currentBulletIndent.parent; // used to find a previous level
@@ -52,16 +56,18 @@ class BulletIndent {
 					this.level = matchingLevel.level;
 					this.index = matchingLevel.index + 1;
 					this.parent = matchingLevel.parent;
+					this.styleInitializerLevel = this.level; // don't honor style initializers above this level
 					break;
 				} else {
 					matchingLevel = matchingLevel.parent;
 				}
 			} 
 			if (matchingLevel == null){
-				// create a new level even if this indent is less than the previous
+				// create a new level
 				this.level = level == null ? (currentBulletIndent.level + 1) : level;
 				this.index = 0;
 				this.parent = currentBulletIndent;
+				this.styleInitializerLevel = currentBulletIndent.styleInitializerLevel;
 			}
 		}
 	}
@@ -74,13 +80,14 @@ class BulletIndent {
 		cloneBulletIndent.parent = this.parent;
 		cloneBulletIndent.lastBullet = this.lastBullet;
 		cloneBulletIndent.bulletStyles = this.bulletStyles;
+		cloneBulletIndent.styleInitializerLevel = this.styleInitializerLevel;
 		return cloneBulletIndent;
 	}
 	getBullet(){
 		let bullet;
 		let bulletStyles = this.bulletStyles;
 		if (bulletStyles == null || bulletStyles.length == 0){
-			bullet = '(' + this.level + '.' + this.index + ')'; // TODO: bullet style
+			bullet = '(' + this.level + '.' + this.index + ')'; // TODO: default bullet style
 		} else {
 			let bulletStyle = bulletStyles[this.level < bulletStyles.length ? this.level : bulletStyles.length - 1];
 			let padding = '';
@@ -90,10 +97,22 @@ class BulletIndent {
 			}
 			let prefix = '';
 			let postfix = '';
-			if (/^.*%[Ii1Aa].*$/.test(bulletStyle)){
-				prefix = bulletStyle.replace(/^(.*)%[Ii1Aa].*$/,'$1');
-				postfix = bulletStyle.replace(/^.*%[Ii1Aa](.*)$/,'$1');
-				bulletStyle = bulletStyle.replace(/^.*%([Ii1Aa]).*$/,'$1');
+			let bulletType = '';
+			// support styles like 'i', 'i:iv', 'I', 'I:LV', '1', '1:13', 'a', 'a:d', 'A', 'A:AF'
+			if (/^.*(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/.test(bulletStyle)){
+				prefix = bulletStyle.replace(/^(.*?)(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
+				postfix = bulletStyle.replace(/^.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A)(.*)$/,'$2');
+				bulletStyle = bulletStyle.replace(/^.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
+				bulletType = bulletStyle.substr(0, 1);
+				if (bulletStyle.includes(':')){
+					if (this.styleInitializerLevel != null && this.level > this.styleInitializerLevel){
+						// ignore the style initializer because we've already popped back to a level above this
+						bulletStyle = bulletType; 
+					} else {
+						// capture the style initializer, which is the value after the ':'
+						bulletStyle = bulletStyle.substr(bulletStyle.indexOf(':') + 1);
+					}
+				}
 			} else if (bulletStyle.length > 1){
 				if ('(<#$%*.-=+`~[{_=+|\'"'.includes(bulletStyle.substr(0,1))){
 					prefix = bulletStyle[0];
@@ -105,24 +124,24 @@ class BulletIndent {
 				}
 			}
 			bullet = bulletStyle;
-			if (bulletStyle.length == 1){
-				switch (bulletStyle){
+			if (bulletType.length == 1){
+				switch (bulletType){
 					case 'I':
-						bullet = this.numberToRoman(this.index + 1);
+						bullet = this.numberToRoman(this.index + (bulletStyle != 'I' ? this.romanToNumber(bulletStyle) : 1));
 						break;
 					
 					case 'i':
-						bullet = this.numberToRoman(this.index + 1).toLowerCase();
+						bullet = this.numberToRoman(this.index + (bulletStyle != 'i' ? this.romanToNumber(bulletStyle) : 1)).toLowerCase();
 						break;
 					
 					case '1':
-						bullet = (this.index + 1).toString();
+						bullet = (this.index + (bulletStyle != '1' ? parseInt(bulletStyle) : 1)).toString();
 						break;
 					
 					case 'A':
 					case 'a':
-						bullet = this.numberToAlphabet(this.index + 1);
-						if (bulletStyle == 'a'){
+						bullet = this.numberToAlphabet(this.index + (bulletStyle.toLowerCase() != 'a' ? this.alphabetToNumber(bulletStyle) : 1));
+						if (bulletType == 'a'){
 							bullet = bullet.toLowerCase();
 						}
 						break;
@@ -148,8 +167,28 @@ class BulletIndent {
 		}
 		return s;
 	}
+	romanToNumber(romanNumeral : string) : number {
+	  let DIGIT_VALUES = {I: 1,V: 5,X: 10,L: 50,C: 100,D: 500,M: 1000};
+	  let result = 0;
+	  let input = romanNumeral.toUpperCase().split('');
+	  for (let i = 0; i < input.length; i++) {
+		let currentLetter = DIGIT_VALUES[input[i]];
+		let nextLetter = DIGIT_VALUES[input[i + 1]];
+		if (currentLetter == null) {
+		  return -1;
+		} else {
+		  if (currentLetter < nextLetter) {
+			result += nextLetter - currentLetter;
+			i++;
+		  } else {
+			result += currentLetter;
+		  }
+		}
+	  }
+	  return result;
+	}
 	numberToAlphabet (num : number) {
-		// from Chris West
+		// from Chris West's routine to convert spreadsheet columns to numbers and back
 		let ret = '';
 		let b = 26;
 		for (let a = 1; (num -a) >= 0; b *= 26) {
@@ -159,6 +198,13 @@ class BulletIndent {
 		}
 		return ret;
 	}
+	alphabetToNumber(alpha : string) : number {
+		let number = 0;
+		for (let i = alpha.length, j = 0; i--; j++) {
+			number += Math.pow(26, i) * (alpha.toUpperCase().charCodeAt(j) - 64);
+		}
+		return number;
+	}	
 }
 
 class TemplateData {
@@ -757,7 +803,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitMethodableTemplateSpec = function(ctx) {
 		let value : any;
 		if (this.context && this.context.type == 'list'){
-			let listObject = {list: [], type:'list'};
+			let listObject = {list: [], type: 'list', defaultIndent: this.annotations.defaultIndent};
 			this.context.iterateList((newContext : TemplateData)=>{
 				let oldContext : TemplateData = this.context;
 				this.context = newContext;
@@ -923,7 +969,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 		}
-		return {type:'bullet', bullet: text.replace('{','\x01{'), parts: []};
+		return {type:'bullet', bullet: text.replace('{','\x01{'), defaultIndent: this.annotations.defaultIndent, parts: []};
 	};
 	visitBeginningBullet = function(ctx) {
 		return this.visitBullet(ctx);
@@ -1033,6 +1079,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else if (args.children && args.children.length > 1 && (
 			method == '@DateTest'
 			|| method == '@Falsy'
+			|| method == '@DateFormat'
+			|| method == '@DefaultIndent'
 		)){
 			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
 		} else if ((args.children && args.children.length > 1 || argValues[0] == null) && (
@@ -1493,12 +1541,28 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 					
 				case '@DateFormat':
-					value['dateFormat'] = argValues[0];
+					if (argValues.length == 0){
+						delete value['dateFormat'];
+					} else {
+						value['dateFormat'] = argValues[0];
+					}
+					break;
+
+				case '@DefaultIndent':
+					if (argValues.length == 0){
+						delete value['defaultIndent'];
+					} else {
+						let nDefaultIndent = parseInt(argValues[0]);
+						if (isNaN(nDefaultIndent) || nDefaultIndent > 25 || nDefaultIndent < 1){
+							this.syntaxError('@DefaultIndent takes a numerical argument between 1 and 25', args);
+						} else {
+							value['defaultIndent'] = (' ' + new Array(nDefaultIndent).join(' ')); // generates a string of n blanks
+						}
+					}
 					break;
 
 				case '@DateTest':
 					if (argValues.length == 0){
-						// remove the date test
 						delete value['dateTest'];
 					} else if (argValues.length != 1 || argValues[0].constructor.name != 'RegExp'){
 						this.syntaxError('@DateTest takes a single regular expression', args.parentCtx)
@@ -1770,7 +1834,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							item.parts.forEach((part)=>{
 								bulletParts.push(part);
 							});
-							item = {type: 'bullet', bullet: item.bullet, parts: bulletParts}; 
+							item = {type: 'bullet', bullet: item.bullet, parts: bulletParts, defaultIndent: item.defaultIndent}; 
 							for (iParts++; iParts < parts.length; iParts++){
 								item.parts.push(parts[iParts]); // repackage the remaining parts by adding them to the bullet object 
 							}
@@ -1830,13 +1894,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (!!indent && indent.includes('\x01{.}')){
 						// This is an unbulleted list under a bullet, so we need to turn each list item into an indent object with an indented bullet
 						let bIncompleteBullet = /^[ \t]*\x01\{\.\}[ \t]*$/.test(lines[lines.length - 1]);
-						let newBullet = indent.replace(/([ \t]*\x01\{\.\})/,'   ' + '$1'); // TODO: allow override of default tab
+						let defaultIndent = item.defaultIndent == null ? '   ' : item.defaultIndent;
+						let newBullet = indent.replace(/([ \t]*\x01\{\.\})/, defaultIndent + '$1'); 
 						for (let i = 0; i < item.list.length; i++){
 							let itemResult = item.list[i];
 							let indentObject = itemResult;
 							// let the next level handle an array of items that aren't lists or indents
 							if (!bNextLineStartsWithBullet){
-								indentObject = {type:'bullet', parts: itemResult, bullet: bIncompleteBullet ? indent : newBullet};
+								indentObject = {type: 'bullet', parts: itemResult, defaultIndent: defaultIndent, bullet: bIncompleteBullet ? indent : newBullet};
 							}
 							if (i == 0){
 								let doComposeParm = [indentObject];
@@ -1863,7 +1928,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// create a list and indent it under the current line, if it isn't empty
 						let bEmptyLine = lines[lines.length - 1] == '';
 						let lastIndent = lines[lines.length - 1].replace(/^([ \t]*).*$/, '$1');
-						let newIndent = (indent == null ?  '   ' + lastIndent : '   ' + indent);  // TODO: allow override of default tab
+						let defaultIndent = item.defaultIndent == null ? '   ' : item.defaultIndent;
+						let newIndent = (indent == null ?  defaultIndent + lastIndent : defaultIndent + indent);
 						let nextIndent = '';
 						if (item.list.length > 0){
 							let nextLine = this.compose(item.list[0], 0); // preview the next line to see its indent is already sufficient
