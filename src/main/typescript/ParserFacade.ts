@@ -98,6 +98,8 @@ class BulletIndent {
 			let prefix = '';
 			let postfix = '';
 			let bulletType = '';
+			// TODO: support styles like 'I.a.1.i', '1.1.1.1' or even '1:10.1.1.1'
+			// TODO: consider allowing \: and \\ for legitimate :
 			// support styles like 'i', 'i:iv', 'I', 'I:LV', '1', '1:13', 'a', 'a:d', 'A', 'A:AF'
 			if (/^.*(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/.test(bulletStyle)){
 				prefix = bulletStyle.replace(/^(.*?)(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
@@ -624,6 +626,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		});
 		if (JSON.stringify(this.annotations.bulletStyles) != JSON.stringify(oldAnnotations.bulletStyles)){
 			// the bullet style has changed, so compose the output before the styles get modified back
+			// TODO: consider instead adding the current bullet style to all bullets and lists in the output
 			value = this.compose(value, 1);
 		}
 		this.annotations = oldAnnotations;
@@ -1250,6 +1253,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				
 				case 'Compose':
 					value = this.compose(value,1);
+					this.bulletIndent = null; // reset bulleting
 					break
 					
 				case 'Count':
@@ -1572,6 +1576,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 					
 				case '@BulletStyle':
+					// TODO: verify that the style is legitimate, including roman numeral correctness
 					for (let i = 0; i < argValues.length; i++){
 						if (typeof argValues[i] == 'object'){
 							this.syntaxError('ERROR: invalid argument for bullet style', args.parentCtx);
@@ -1815,9 +1820,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			let composed = output.lines.join('\n');
 			output = {lines: [""], skipping: false, mode: 1, bullets: bullets};
 			this.doCompose([composed], output, null);
-		}
-		if (mode == 1){
-			this.bulletIndent = null;
 		}
 		return output.lines.join('\n');
 	}
