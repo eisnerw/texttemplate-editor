@@ -89,70 +89,80 @@ class BulletIndent {
 		if (bulletStyles == null || bulletStyles.length == 0){
 			bullet = '(' + this.level + '.' + this.index + ')'; // TODO: default bullet style
 		} else {
-			let bulletStyle = bulletStyles[this.level < bulletStyles.length ? this.level : bulletStyles.length - 1];
-			let padding = '';
-			if (/^ +/.test(bulletStyle)){
-				padding = bulletStyle.replace(/^( +).*$/, '$1');
-				bulletStyle = bulletStyle.substr(padding.length);
-			}
-			let prefix = '';
-			let postfix = '';
-			let bulletType = '';
-			// TODO: support styles like 'I.a.1.i', '1.1.1.1' or even '1:10.1.1.1'
-			// TODO: consider allowing \: and \\ for legitimate :
-			// support styles like 'i', 'i:iv', 'I', 'I:LV', '1', '1:13', 'a', 'a:d', 'A', 'A:AF'
-			if (/^.*(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/.test(bulletStyle)){
-				prefix = bulletStyle.replace(/^(.*?)(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
-				postfix = bulletStyle.replace(/^.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A)(.*)$/,'$2');
-				bulletStyle = bulletStyle.replace(/^.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
-				bulletType = bulletStyle.substr(0, 1);
-				if (bulletStyle.includes(':')){
-					if (this.styleInitializerLevel != null && this.level > this.styleInitializerLevel){
-						// ignore the style initializer because we've already popped back to a level above this
-						bulletStyle = bulletType; 
-					} else {
-						// capture the style initializer, which is the value after the ':'
-						bulletStyle = bulletStyle.substr(bulletStyle.indexOf(':') + 1);
+			let bulletStyleText = bulletStyles[this.level < bulletStyles.length ? this.level : bulletStyles.length - 1];
+			// support multiple numbers at one level by creating an array of styles that contain 0 or 1 number/letter/roman
+			let concatenatedBullet = '';
+			let styleArray = bulletStyleText.replace(/(.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).\S*?)/g,'$1\x02').split('\x02');
+			let currentBulletLevel : any = this;
+			for (let i = styleArray.length - 1; i >= 0 && currentBulletLevel != null; i--){
+				let bulletStyle = styleArray[i];
+				let padding = '';
+				if (/^ +/.test(bulletStyle)){
+					padding = bulletStyle.replace(/^( +).*$/, '$1');
+					bulletStyle = bulletStyle.substr(padding.length);
+				}
+				let prefix = '';
+				let postfix = '';
+				let bulletType = '';
+				// TODO: support styles like 'I.a.1.i', '1.1.1.1' or even '1:10.1.1.1'
+				// TODO: consider allowing \: and \\ for legitimate :
+				// support styles like 'i', 'i:iv', 'I', 'I:LV', '1', '1:13', 'a', 'a:d', 'A', 'A:AF'
+				if (/^.*(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/.test(bulletStyle)){
+					prefix = bulletStyle.replace(/^(.*?)(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
+					postfix = bulletStyle.replace(/^.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A)(.*)$/,'$2');
+					bulletStyle = bulletStyle.replace(/^.*?(i\:[ivxldcm]+|i|I\:[IVXLDCM]+|I|1\:\d+|1|a\:[a-z]+|a|A\:[A-Z]+|A).*$/,'$1');
+					bulletType = bulletStyle.substr(0, 1);
+					if (bulletStyle.includes(':')){
+						if (this.styleInitializerLevel != null && currentBulletLevel.level > this.styleInitializerLevel){
+							// ignore the style initializer because we've already popped back to a level above this
+							bulletStyle = bulletType; 
+						} else {
+							// capture the style initializer, which is the value after the ':'
+							bulletStyle = bulletStyle.substr(bulletStyle.indexOf(':') + 1);
+						}
+					}
+				} else if (bulletStyle.length > 1){
+					if ('(<#$%*.-=+`~[{_=+|\'"'.includes(bulletStyle.substr(0,1))){
+						prefix = bulletStyle[0];
+						bulletStyle = bulletStyle.substr(1);
+					}
+					if (')>*]}.`~*-_=+|:\'"'.includes(bulletStyle.substr(bulletStyle.length - 1, 1))){
+						postfix = bulletStyle[bulletStyle.length - 1];
+						bulletStyle = bulletStyle.substr(0, bulletStyle.length - 1);
 					}
 				}
-			} else if (bulletStyle.length > 1){
-				if ('(<#$%*.-=+`~[{_=+|\'"'.includes(bulletStyle.substr(0,1))){
-					prefix = bulletStyle[0];
-					bulletStyle = bulletStyle.substr(1);
+				bullet = bulletStyle;
+				if (bulletType.length == 1){
+					switch (bulletType){
+						case 'I':
+							bullet = this.numberToRoman(currentBulletLevel.index + (bulletStyle != 'I' ? this.romanToNumber(bulletStyle) : 1));
+							break;
+						
+						case 'i':
+							bullet = this.numberToRoman(currentBulletLevel.index + (bulletStyle != 'i' ? this.romanToNumber(bulletStyle) : 1)).toLowerCase();
+							break;
+						
+						case '1':
+							bullet = (currentBulletLevel.index + (bulletStyle != '1' ? parseInt(bulletStyle) : 1)).toString();
+							break;
+						
+						case 'A':
+						case 'a':
+							bullet = this.numberToAlphabet(currentBulletLevel.index + (bulletStyle.toLowerCase() != 'a' ? this.alphabetToNumber(bulletStyle) : 1));
+							if (bulletType == 'a'){
+								bullet = bullet.toLowerCase();
+							}
+							break;
+					}
+					if (padding.length > 0 && bullet.length < (padding.length + 1)){
+						prefix = padding.substr(0, padding.length - bullet.length + 1) + prefix;
+					}
+					bullet = prefix + bullet + postfix;
+					currentBulletLevel = currentBulletLevel.parent; 
 				}
-				if (')>*]}.`~*-_=+|:\'"'.includes(bulletStyle.substr(bulletStyle.length - 1, 1))){
-					postfix = bulletStyle[bulletStyle.length - 1];
-					bulletStyle = bulletStyle.substr(0, bulletStyle.length - 1);
-				}
+				concatenatedBullet = bullet + concatenatedBullet;
 			}
-			bullet = bulletStyle;
-			if (bulletType.length == 1){
-				switch (bulletType){
-					case 'I':
-						bullet = this.numberToRoman(this.index + (bulletStyle != 'I' ? this.romanToNumber(bulletStyle) : 1));
-						break;
-					
-					case 'i':
-						bullet = this.numberToRoman(this.index + (bulletStyle != 'i' ? this.romanToNumber(bulletStyle) : 1)).toLowerCase();
-						break;
-					
-					case '1':
-						bullet = (this.index + (bulletStyle != '1' ? parseInt(bulletStyle) : 1)).toString();
-						break;
-					
-					case 'A':
-					case 'a':
-						bullet = this.numberToAlphabet(this.index + (bulletStyle.toLowerCase() != 'a' ? this.alphabetToNumber(bulletStyle) : 1));
-						if (bulletType == 'a'){
-							bullet = bullet.toLowerCase();
-						}
-						break;
-				}
-				if (padding.length > 0 && bullet.length < (padding.length + 1)){
-					prefix = padding.substr(0, padding.length - bullet.length + 1) + prefix;
-				}
-				bullet = prefix + bullet + postfix;
-			}
+			bullet = concatenatedBullet;
 		}
 		this.lastBullet = this.indent + bullet.replace('\x01', '');
 		return bullet;	

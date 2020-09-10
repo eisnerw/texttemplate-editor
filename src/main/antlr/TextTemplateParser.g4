@@ -32,7 +32,7 @@ methodInvoked: methodable methodInvocation+;
 
 predicateExpression: LP predicateExpression RP #nestedPredicate | relationalOperand RELATIONAL relationalOperand #relationalOperation | NOT predicateExpression #notPredicate | predicateExpression (AND|OR) predicateExpression #logicalOperator | (methodInvoked | namedSubtemplate | identifierCondition) #condition;
 
-relationalOperand: methodInvoked | quoteOperand | apostropheOperand | namedSubtemplate | identifierOperand | digits;
+relationalOperand: optionallyInvoked | quoteOperand | apostropheOperand | namedSubtemplate | identifierOperand | digits;
 
 digits: MINUS* DIGITS;
 
