@@ -304,9 +304,11 @@
 				"     ",
 				"{.} Documentation",
 				"",
-				"     The TextTemplate language and this environment are documented in a series `",
-				"     of \"live\" template-based web pages starting `",
-				"     {'here'.#Click('','Click to go to the table of contents')}",
+				"     The TextTemplate language is documented using `",
+				"     a \"live\" template-based web page  `",
+				"     {'here'.#Click('/load/docs','Click to see the documentation using TextTemplate')}`",
+				"     or if you prefer, you can view an HTML version `",
+				"     {'here'.#Click('/docs/index.html','Click to load the documentation in HTML')}`",
 				"",
 				"",
 				"].@BulletStyle('I.','(a)','•','1.').@BulletMode('explicit')}",
@@ -346,7 +348,7 @@
 				"{#deadoralive:[{fname} {lname} is {isAlive=>[alive],[dead]}]}",
 				"{#Click:[<a title='{$2=>[{$2}],[Click to see the Github project]}' `",
 				"   style=\"font-style:italic;text-decoration: underline;cursor: pointer\" `",
-				"   href=\"https:{'//'}{$1}\">{$0}</a>]}",
+				"   href=\"{!$1.StartsWith('/')->[https:{'//'}]}{$1}\">{$0}</a>]}",
 				"{#externalData:[{'/data/famousBirthdays'}]}"
 				].join('\n'));
 		} else {

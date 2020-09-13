@@ -342,7 +342,7 @@ class TemplateData {
 					} else if (value == null) {
 						result += 'null';
 					} else if (typeof value == 'string') {
-						result += ('"' + value.replace(/\n/g,'\\n') + '"');
+						result += ('"' + value.replace(/\\/g,'\\').replace(/"/g,'\\"').replace(/\n/g,'\\n') + '"');
 					} else {
 						result += value.toString();
 					}
@@ -1079,7 +1079,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else if (!args.children && (
 			method == 'GreaterThan' 
 			|| method == 'LessThan' 
-			|| method == 'Pad' 
+			|| method == 'Align' 
 			|| method == 'StartsWith' 
 			|| method == 'EndsWith' 
 			|| method == 'Replace' 
@@ -1116,7 +1116,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'GreaterThan'
 			|| method == 'LessThan'
 			|| method == 'Case'
-			|| method == 'Pad'
+			|| method == 'Align'
 			|| method == 'Trim'
 			|| method == 'StartsWith'
 			|| method == 'EndsWith'
@@ -1339,7 +1339,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 
-				case 'Pad':
+				case 'Align':
 					if (argValues.length > 3 || argValues.length == 0 || isNaN(argValues[0]) 
 						   || (argValues.length > 1 && !(argValues[1] == 'L' || argValues[1] == 'R' || argValues[1] == 'C'))){
 						this.syntaxError('Incorrect arguments for ' + method, args);
@@ -1441,6 +1441,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables in case they are needed for a calculaton
 							});
 							let groupKey = args.children[0].accept(this)[0];
+							if (Array.isArray(groupKey)){
+								// composite probably created from a template argument that needs to be composed
+								groupKey = this.compose(groupKey, 1);
+							}
 							Object.keys(dollarVariables).forEach((key)=>{
 								delete newContext.dictionary[key];  // remove the added $ variables
 							});
@@ -1898,7 +1902,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let nextLine = '';
 					let bNextLineStartsWithBullet = false;
 					if (item.list.length > 0){
-						nextLine = this.compose(item.list[0], 0); // preview the next line to let routines below determine what is needed
+						// preview the next line to let routines below determine what is needed
+						nextLine = this.compose([item.list[0]], 0);  // note that send an array to compose insures a string
 						if (typeof nextLine == "string"){
 							bNextLineStartsWithBullet = /^\s*\x01{.}.*/s.test(nextLine);
 						}
@@ -2066,7 +2071,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else if (this.bulletIndent != null && /\S/.test(text) && this.annotations.bulletMode == 'implicit') {
 						// there is a non-bulleted line in the output; see if it should reset bulleting levels because it is less indented then the bullet(s)
 						let nextLineIndent = text.replace(/^([ \t]*).*$/,'$1'); // TODO: Should this be an option?
-						while (this.bulletIndent != null && this.bulletIndent.indent.length >= nextLineIndent.length){
+						while (this.bulletIndent != null && this.bulletIndent.indent.length > nextLineIndent.length){
 							this.bulletIndent = this.bulletIndent.parent;
 						}
 					}

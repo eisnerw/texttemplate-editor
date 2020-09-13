@@ -144,7 +144,7 @@ fragment KEYWORDS: (
 	| 'EndsWith'
 	| 'Replace'
 	| 'Contains'
-	| 'Pad'
+	| 'Align'
 	| 'Substr'
 	| 'IndexOf'
 	| 'LastIndexOf'
