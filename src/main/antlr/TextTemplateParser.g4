@@ -14,7 +14,7 @@ subtemplateSpecs: subtemplateSpec*;
 
 subtemplateSpec: templateContextToken text*;
 
-templateContents: beginningBullet? (subtemplateSection | bullet | templateToken | templateContextToken | text+);
+templateContents: beginningBullet? (subtemplateSection | bullet | templateToken | templateContextCommaToken | templateContextToken | text+);
 
 bullet: NL BULLET SPACES?;
 
@@ -43,6 +43,8 @@ apostropheOperand: APOSTROPHE TEXT? APOSTROPHE;
 identifierOperand: IDENTIFIER;
 
 identifierCondition: IDENTIFIER;
+
+templateContextCommaToken: LBRACE contextToken COMMA optionallyInvoked RBRACE;
 
 templateContextToken: LBRACE contextToken RBRACE;
 

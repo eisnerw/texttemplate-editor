@@ -523,10 +523,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				//}
 			}
 		}
-		//if (!ctx.children[3] || !ctx.children[3].getText() || ctx.children[3].exception){
-		//	// protect code against illegal bracketted expression while editing
-		//	return null;
-		//}
+		if (bHasContext && !ctx.children[2]){ // note: this used to check  || !ctx.children[2].getText() || ctx.children[2].exception
+			// protect code against illegal bracketted expression while editing
+			return null;
+		}
 		var result = [];
 		result = ctx.children[bHasContext ?  2 : 1].accept(this);
 		this.context = oldContext;
