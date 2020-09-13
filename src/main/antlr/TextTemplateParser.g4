@@ -44,7 +44,9 @@ identifierOperand: IDENTIFIER;
 
 identifierCondition: IDENTIFIER;
 
-templateContextToken: LBRACE ((namedSubtemplate | optionallyInvoked) COLON | COLON) (namedSubtemplate | optionallyInvoked) RBRACE;
+templateContextToken: LBRACE contextToken RBRACE;
+
+contextToken: ((namedSubtemplate | optionallyInvoked) COLON | COLON) (namedSubtemplate | optionallyInvoked);
 
 templateSpec: namedSubtemplate | bracketedTemplateSpec;
 

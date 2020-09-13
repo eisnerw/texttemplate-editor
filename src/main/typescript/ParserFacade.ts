@@ -446,13 +446,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		return value;
 	};
-	visitTemplateContextToken = function(ctx) {
-		if (ctx.children.length < 3){
-			return null; // invalid
-		}
+	visitTemplateContextToken = function(ctx){
+		return ctx.children[1].accept(this); // ignore the information in the brackets
+	}
+	visitContextToken = function(ctx) {
+		//if (ctx.children.length < 3){
+		//	return null; // invalid
+		//}
 		let oldContext : TemplateData = this.context;
-		let bHasContext : boolean = ctx.children[1].getText() != ':'; // won't change context if format {:[template]}
-		if (bHasContext && ctx.children[1].children){  // ctx.children[1].children protects against invalid spec
+		let bHasContext : boolean = ctx.children[0].getText() != ':'; // won't change context if format {:[template]}
+		if (bHasContext && ctx.children[0].children){  // ctx.children[0].children protects against invalid spec
 			let context : any;
 			// (Not sure why we were ignoring url errors)
 			let oldErrors = [];
@@ -460,10 +463,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			this.errors.forEach((error)=>{
 				oldErrors.push(error);
 			});
-			if (ctx.children[1].constructor.name == 'NamedSubtemplateContext'){
-				context = ctx.children[1].accept(this);
+			if (ctx.children[0].constructor.name == 'NamedSubtemplateContext'){
+				context = ctx.children[0].accept(this);
 			} else {
-				context = ctx.children[1].children[0].accept(this);
+				context = ctx.children[0].children[0].accept(this);
 			}
 			context = this.compose(context, 0);
 			if (Array.isArray(context) && context.length == 1){
@@ -506,9 +509,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					this.syntaxError(msg, ctx);
 					return msg;
 				}
-				if (ctx.children.length > 1 && ctx.children[1].children && ctx.children[1].children[0].constructor.name == 'MethodInvokedContext'){
+				if (ctx.children.length > 1 && ctx.children[0].children && ctx.children[0].children[0].constructor.name == 'MethodInvokedContext'){
 					// there is a method invocation on a context that was created here.  We need to rerun the method(s)
-					let invocations = ctx.children[1].children[0].children.slice(1);
+					let invocations = ctx.children[0].children[0].children.slice(1);
 					this.context = this.invokeMethods(null, invocations); // a null valueContext implies this.context
 				}
 				
@@ -520,12 +523,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				//}
 			}
 		}
-		if (!ctx.children[3] || !ctx.children[3].getText() || ctx.children[3].exception){
-			// protect code against illegal bracketted expression while editing
-			return null;
-		}
+		//if (!ctx.children[3] || !ctx.children[3].getText() || ctx.children[3].exception){
+		//	// protect code against illegal bracketted expression while editing
+		//	return null;
+		//}
 		var result = [];
-		result = ctx.children[bHasContext ?  3 : 2].accept(this);
+		result = ctx.children[bHasContext ?  2 : 1].accept(this);
 		this.context = oldContext;
 		return result;
 	};
