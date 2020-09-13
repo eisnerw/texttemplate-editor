@@ -407,7 +407,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			value = this.annotations[key.substr(2)];
 		} else if (!this.context || !(this.context instanceof TemplateData)){
-			this.syntaxError('Attempting to look up "' + key + '" without a data context', ctx.parentCtx);
+			console.warn('Attempting to look up "' + key + '" without a data context');
 		} else {
 			value = this.context.getValue(key);
 		}
@@ -1322,7 +1322,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 							this.context = oldContext; // restore old context
 							if (result.length == 0){
-								value = undefined; // indication of missing value
+								value = { type: 'missing', missingValue: this.annotations.missingValue, key: 'list' }; // indication of missing value
 							} else {
 								value = new TemplateData(result, this.context);
 							}
