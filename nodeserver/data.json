@@ -120,7 +120,7 @@
 			{
 			  "name": "Context Tokens",
 			  "type": "comma",
-			  "text": "which are the mechanism for specifying how non-scalar data e.g., objects, are to be interpolated.  Context tokens have the syntax {DataSource:[template]}, where DataSource is a complex data type (see below) that can be specified using:",
+			  "text": "which are the mechanism for specifying how non-scalar data e.g., objects, are to be interpolated.  Context tokens have the syntax {DataSource:[template]} or {DataSource:[template],[optional]}, where \"template\" is a bracketed or named subtemplate and \"optional\" is an alternative subroutine that is interpolated if the data source has no data.  \"DataSource\" is a complex data type (see below) that can be specified using:",
 			  "contents": [
 				{
 				  "name": "JSON string",
@@ -152,7 +152,7 @@
 				{
 				  "name": "thin arrow",
 				  "type": "The",
-				  "text": "consists of a predicate (a conditional expression) followed by \"->\" followed by either a bracketed subtemplate or a named subtemplate. For example, a template with a thin arrow might be something like [{firstName {middleName->[ {middleName}]} {lastName}].  In this template, the presence of a middle name can be tested by using the variable as a predicate and, if it is present, a subtemplate can format the middle name with a preceding space."
+				  "text": " consists of a predicate (a conditional expression) followed by \"->\" followed by either a bracketed subtemplate or a named subtemplate. For example, a template with a thin arrow might be something like [{firstName {middleName->[ {middleName}]} {lastName}].  In this template, the presence of a middle name can be tested by using the variable as a predicate and, if it is present, a subtemplate can format the middle name with a preceding space."
 				},
 				{
 				  "name": "thick arrow",
