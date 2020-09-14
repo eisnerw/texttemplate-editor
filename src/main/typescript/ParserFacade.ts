@@ -449,6 +449,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTemplateContextToken = function(ctx){
 		return ctx.children[1].accept(this); // ignore the information in the brackets
 	}
+	visitTemplateContextCommaToken = function(ctx) {
+		let result = ctx.children[1].accept(this);
+		if (result != null && typeof result == 'object' && result.type == 'missing'){
+			result = ctx.children[3].accept(this); // when there is no context, run the second template
+		}
+		return result;
+	}
 	visitContextToken = function(ctx) {
 		//if (ctx.children.length < 3){
 		//	return null; // invalid
@@ -523,12 +530,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				//}
 			}
 		}
+		var result = [];
 		if (bHasContext && !ctx.children[2]){ // note: this used to check  || !ctx.children[2].getText() || ctx.children[2].exception
 			// protect code against illegal bracketted expression while editing
-			return null;
+			result = null;
 		}
-		var result = [];
 		result = ctx.children[bHasContext ?  2 : 1].accept(this);
+		if (this.context != null && typeof this.context == 'object' && this.context.type == 'missing'){
+			result = this.context; // can't return a value from a missing context although we still need to visit children
+		}
 		this.context = oldContext;
 		return result;
 	};
