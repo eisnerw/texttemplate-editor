@@ -2255,7 +2255,7 @@ class RelocatingCollectorErrorListener extends CollectorErrorListener {
     }
 }
 declare global {
-  interface Window {
+  interface window {
     ParserFacade: any;
   }
 }
@@ -2265,7 +2265,7 @@ export function createColorizeLexer(input: String) {
     const lexer = new TextTemplateColorizeLexer(chars);
 
     lexer.strictMode = false;
-	window.ParserFacade = this;
+	window['ParserFacade'] = this;
     return lexer;
 }
 
@@ -2672,11 +2672,17 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 						if (!urls[key].data){
 							urlsBeingLoaded.push(key);
 							if (!urls[key].loading){
+                                let urlPrefix = (key.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
 								urls[key].loading = true
-								console.debug('loading ' + key);
+								console.debug('loading ' + urlPrefix +  key);
 								$.ajax({
-									url: key,
+									url: urlPrefix + key,
 									success: function (data) {
+                                        if (data.Result){
+                                            data = data.Result;
+                                        } else if (data.FriendlyErrorMessage){
+                                            data = {error: data.FriendlyErrorMessage};
+                                        }
 										if (data.error){
 											urls[key].data = data.error
 											urls[key].error = true;
