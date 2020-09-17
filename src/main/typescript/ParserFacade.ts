@@ -2693,7 +2693,12 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 												validate(monaco.editor.getModels()[0].getValue(), invocation, 0);
 											}
 										}, 0);
-									}
+                                    }
+                                    ,error: function(obj, err, errorThrown){
+                                        let msg = 'Unable to GET ' + this.url + '. Received error: "' + err + ' ' + errorThrown + '"';
+                                        this.success({error: msg});
+                                        console.error(msg);
+                                    }
 								});
 							}
 						}

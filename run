@@ -14,6 +14,6 @@ if tsc --sourceMap; then
 else
 	exit 1
 fi
-webpack
+npx webpack
 echo "starting server ... (http://localhost:3000)"
 npm start
