@@ -16,13 +16,13 @@ app.use('/subtemplate', require('./routes/subtemplate'));
 app.use('/data', require('./routes/data'));
 app.use('/template', require('./routes/template'));
 app.use('/load', require('./routes/load'));
-
+app.use('/runOnServer', require('./routes/runOnServer'));
 
 // static files
 app.use(express.static(path.join(__dirname, '../src/main')));
 app.use("/node_modules", express.static(path.join(__dirname, '../node_modules')));
 app.use("/js", express.static(path.join(__dirname, '../dist')));
-app.use('/docs', express.static(path.join(__dirname, '../nodeserver/docs')))
+app.use('/docs', express.static(path.join(__dirname, '../nodeserver/docs')));
 
 
 // start the server

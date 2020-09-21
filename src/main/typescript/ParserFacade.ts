@@ -2315,11 +2315,13 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 		let tokenName = tokenObject.name;
 		if (tokenName == 'SUBTEMPLATES'){
 			let numberBlankLines = tokenObject.text.split('\nSubtemplates:')[0].split('\n').length; // computes the number of new lines before 'Subtemplates::';
-			folds.push({
-				start: tokenObject.line + numberBlankLines + lineOffset,
-				end: tokenArray[tokenArray.length - 1].line + lineOffset,
-				kind: monaco.languages.FoldingRangeKind.Region
-			});
+			if (folds != null){
+				folds.push({
+					start: tokenObject.line + numberBlankLines + lineOffset,
+					end: tokenArray[tokenArray.length - 1].line + lineOffset,
+					kind: monaco.languages.FoldingRangeKind.Region
+				});
+			}
 			bFound = true;
 			newInput = input.substr(0, tokenObject.start);
 			let bExtractingSubtemplates = true;
@@ -2348,7 +2350,7 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 							text = '[' + processed.input + input.substring(parts[5].start, parts[6].start); 
 							subSubtemplates = processed.subtemplates;
 						}
-						if (parts[0].line != parts[6].line){
+						if (folds != null && parts[0].line != parts[6].line){
 							// fold any multi-line subtemplates
 							folds.push({
 								start: parts[0].line + lineOffset,
@@ -2567,7 +2569,7 @@ function getSubtemplatePositions(positions : any[], processed, lineOffset : numb
 		});
 	}
 }
-let folds = [];
+let folds : any = [];
 let urls = {};
 let invocations = 0;
 
@@ -2595,13 +2597,16 @@ function tokensAsString(ctx){
 	}
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
-function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip
+export function validate(input, invocation, mode, callback?) : void { // mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip, 3 = node
 	setTimeout(()=>{
 		if (invocation != invocations){
 			return;
 		}
+		if (mode == 3){
+			folds = null; // indicate not running with editor
+		}
 		let errors : Error[] = [];
-		if (mode != 2){
+		if (mode != 2 && mode != 3){
 			document.getElementById('interpolated').innerHTML = 'parsing...';
 			console.log('parsing...');
 		}
@@ -2609,6 +2614,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			if (invocation != invocations){
 				return;
 			}
+			// if processedSubtemplates is not null, it has been set by provideFoldingRanges for performance reasons
 			if (processedSubtemplates == null){
 				processedSubtemplates = processSubtemplates(input, 0); 
 			}
@@ -2634,7 +2640,7 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 			  };
 			};
 			let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
-			if (mode != 2){
+			if (mode != 2 && mode != 3){
 				document.getElementById('interpolated').innerHTML = "interpolating...";
 				console.log('interpolating...');
 			}
@@ -2672,64 +2678,83 @@ function validate(input, invocation, mode) : void { // mode 0 = immediate, 1 = d
 						if (!urls[key].data){
 							urlsBeingLoaded.push(key);
 							if (!urls[key].loading){
-                                let urlPrefix = (key.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
+                                let urlPrefix = (mode != 3 && key.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
 								urls[key].loading = true
 								console.debug('loading ' + urlPrefix +  key);
-								$.ajax({
-									url: urlPrefix + key,
-									success: function (data) {
-                                        if (data.Result){
-                                            data = data.Result;
-                                        } else if (data.FriendlyErrorMessage){
-                                            data = {error: data.FriendlyErrorMessage};
-                                        }
-										if (data.error){
-											urls[key].data = data.error
-											urls[key].error = true;
-											console.error(data.error);
-										} else {
-											if (typeof data != 'string'){
-												data = JSON.stringify(data);
-											}
+								if (mode == 3){
+									callback({
+										type:'url'
+										, path: urlPrefix + key
+										, urls: urls
+										, success: (data)=>{
 											urls[key].data = data;
+											validate(data, 0, 3, callback);
 										}
-										let invocation = ++invocations;
-										setTimeout(()=>{
-											if (invocation == invocations){
-												validate(monaco.editor.getModels()[0].getValue(), invocation, 0);
+									});
+								} else {
+									$.ajax({
+										url: urlPrefix + key,
+										success: function (data) {
+											if (data.Result){
+												data = data.Result;
+											} else if (data.FriendlyErrorMessage){
+												data = {error: data.FriendlyErrorMessage};
 											}
-										}, 0);
-                                    }
-                                    ,error: function(obj, err, errorThrown){
-                                        let msg = 'Unable to GET ' + this.url + '. Received error: "' + err + ' ' + errorThrown + '"';
-                                        this.success({error: msg});
-                                        console.error(msg);
-                                    }
-								});
+											if (data.error){
+												urls[key].data = data.error
+												urls[key].error = true;
+												console.error(data.error);
+											} else {
+												if (typeof data != 'string'){
+													data = JSON.stringify(data);
+												}
+												urls[key].data = data;
+											}
+											let invocation = ++invocations;
+											setTimeout(()=>{
+												if (invocation == invocations){
+													validate(monaco.editor.getModels()[0].getValue(), invocation, 0);
+												}
+											}, 0);
+										}
+										,error: function(obj, err, errorThrown){
+											let msg = 'Unable to GET ' + this.url + '. Received error: "' + err + ' ' + errorThrown + '"';
+											this.success({error: msg});
+											console.error(msg);
+										}
+									});
+								}
 							}
 						}
 					}
 				});
 				if (urlsBeingLoaded.length > 0){
 					let loadingMessage = 'loading ' +  (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))));
-					document.getElementById('interpolated').innerHTML = loadingMessage;
+					if (mode != 3){
+						document.getElementById('interpolated').innerHTML = loadingMessage;
+					}
 					console.log(loadingMessage);
-				} else if (mode != 2){
+				} else if (mode != 2 && mode != 3){
 					console.log('done')
 					document.getElementById('interpolated').innerHTML = (result == null ? 'null' : result.toString());
+				} else if (mode == 3){
+					callback({type: 'result', result: result});
+					processedSubtemplates = null; // remove memory of the previous template
 				}
-				let monacoErrors = [];
-				for (let e of visitor.errors) {
-					monacoErrors.push({
-						startLineNumber: e.startLine,
-						startColumn: e.startCol,
-						endLineNumber: e.endLine,
-						endColumn: e.endCol,
-						message: e.message,
-						severity: monaco.MarkerSeverity.Error
-					});
-				};
-				monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
+				if (mode != 3){
+					let monacoErrors = [];
+					for (let e of visitor.errors) {
+						monacoErrors.push({
+							startLineNumber: e.startLine,
+							startColumn: e.startCol,
+							endLineNumber: e.endLine,
+							endColumn: e.endCol,
+							message: e.message,
+							severity: monaco.MarkerSeverity.Error
+						});
+					};
+					monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
+				}
 			}, 1);
 		}, 1);
 	}, 1);
