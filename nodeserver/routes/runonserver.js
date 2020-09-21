@@ -13,7 +13,7 @@ const processResult = function(parm){
 			requestResponse.write(
 				"<div style='width: 800px;'><pre style='word-wrap: break-word;overflow-x:auto;white-space:pre-wrap;'>" 
 				+ parm.result
-				+ "pre></div>"
+				+ "</pre></div>"
 				);  
 			requestResponse.end();  
 			break;
