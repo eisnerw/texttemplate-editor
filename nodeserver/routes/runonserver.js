@@ -20,13 +20,16 @@ const processResult = function(parm){
 		case 'url':
 			//console.debug('url=' + parm.path);
 			http.request({host:'localhost', path: parm.path, port:3000, method: 'GET'}, function(response){
+				result = [];
 				response.on('data', function (data) {
-					//console.debug('gotData'+ data);
-					parm.success(data.toString());
+					result.push(data.toString());
 				});
 				response.on('error', function(error) {
 					console.error('got error' + error);
 					parm.failure(error);
+				});
+				response.on('end', function(){
+					parm.success(result.join(''));
 				});
 			}).end();
 			break;
