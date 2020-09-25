@@ -1,3 +1,4 @@
+/// <reference path="./TextTemplateInterpreter.ts" />
 const ctx: Worker = self as any;
 import textTemplateInterpreter = require("../../main-generated/javascript/TextTemplateInterpreter.js");
 

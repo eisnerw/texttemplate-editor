@@ -1,3 +1,5 @@
+/// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
+/// <reference path="./TextTemplateWorker.ts" />
 import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
 import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
 import {TextTemplateColorizeLexer} from "../../main-generated/javascript/TextTemplateColorizeLexer.js"

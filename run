@@ -9,6 +9,7 @@ if ./gradlew generateParser; then
 else
 	exit 1
 fi
+touch ./src/main-generated/javascript/TextTemplateInterpreter.js # fix wierd tsc ordering issue	
 if tsc; then
 	echo "running webpack..."
 else
