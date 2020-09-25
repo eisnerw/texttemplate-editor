@@ -2,6 +2,7 @@ module.exports = {
     entry: './src/main/javascript/index.js',
     output: {
         filename: 'main.js',
+		publicPath: '/js/'
     },
     module: {
         rules: [{
@@ -11,7 +12,11 @@ module.exports = {
                 loader: 'source-map-loader',
             },
             exclude: /node_modules/
-        }]
+        },
+		{
+			test: /worker\.js/,
+			use: {loader: 'worker-loader'}
+		}]
     },
     resolve: {
         modules: ['node_modules'],

@@ -9,7 +9,7 @@ if ./gradlew generateParser; then
 else
 	exit 1
 fi
-if tsc --sourceMap; then
+if tsc; then
 	echo "running webpack..."
 else
 	exit 1

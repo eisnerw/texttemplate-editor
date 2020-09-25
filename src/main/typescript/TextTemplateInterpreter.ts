@@ -1,18 +1,14 @@
-/// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
-
 import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
 import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
 import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
-import {TextTemplateColorizeLexer} from "../../main-generated/javascript/TextTemplateColorizeLexer.js"
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
 import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
 import moment = require('moment');
-import Worker from "worker-loader!../../main-generated/javascript/TextTemplateWorker.js";
 
 var parsedTemplates = {};
 var parsedTokens = {};
-var processedSubtemplates = null; // keeps a tree of the latest subtemplates and any local subtemplates within them, including where they were found in the editor
-declare let foundJsonObjects; // used by TemplateData to prevent loops
+let processedSubtemplates;
+let foundJsonObjects; // used by TemplateData to prevent loops
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
@@ -869,10 +865,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			// process the loaded subtemplate
 			let data = urls[subtemplateUrl].data;
-			if (data.substr(0 ,1) != '['){
-				let msg = 'Error loading subtemplate "' + subtemplateName + '": ' + data;
+			let bError = typeof data == 'object';
+			if (bError || data.substr(0 ,1) != '['){
+				let msg = 'Error loading subtemplate "' + subtemplateName + '": ' + (bError ? data.error : data);
 				console.error(msg);
 				this.syntaxError(msg, ctx);
+				this.subtemplates[subtemplateName] = '[' + msg + ']';
 				return '';
 			}
 			// process info between brackets adding an extra nl so "included" subtemplates can start with "Subtemplates:"
@@ -1979,10 +1977,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 						let bFirst = true;
 						item.list.forEach((listItem)=>{
-							if (nextLine.startsWith('\n')){
+							if (nextLine != null && nextLine.startsWith('\n')){
 								newIndent = indent;
 							}
-							if (!nextLine.startsWith('\n') && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
+							if (nextLine != null && !nextLine.startsWith('\n') && !(bIncompleteIndent && bFirst) && (!bEmptyLine || !bFirst)){
 								this.addToOutput('\n', output); // start a new line
 								if (!!newIndent && newIndent != '' && !bNextLineStartsWithBullet){
 									this.addToOutput(newIndent, output);
@@ -2208,7 +2206,7 @@ interface TextTemplateVisitor {
     (source: string, subString: string): boolean;
 }
 
-export class Error {
+class Error {
     startLine: number;
     endLine: number;
     startCol: number;
@@ -2255,22 +2253,8 @@ class RelocatingCollectorErrorListener extends CollectorErrorListener {
 		super.syntaxError(recognizer, offendingSymbol, line + this._line, line == 1 ? (column + this._column) : column, msg, e);
     }
 }
-declare global {
-  interface window {
-    ParserFacade: any;
-  }
-}
 
-export function createColorizeLexer(input: String) {
-    const chars = new InputStream(input);
-    const lexer = new TextTemplateColorizeLexer(chars);
-
-    lexer.strictMode = false;
-	window['ParserFacade'] = this;
-    return lexer;
-}
-
-export function createLexer(input: String) {
+function createLexer(input: String) {
     const chars = new InputStream(input);
     const lexer = new TextTemplateLexer(chars);
 
@@ -2278,7 +2262,7 @@ export function createLexer(input: String) {
     return lexer;
 }
 
-export function parseTemplate(input, listeners? : ConsoleErrorListener[]){
+function parseTemplate(input, listeners? : ConsoleErrorListener[]){
 	const lexer = createLexer(input);
 	if (listeners != null){
 		lexer.removeErrorListeners();
@@ -2303,7 +2287,7 @@ export function parseTemplate(input, listeners? : ConsoleErrorListener[]){
 // It returns an object containing the input without the subtemplate section and a map of the subtemplate objects keyed by the name and 
 // containing the text plus the line/column where the subtemplate was found
 // The routine calls itself recursively to find subtemplates with the subtemplates
-export function processSubtemplates(input: string, lineOffset: number) : {} {
+function processSubtemplates(input: string, lineOffset: number) : {} {
 	if (!(input).includes('\nSubtemplates:')){
 		return {input: input, subtemplates: {}}
 	}
@@ -2316,13 +2300,6 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 		let tokenName = tokenObject.name;
 		if (tokenName == 'SUBTEMPLATES'){
 			let numberBlankLines = tokenObject.text.split('\nSubtemplates:')[0].split('\n').length; // computes the number of new lines before 'Subtemplates::';
-			if (folds != null){
-				folds.push({
-					start: tokenObject.line + numberBlankLines + lineOffset,
-					end: tokenArray[tokenArray.length - 1].line + lineOffset,
-					kind: monaco.languages.FoldingRangeKind.Region
-				});
-			}
 			bFound = true;
 			newInput = input.substr(0, tokenObject.start);
 			let bExtractingSubtemplates = true;
@@ -2350,14 +2327,6 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 							// reconstruct the text without the subtemplates
 							text = '[' + processed.input + input.substring(parts[5].start, parts[6].start); 
 							subSubtemplates = processed.subtemplates;
-						}
-						if (folds != null && parts[0].line != parts[6].line){
-							// fold any multi-line subtemplates
-							folds.push({
-								start: parts[0].line + lineOffset,
-								end: parts[6].line + lineOffset,
-								kind: monaco.languages.FoldingRangeKind.Region
-							});
 						}
 						subtemplates['#' + parts[2].text] = {text: text, line: parts[0].line, column:parts[4].column, endLine: parts[6].line, endColumn: parts[6].column, subtemplates: subSubtemplates};
 					} else {
@@ -2392,7 +2361,7 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 	}
 	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
 }
-export function getTokensWithSymbols(input : string){
+function getTokensWithSymbols(input : string){
 	const chars = new InputStream(input);
 	const lexer = new TextTemplateLexer(chars);
 	lexer.strictMode = false;
@@ -2443,7 +2412,7 @@ function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	}
 }
 
-export function getTokens(input: String) : Token[] {
+function getTokens(input: String) : Token[] {
     return createLexer(input).getAllTokens()
 }
 
@@ -2510,57 +2479,7 @@ class TextTemplateErrorStrategy extends DefaultErrorStrategy {
     };
 
 }
-export function provideFoldingRanges(model, context, token) {
-	folds = [];
-	processedSubtemplates = processSubtemplates(model.getValue(), 0); // collect folds
-	return folds;
-}
 
-export function provideDefinition(model, position, token){
-	let currentLine : string = model.getLinesContent()[position.lineNumber - 1];
-	let tokenArray = getTokensWithSymbols(model.getValue());
-	let column = position.column - 1;  // position uses 1 origin and tokens use 0 origin
-	let definitionName = '';
-	for (let iToken = 0; iToken < tokenArray.length; iToken++){
-		if (tokenArray[iToken].line == position.lineNumber && column >= tokenArray[iToken].column && (((iToken + 1) == tokenArray.length) || tokenArray[iToken + 1].line > position.lineNumber || column < tokenArray[iToken + 1].column)){
-			if (tokenArray[iToken].name == 'IDENTIFIER' && iToken > 0 && tokenArray[iToken - 1].name == 'POUND'){
-				definitionName = '#' + tokenArray[iToken].text;
-			} else if (tokenArray[iToken].name == 'POUND' && (iToken + 1) < tokenArray.length && tokenArray[iToken].name == 'IDENTIFIER'){
-				definitionName = '#' + tokenArray[iToken + 1].text;
-			} else if (tokenArray[iToken].name == 'METHODNAME' && tokenArray[iToken].text.startsWith('.#')){
-				definitionName = tokenArray[iToken].text.substr(1, tokenArray[iToken].text.length - 2);
-			}
-			break;
-		}
-	}
-	if (definitionName == ''){
-		return; // not pointing to an identifier
-	}
-	let subtemplatePositions : any[] = [];
-	getSubtemplatePositions(subtemplatePositions, processedSubtemplates, 0, '');
-	subtemplatePositions.sort((a, b) => (a.line > b.line) ? 1 : -1);
-	let subtemplateMap = {};
-	let level = '';
-	for (let i = 0; i < subtemplatePositions.length; i++){
-		let subtemplate = subtemplatePositions[i];
-		subtemplateMap[subtemplate.name] = subtemplate;
-		if (position.lineNumber >= subtemplate.line && ((i + 1) == subtemplatePositions.length || position.lineNumber < subtemplatePositions[i + 1].line)){
-			level = subtemplate.name + '.';
-		}
-	}
-	let definition = null;
-	let keyArray = (level + definitionName).split('.');
-	for (let i = 0; definition == null && i < keyArray.length; i++){
-		definition = subtemplateMap[keyArray.slice(i).join('.')];
-	}
-	if (definition == null){
-		return;
-	}
-	return {
-        range: new monaco.Range(definition.line, definition.column + 1, definition.endLine, definition.endColumn + 1),
-        uri: model.uri
-    };
-}
 function getSubtemplatePositions(positions : any[], processed, lineOffset : number, level : string){
 	if (processed.subtemplates != null){
 		Object.keys(processed.subtemplates).forEach((key)=>{
@@ -2570,18 +2489,8 @@ function getSubtemplatePositions(positions : any[], processed, lineOffset : numb
 		});
 	}
 }
-let folds : any = [];
 let urls = {};
-let invocations = 0;
 
-export function runValidation(input ,mode) : void {
-	let invocation = ++invocations;
-	setTimeout(()=>{
-		if (invocation == invocations){
-			validate(input, invocation, mode);
-		}
-	}, mode != 1 || invocation == 1 ? 0 : 2000); // if delay (other than the first time), wait 2 seconds after last keystroke to allow typing in the editor to continue
-}
 function tokensAsString(ctx){
 	let treeTokens : CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
 	let symbolicNames : string[] = ctx.parser.symbolicNames
@@ -2598,218 +2507,71 @@ function tokensAsString(ctx){
 	}
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
-export function validate(input, invocation, mode, callback?) : void { // mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip, 3 = node
-	if (input != null){
-		window["workerObject"] = window["workerObject"] || {loaded: false};
-		if (!window["workerObject"].loaded){
-			window["workerObject"].worker = new Worker();
-			window["workerObject"].worker.onmessage = (event) => {
-				let payload = event.data;
-				switch (payload.type){
-					case 'result':
-						let monacoErrors = [];
-						for (let e of payload.errors) {
-							monacoErrors.push({
-								startLineNumber: e.startLine,
-								startColumn: e.startCol,
-								endLineNumber: e.endLine,
-								endColumn: e.endCol,
-								message: e.message,
-								severity: monaco.MarkerSeverity.Error
-							});
-						};
-						monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
-						document.getElementById('interpolated').innerHTML = payload.result;
-						break;
-
-					case 'url':
-						document.getElementById('interpolated').innerHTML = 'loading ' + payload.path;
-						$.ajax({
-							url: payload.path,
-							success: function (data) {
-								document.getElementById('interpolated').innerHTML = payload.path + ' loaded'
-								window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
-							}
-							,error: function(obj, err, errorThrown){
-								document.getElementById('interpolated').innerHTML = payload.path + ' ERROR: ' + errorThrown;
-								let msg = 'Unable to GET ' + this.url + '. Received error: "' + err + ' ' + errorThrown + '"';
-								window["workerObject"].worker.postMessage({type:'url', data: {error: msg}, id: payload.id});
-								console.error(msg);
-							}
-						});
-						break;
-					
-					case 'status':
-						document.getElementById('interpolated').innerHTML = payload.status;
-						break;
-				}
-			};
-			window["workerObject"].loaded = true;
-			window["workerObject"].worker.postMessage({type:'input', input: input});
-			//worker.postMessage({type: 'primes', limit: 1000 });
-		}
-		document.getElementById('interpolated').innerHTML = '';
-		window["workerObject"].worker.postMessage({type:'input', input: input});			
-		return;
+export function interpret(input, callback, options?) : void { 
+	callback({type: 'status', status: 'parsing...'});
+	let errors : Error[] = [];
+	if (processedSubtemplates == null){  // non-null implies being called again
+		processedSubtemplates = processSubtemplates(input, 0); 
+		input = processedSubtemplates.input;
 	}
-	setTimeout(()=>{
-		if (invocation != invocations){
-			return;
-		}
-		if (mode == 3){
-			folds = null; // indicate not running with editor
-		}
-		let errors : Error[] = [];
-		if (mode != 2 && mode != 3){
-			document.getElementById('interpolated').innerHTML = 'parsing...';
-			console.log('parsing...');
-		}
-		setTimeout(()=>{
-			if (invocation != invocations){
-				return;
-			}
-			// if processedSubtemplates is not null, it has been set by provideFoldingRanges for performance reasons
-			if (processedSubtemplates == null){
-				processedSubtemplates = processSubtemplates(input, 0); 
-			}
-			input = processedSubtemplates.input;
-			input = mode == 2 || input.length == 0 ? ' ' : input; // parser needs at least one character
-			let tree = parsedTemplates[input];
-			if (!tree){
-				tree = parseTemplate(input, [new ConsoleErrorListener(), new CollectorErrorListener(errors)])
-				parsedTemplates[input] = tree;
-				parsedTokens[input] = tokensAsString(tree);
-			}
-			/* used to get json representation of tree for debugging
-			const getCircularReplacer = () => {
-			  const seen = new WeakSet();
-			  return (key, value) => {
-				if (typeof value === 'object' && value !== null) {
-				  if (seen.has(value)) {
-					return;
-				  }
-				  seen.add(value);
-				}
-				return value;
-			  };
-			};
-			let treeJson : string = JSON.stringify(tree, getCircularReplacer()); */
-			if (mode != 2 && mode != 3){
-				document.getElementById('interpolated').innerHTML = "interpolating...";
-				console.log('interpolating...');
-			}
-			setTimeout(()=>{
-				if (invocation != invocations){
-					return;
-				}
-				var visitor = new TextTemplateVisitor();
-				// clone to allow interpreter errors to be undone
-				errors.forEach((error)=>{
-					visitor.errors.push(error);
-				});
-				visitor.input = input;
-				visitor.bulletIndent = null; // start bulleting from 0,0
-				// parse and cache subtemplates found by processSubtemplates and add the text to the visitor (a TextTemplateVisitor instance)
-				Object.keys(processedSubtemplates.subtemplates).forEach((key)=>{
-					let subtemplateObject = processedSubtemplates.subtemplates[key];
-					visitor.parseSubtemplates(subtemplateObject, key, subtemplateObject.line - 1, subtemplateObject.column);
-				});
-				var result = visitor.visitCompilationUnit(tree);
-				if (invocation != invocations){
-					return;
-				}
-				if (result != null && !Array.isArray(result) && typeof result == 'object'){
-					result = [result];
-				}
-				if (Array.isArray(result)){
-					result = visitor.compose(result, 1);
-				}
-				let urlsBeingLoaded = [];
-				Object.keys(urls).forEach((key : string) =>{
-					if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
-						delete urls[key] // clean up incomplete urls
-					} else {
-						if (!urls[key].data){
-							urlsBeingLoaded.push(key);
-							if (!urls[key].loading){
-                                let urlPrefix = (mode != 3 && key.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
-								urls[key].loading = true
-								console.debug('loading ' + urlPrefix +  key);
-								if (mode == 3){
-									callback({
-										type:'url'
-										, path: urlPrefix + key
-										, urls: urls
-										, success: (data)=>{
-											urls[key].data = data;
-											validate(data, 0, 3, callback);
-										}
-									});
-								} else {
-									$.ajax({
-										url: urlPrefix + key,
-										success: function (data) {
-											if (data.Result){
-												data = data.Result;
-											} else if (data.FriendlyErrorMessage){
-												data = {error: data.FriendlyErrorMessage};
-											}
-											if (data.error){
-												urls[key].data = data.error
-												urls[key].error = true;
-												console.error(data.error);
-											} else {
-												if (typeof data != 'string'){
-													data = JSON.stringify(data);
-												}
-												urls[key].data = data;
-											}
-											let invocation = ++invocations;
-											setTimeout(()=>{
-												if (invocation == invocations){
-													validate(monaco.editor.getModels()[0].getValue(), invocation, 0);
-												}
-											}, 0);
-										}
-										,error: function(obj, err, errorThrown){
-											let msg = 'Unable to GET ' + this.url + '. Received error: "' + err + ' ' + errorThrown + '"';
-											this.success({error: msg});
-											console.error(msg);
-										}
-									});
-								}
+	let tree = parsedTemplates[input];
+	if (!tree){
+		tree = parseTemplate(input, [new ConsoleErrorListener(), new CollectorErrorListener(errors)])
+		parsedTemplates[input] = tree;
+		parsedTokens[input] = tokensAsString(tree);
+	}
+	callback({type: 'status', status: 'interpolating...'});
+	var visitor = new TextTemplateVisitor();
+	// clone to allow interpreter errors to be undone
+	errors.forEach((error)=>{
+		visitor.errors.push(error);
+	});
+	visitor.input = input;
+	visitor.bulletIndent = null; // start bulleting from 0,0
+	// parse and cache subtemplates found by processSubtemplates and add the text to the visitor (a TextTemplateVisitor instance)
+	Object.keys(processedSubtemplates.subtemplates).forEach((key)=>{
+		let subtemplateObject = processedSubtemplates.subtemplates[key];
+		visitor.parseSubtemplates(subtemplateObject, key, subtemplateObject.line - 1, subtemplateObject.column);
+	});
+	var result = visitor.visitCompilationUnit(tree);
+	if (result != null && !Array.isArray(result) && typeof result == 'object'){
+		result = [result];
+	}
+	if (Array.isArray(result)){
+		result = visitor.compose(result, 1);
+	}
+	let urlsBeingLoaded = [];
+	Object.keys(urls).forEach((key : string) =>{
+		if (!key.startsWith('/') && (key.split('//').length != 2 || key.split('//')[1].indexOf('/') == -1)){
+			delete urls[key] // clean up incomplete urls
+		} else {
+			if (!urls[key].data){
+				urlsBeingLoaded.push(key);
+				if (!urls[key].loading){
+					let urlPrefix = (key.startsWith('/') && options && options['urlPrefix']) ? options['urlPrefix'] : '';
+					urls[key].loading = true
+					console.debug('loading ' + urlPrefix +  key);
+					callback({
+						type:'url'
+						, path: urlPrefix + key
+						, urls: urls
+						, success: (data)=>{
+							urls[key].data = data;
+							try{
+								interpret(input, callback, options);
+							} catch (e) {
+								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: []});
 							}
 						}
-					}
-				});
-				if (urlsBeingLoaded.length > 0){
-					let loadingMessage = 'loading ' +  (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))));
-					if (mode != 3){
-						document.getElementById('interpolated').innerHTML = loadingMessage;
-					}
-					console.log(loadingMessage);
-				} else if (mode != 2 && mode != 3){
-					console.log('done')
-					document.getElementById('interpolated').innerHTML = (result == null ? 'null' : result.toString());
-				} else if (mode == 3){
-					callback({type: 'result', result: result});
-					processedSubtemplates = null; // remove memory of the previous template
+					});
 				}
-				if (mode != 3){
-					let monacoErrors = [];
-					for (let e of visitor.errors) {
-						monacoErrors.push({
-							startLineNumber: e.startLine,
-							startColumn: e.startCol,
-							endLineNumber: e.endLine,
-							endColumn: e.endCol,
-							message: e.message,
-							severity: monaco.MarkerSeverity.Error
-						});
-					};
-					monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
-				}
-			}, 1);
-		}, 1);
-	}, 1);
+			}
+		}
+	});
+	if (urlsBeingLoaded.length > 0){
+		callback({type: 'status', status: (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))))});
+	} else {
+		callback({type: 'result', result: result, errors:visitor.errors});
+		processedSubtemplates = null; // remove memory of the previous template
+	}
 }

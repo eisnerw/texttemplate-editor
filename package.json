@@ -22,7 +22,8 @@
     "nodemon": "^2.0.4",
     "source-map-loader": "^1.1.0",
     "ts-loader": "^8.0.4",
-    "webpack-cli": "^3.3.12"
+    "webpack-cli": "^3.3.12",
+    "worker-loader": "^3.0.3"
   },
   "scripts": {
     "test": "mocha",

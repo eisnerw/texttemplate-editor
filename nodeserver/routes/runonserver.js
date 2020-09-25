@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const http = require('http');
-const parserFacade = require('../../src/main-generated/javascript/ParserFacade.js');
+const textTemplateInterpreter = require('../../src/main-generated/javascript/TextTemplateInterpreter.js');
 let requestResponse;
 const processResult = function(parm){
 	switch (parm.type){
@@ -44,7 +44,7 @@ router.get('/:template', (req, res) => {
 		, 'path': '/template/' + template
 		, success: function(data){
 			//console.debug('templatedata='+data);
-			parserFacade.validate(data, 0, 3, processResult);
+			textTemplateInterpreter.interpret(data, processResult);
 		}
 		, error: function(error){
 		}
