@@ -293,9 +293,11 @@ export function validate(input, invocation, mode, callback?) : void { // mode 0 
 					break;
 
 				case 'url':
+                    let urlPrefix = (payload.path.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
+                    console.debug('loading ' + urlPrefix + payload.path);
 					document.getElementById('interpolated').innerHTML = 'loading ' + payload.path;
 					$.ajax({
-						url: payload.path,
+						url: urlPrefix + payload.path,
 						success: function (data) {
 							document.getElementById('interpolated').innerHTML = payload.path + ' loaded'
 							window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
