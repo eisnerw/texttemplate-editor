@@ -1207,7 +1207,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else {
 						let bFirst = true;
 						argValues.forEach((arg)=>{
-							if (method != 'Assert' || bFirst){ // Assert only matches the first argument
+							if (arg != null && (method != 'Assert' || bFirst)){ // Assert only matches the first argument
 								if (arg.constructor.name == 'RegExp'){
 									matches = matches || arg.test(value);
 								} else if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
