@@ -42,7 +42,7 @@ apostropheOperand: APOSTROPHE TEXT? APOSTROPHE;
 
 identifierOperand: IDENTIFIER;
 
-identifierCondition: IDENTIFIER;
+identifierCondition: IDENTIFIER (DOT IDENTIFIER)*;
 
 templateContextCommaToken: LBRACE contextToken COMMA optionallyInvoked RBRACE;
 

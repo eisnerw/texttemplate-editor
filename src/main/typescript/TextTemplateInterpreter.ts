@@ -725,15 +725,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitChildren(ctx.children[2].children[2]) // false
 	};
 	visitIdentifierCondition = function(ctx) {
-		// testing to see if the identifier has a value
-		let value = this.visitIdentifier(ctx.children[0]);
-		if (!this.valueIsMissing(value) && value != ''){
-			if (this.annotations.falsy != null && this.annotations.falsy.test(value)){
-				return false;
-			}
-			return true;
-		}
-		return false;
+		return  this.visitIdentifier(ctx);
 	}
 	visitLogicalOperator = function(ctx) {
 		let operator : string = ctx.children[1].getText() 
@@ -966,7 +958,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return !result;
 	};
 	visitCondition = function(ctx) {
-		return this.visitChildren(ctx)[0];
+		let value = this.visitChildren(ctx)[0];
+		// testing to see if the identifier has a value
+		if (!this.valueIsMissing(value) && value != ''){
+			if (this.annotations.falsy != null && this.annotations.falsy.test(value)){
+				return false;
+			}
+			return true;
+		}
+		return false;
 	};
 	visitBraced = function(ctx) {
 		// remove extraneous array
