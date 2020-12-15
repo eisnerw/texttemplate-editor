@@ -339,7 +339,8 @@ class TemplateData {
 					} else if (value == null) {
 						result += 'null';
 					} else if (typeof value == 'string') {
-						result += ('"' + value.replace(/\\/g,'\\').replace(/"/g,'\\"').replace(/\n/g,'\\n') + '"');
+                        value = value.replace(/\n/g,'\\n').replace(/\r/g,'\\r');
+						result += ('"' + value.replace(/\\/g,'\\').replace(/"/g,'\\"') + '"');
 					} else {
 						result += value.toString();
 					}
