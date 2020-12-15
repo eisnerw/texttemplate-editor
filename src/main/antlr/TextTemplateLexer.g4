@@ -54,6 +54,7 @@ PARENED_DOT: '.' ->type(DOT);
 PARENED_METHODNAME: '.' [#@a-zA-Z_][a-zA-Z0-9_]* '(' ->type(METHODNAME),pushMode(PARENED);
 PARENED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
 PARENED_DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+ ->type(DIGITS);
+PARENED_MINUS: '-' ->type(MINUS);
 RP: ')' -> popMode;
 QUOTE: '"' -> pushMode(QUOTED);
 APOSTROPHE: '\'' -> pushMode(APOSTROPHED);

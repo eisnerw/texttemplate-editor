@@ -37,6 +37,7 @@ AND: '&';
 OR: '|';
 NOT: '!';
 DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+;
+MINUS: '-';
 BRACED_ILLEGAL: ('%' | '*' | '-' | '=' | '{' | ';' | '<' | '>' | '?' | '\\' | ']')+;
 
 mode PARENED;
@@ -51,6 +52,7 @@ PARENED_IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(IDENTIFIER);
 PARENED_KEYWORD: '.' KEYWORDS ->type(KEYWORD);
 PARENED_DOT: '.' ->type(DOT);
 PARENED_DIGITS: ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9')+ ->type(DIGITS);
+PARENED_MINUS: '-' ->type(MINUS);
 RP: ')' -> popMode;
 LQUOTE: '"' -> pushMode(QUOTEDMODE);
 PARENED_APOSTROPHE: '\'' ->type(LAPOSTROPHE),pushMode(APOSTROPHED);
