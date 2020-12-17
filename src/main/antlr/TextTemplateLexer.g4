@@ -107,7 +107,7 @@ BRACKETED_SUBTEMPLATES: [ \t\n]+ 'Subtemplates:' [ \t\n]+ ->type(SUBTEMPLATES);
 mode NESTED;
 NESTED_SLASH_STAR: '/*' .*? '*/' -> skip;
 NESTED_COMMENT5: [ ]+  '//' ~[\n]* ('\n' | EOF) ->skip;
-NESTED_IDENTIFIER: [$@a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
+NESTED_IDENTIFIER: [$@a-zA-Z_^][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_METHODNAME: '.' [a-zA-Z_][a-zA-Z0-9_]* '(' -> type(METHODNAME),pushMode(PARENED);
 NESTED_DOT: '.' ->type(DOT);
 NESTED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
