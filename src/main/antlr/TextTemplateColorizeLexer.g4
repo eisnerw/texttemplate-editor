@@ -105,7 +105,7 @@ mode NESTED;
 NESTED_SLASH_STAR_COMMENT: '/*' .*? '*/' ->type(COMMENT);
 NESTED_SLASH_STAR: '/*' ->type(SLASHSTAR);
 NESTED_POUNDIDENTIFIER: '#' [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(POUNDIDENTIFIER);
-NESTED_IDENTIFIER: [$@a-zA-Z_][a-zA-Z0-9_]* ->type(IDENTIFIER);
+NESTED_IDENTIFIER: [@$a-zA-Z_^][a-zA-Z0-9_]* ->type(IDENTIFIER);
 NESTED_KEYWORD: '.' KEYWORDS ->type(KEYWORD);
 NESTED_DOT: '.' ->type(DOT);
 NESTED_RELATIONAL: ('==' | '!=' | '=' | '<=' | '>=' | '<' | '>') ->type(RELATIONAL);
