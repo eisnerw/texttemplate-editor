@@ -416,6 +416,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			value = {type: 'date', moment: moment(value), string: value, format: this.annotations['dateFormat']};
 			if (!value.moment.isValid()){
 				this.syntaxError('Invalid date', ctx);
+			} else if (this.annotations['dateFormatMode'] && this.annotations['dateFormatMode'] == 'GMT'){
+				//value.moment.subtract(value.moment.parseZone().utcOffset(), 'minutes');
+				value.moment.utc();
 			}
 		}
 		if (typeof value == 'string'){
@@ -758,8 +761,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let leftValue = ctx.children[0].accept(this);
 		let rightValue = ctx.children[2].accept(this);
 		let operator = ctx.children[1].getText();
-		if (leftValue == null || rightValue == null){
-			return false; // null always yields false
+		// null == null and  null != !null
+		if (leftValue == null || this.valueIsMissing(leftValue)){
+			if (rightValue == null || this.valueIsMissing(rightValue)){
+				return true;
+			}
+			else if (operator == '!='){
+				return true;
+			}
+		}
+		// !null != null and !null == null
+		else if (rightValue == null || this.valueIsMissing(rightValue)){
+			if (operator == '!='){
+				return true;
+			}
+			return false;
 		}
 		if (!isNaN(leftValue) && !isNaN(rightValue)){
 			leftValue = parseInt(leftValue);
@@ -1105,7 +1121,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else if (args.children && args.children.length > 1 && (
 			method == '@DateTest'
 			|| method == '@Falsy'
-			|| method == '@DateFormat'
 			|| method == '@DefaultIndent'
 		)){
 			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
@@ -1318,7 +1333,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 										newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables
 									});
 									let addToResult = args.children[0].accept(this)[0];
-									if (typeof addToResult == "string" && this.annotations.falsy && this.annotations.falsy.test(addToResult)){
+									if (this.valueIsMissing(addToResult) || (typeof addToResult == "string" && this.annotations.falsy && this.annotations.falsy.test(addToResult))){
 										addToResult = false;
 									}
 									if (addToResult){
@@ -1330,8 +1345,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									}
 									this.context = oldContext;
 								});
-							} else if (args.accept(this)){
-								result.push(this.context); // no filtering (or cloning) necessary 
+							} else {
+								let filterResult = args.accept(this);
+								while (Array.isArray(filterResult) && filterResult.length == 1){
+									filterResult = filterResult[0];
+								}
+
+								if (filterResult){
+									result.push(this.context); // no filtering (or cloning) necessary 
+								}
 							}
 							this.context = oldContext; // restore old context
 							if (result.length == 0){
@@ -1545,6 +1567,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = date.toDate().toLocaleDateString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric' }); // puts out local format
 							}
 						} else {
+							if (argValues.length > 1 && argValues[1] == 'GMT'){
+								//date.subtract(date.parseZone().utcOffset(), 'minutes');
+								date.utc();
+							}
 							value = date.format(argValues[0]);
 						}
 					}
@@ -1576,6 +1602,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						delete value['dateFormat'];
 					} else {
 						value['dateFormat'] = argValues[0];
+						if (argValues.length > 1){
+							value['dateFormatMode'] = argValues[1];
+						}
+					}
+					if (argValues.length < 1){
+						delete value['dateFormatMode'];
 					}
 					break;
 
