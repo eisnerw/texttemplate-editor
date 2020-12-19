@@ -292,7 +292,7 @@
 				{
 				  "name": "ToDate",
 				  "type": "dash",
-				  "text": "This method takes zero one argument.  The function formats any string that can be interpreted as a date or date and time using a format specification from the method's argument.  The method has been implemented using the MomentJs library's format function and it follows the specifications of that library (see: https://momentjs.com/docs/#/displaying/).  When no argument is specified, the method converts the string to the local date format of the machine where TextTemplate is hosted.  Note that this method provides explicit date formatting that overrides date formatting provided implicitly through the @DateTest() and @DateFormat() annotations, below. "
+				  "text": "This method takes zero one or two arguments.  The function formats any string that can be interpreted as a date or date and time using a format specification from the method's first argument.  The method has been implemented using the MomentJs library's format function and it follows the specifications of that library (see: https://momentjs.com/docs/#/displaying/).  When no argument is specified, the method converts the string to the local date format of the machine where TextTemplate is hosted.  If the optional second argument is \"GMT\", the date will be converted to GMT prior to being formatted.  Note that this method provides explicit date formatting that overrides date formatting provided implicitly through the @DateTest() and @DateFormat() annotations, below. "
 				},
 				{
 				  "name": "EncodeFor",
@@ -373,7 +373,7 @@
 				{
 				  "name": "@MissingValue",
 				  "type": "dash",
-				  "text": "this annotation, which takes zero or one argument, specifies the string value that will be substituted for any missing, null or empty string value that is encountered when retrieving data from a TextTemplate context.  When specified without an argument, missing values remain missing or null.  Note that @MissingValue can be explicitly overridden by the use of the IfMissing method"
+				  "text": "this annotation, which takes zero or one argument, specifies the string value that will be substituted for any missing, null or empty string value that is encountered when retrieving data from a TextTemplate context.  When specified without an argument, missing values remain missing or null.  The missing value can contain the string \"{key}\", which will be replaced by the key of the missing value. Note that @MissingValue can be explicitly overridden by the use of the IfMissing method"
 				},
 				{
 				  "name": "@DateTest",
@@ -383,7 +383,7 @@
 				{
 				  "name": "@DateFormat",
 				  "type": "dash",
-				  "text": "this annotation takes a single argument.  It is used to change the default date formatting to that specified in the argument.  Like the ToDate() method, above, the specification uses the syntax of the MomentJs library.  Note that @DateFormat can be explicitly overridden by the use of the ToDate method"
+				  "text": "this annotation takes one or two arguments.  It is used to change the default date formatting to that specified in the first argument.  Like the ToDate() method, above, the specification uses the syntax of the MomentJs library, and like ToDate, the second argument can be used to convert dates to GMT.  Note that @DateFormat can be explicitly overridden by the use of the ToDate method"
 				},
 				{
 				  "name": "@EncodeDataFor",

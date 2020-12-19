@@ -411,7 +411,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		if (value === undefined){
 			console.debug('Missing value for ' + key);
-			return {type: 'missing', missingValue: this.annotations.missingValue, key: key};
+			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
+			return {type: 'missing', missingValue: missingValue, key: key};
 		} else if (this.annotations.dateTest != null && this.annotations.dateTest.test(key)){
 			value = {type: 'date', moment: moment(value), string: value, format: this.annotations['dateFormat']};
 			if (!value.moment.isValid()){
