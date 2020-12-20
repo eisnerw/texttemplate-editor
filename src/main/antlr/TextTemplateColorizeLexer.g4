@@ -156,4 +156,5 @@ fragment KEYWORDS: (
 	| '@Falsy'
 	| 'Compose'
 	| '@DefaultIndent'
+	| '@ValueFunction'
 );

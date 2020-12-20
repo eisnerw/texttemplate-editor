@@ -4,6 +4,7 @@ import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLex
 import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
 import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
 import moment = require('moment');
+import {Externals} from "../../main-generated/javascript/Externals.js"
 
 var parsedTemplates = {};
 var parsedTokens = {};
@@ -383,6 +384,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	};
 	visitIdentifier = function(ctx) {
 		var key = ctx.getText();
+		if (this.annotations.valueFunction){
+			let valueFunction = this.annotations.valueFunction;
+			delete this.annotations.valueFunction;
+			let retValue = valueFunction(ctx, this);
+			this.annotations.valueFunction = valueFunction;
+			return retValue;
+		}
 		let value = undefined;
 		if (key == '@'){
 			return new TemplateData(JSON.stringify(this.annotations), this.context);
@@ -1018,6 +1026,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitBullet(ctx);
 	};
 	callMethod = function(method : string, value : any, args: any){
+		let externalMethod = Externals.getMethod(method);
+		if (externalMethod){
+			return externalMethod(value, args, this);
+		}
 		let argValues = [];
 		if (args.constructor.name == 'ConditionContext'){
 			// the argument is a boolean
@@ -1587,6 +1599,20 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					
 				case '@MissingValue':
 					value['missingValue'] = argValues[0];
+					break;
+					
+				case '@ValueFunction':
+					if (argValues.length == 0){
+						delete value['valueFunction'];
+					} else {
+						let valueFunction = Externals.getValueFunction(argValues[0]);
+						if (valueFunction){		
+							value['valueFunction'] = valueFunction;
+						} else {
+							this.syntaxError('Value Function not found: ' + argValues[0], args.children[0]);
+							delete value['valueFunction'];
+						}
+					}
 					break;
 					
 				case '@BulletMode':
