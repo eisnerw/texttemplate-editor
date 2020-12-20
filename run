@@ -10,6 +10,7 @@ else
 	exit 1
 fi
 touch ./src/main-generated/javascript/TextTemplateInterpreter.js # fix weird tsc ordering issue	
+touch ./src/main-generated/javascript/Externals.js # fix weird tsc ordering issue	
 if tsc; then
 	echo "running webpack..."
 else
