@@ -772,15 +772,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let operator = ctx.children[1].getText();
 		// null == null and  null != !null
 		if (leftValue == null || this.valueIsMissing(leftValue)){
-			if (rightValue == null || this.valueIsMissing(rightValue)){
+			if (rightValue == null || this.valueIsMissing(rightValue) || operator == '!='){
 				return true;
 			}
-			else if (operator == '!='){
-				return true;
-			}
+			return false;
 		}
 		// !null != null and !null == null
-		else if (rightValue == null || this.valueIsMissing(rightValue)){
+		if (rightValue == null || this.valueIsMissing(rightValue)){
 			if (operator == '!='){
 				return true;
 			}
