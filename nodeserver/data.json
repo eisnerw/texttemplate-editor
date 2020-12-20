@@ -414,6 +414,11 @@
 				  "name": "@Include",
 				  "type": "dash",
 				  "text": "This annotation is used to invoke shared annotations and subtemplates that might be used by several templates.  Since normally the scope of annotations and subtemplates is limited to the template that is being annotated and any subtemplates invoked within it, the effect of invoking a shared subtemplate with annotations and subtemplates would not persist beyond that invocation.  @Include is a mechanism for calling a shared subtemplate, specified by name as the first argument.  Upon completion of the subtemplate invoked by @Include, any annotations on that subtemplate as well as any subtemplates loaded by the subtemplate are retained on the template or subtemplate that invoked the @Include."
+				},
+				{
+				  "name": "@ValueFunction",
+				  "type": "dash",
+				  "text": "this annotation, which takes a single string argument, provides a mechanism for substituting an alternative function that provides values from the current context when an identifier is encountered.  The alternative function must be implemented in the Externals.ts module, where there is an example function called 'test'."
 				}
 			  ]
 			},
