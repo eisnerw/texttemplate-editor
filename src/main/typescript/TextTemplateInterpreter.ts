@@ -1224,7 +1224,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let originalValue = value;
 					if (typeof value == 'string' && value.includes('\x01{.}')){
 						// special case for matching the output of bullet templates
+						let oldBulletIndent = this.bulletIndent;
 						value = this.compose([value], 1); // compose with bulleting
+						let this.bulletIndent = oldBulletIndent;
 					}
 					let matches : any = false;
 					if (argValues.length == 0 || this.valueIsMissing(value)){
