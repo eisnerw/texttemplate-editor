@@ -1871,7 +1871,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			parts = [parts];  // do compose expects arrays
 		}
 		if (!Array.isArray(parts)){
-			return parts;
+			if (mode == 0){
+				return parts;
+			}
+			parts = [parts];
 		}
 		let output = {lines: [""], skipping: false, mode: 0, bullets: {}};
 		this.doCompose(parts, output, null);
