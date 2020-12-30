@@ -1963,7 +1963,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						} else {
 							// list
 							for (let i = 0; i < item.parts.list.length; i ++){
-								this.doCompose(item.parts.list[i], output, item.bullet);
+								this.doCompose([item.parts.list[i]], output, item.bullet);
 								if (i < item.parts.list.length - 1){
 									this.addToOutput('\n', output);
 								}
