@@ -1226,7 +1226,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// special case for matching the output of bullet templates
 						let oldBulletIndent = this.bulletIndent;
 						value = this.compose([value], 1); // compose with bulleting
-						let this.bulletIndent = oldBulletIndent;
+						this.bulletIndent = oldBulletIndent;
 					}
 					let matches : any = false;
 					if (argValues.length == 0 || this.valueIsMissing(value)){
@@ -1962,9 +1962,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							this.doCompose([item.parts], output, item.bullet);
 						} else {
 							// list
-							for (let i = 0; i < item.parts.list.length(); i ++){
-								this.doCompose(this.parts.list[i], output, item.bullet);
-								if (i < this.parts.list.length - 1){
+							for (let i = 0; i < item.parts.list.length; i ++){
+								this.doCompose(item.parts.list[i], output, item.bullet);
+								if (i < item.parts.list.length - 1){
 									this.addToOutput('\n', output);
 								}
 							}
