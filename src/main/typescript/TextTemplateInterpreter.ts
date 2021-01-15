@@ -2580,6 +2580,13 @@ export function interpret(input, callback, options?) : void {
 	}
 	callback({type: 'status', status: 'interpolating...'});
 	var visitor = new TextTemplateVisitor();
+	if (options && options.data){
+		try{
+			visitor.context = new TemplateData(options.data, null);
+		} catch(e){
+			console.error("Invalid data");
+		}
+	}
 	// clone to allow interpreter errors to be undone
 	errors.forEach((error)=>{
 		visitor.errors.push(error);

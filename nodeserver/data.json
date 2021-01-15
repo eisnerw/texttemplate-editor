@@ -9,7 +9,7 @@
 		  }
 	   ]
 	}
-	,"simple":{
+	,"simpledata":{
 	   "firstName": "John"
 	   ,"lastName": "Smith"
 	   ,"pets": [

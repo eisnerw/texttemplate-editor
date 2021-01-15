@@ -39,7 +39,7 @@ ctx.addEventListener("message", (event) => {
 			} else {
 				input = payload.input;
 				bProcessing = true;
-				interpret(input);
+				interpret(input, {data: payload.data});
 			}
 			break;
 
@@ -49,9 +49,9 @@ ctx.addEventListener("message", (event) => {
 			break;
 	}
 });
-function interpret(input){
+function interpret(input, options?){
 	try{
-		textTemplateInterpreter.interpret(input, processResult);
+		textTemplateInterpreter.interpret(input, processResult, options);
 	} catch (e){
 		processResult({type: 'result', result: 'EXCEPTION ' + e.stack, errors: []});
 	}

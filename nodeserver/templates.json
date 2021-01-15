@@ -736,4 +736,15 @@
 		"      ,'none', '')}",
 		"]}"
 	]
+	,"simpledata":[
+		"{\"Hello\"} {lastName}, {firstName} with {pets=>",
+		"   [{pets:#formatPet.#anded()}]",
+		"   ,[no pets]",
+		"}!!",
+		"",
+		"Subtemplates:",
+		"",
+		"{#formatPet:[a {type} named {name}]}",
+		"{#anded:[{$0.Join(', ',' and ')}]}"				
+	]
 }

@@ -260,16 +260,16 @@ let folds : any = [];
 let urls = {};
 let invocations = 0;
 
-export function runValidation(input ,mode) : void {
+export function runValidation(input, options) : void {
 	let invocation = ++invocations;
 	setTimeout(()=>{
 		if (invocation == invocations){
-			validate(input, invocation, mode);
+			validate(input, invocation, options);
 		}
-	}, mode != 1 || invocation == 1 ? 0 : 2000); // if delay (other than the first time), wait 2 seconds after last keystroke to allow typing in the editor to continue
+	}, options.mode != 1 || invocation == 1 ? 0 : 2000); // if delay (other than the first time), wait 2 seconds after last keystroke to allow typing in the editor to continue
 }
 
-export function validate(input, invocation, mode, callback?) : void { // mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip, 3 = node
+export function validate(input, invocation, options, callback?) : void { // options.mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip, 3 = node
 	window["workerObject"] = window["workerObject"] || {loaded: false};
 	if (!window["workerObject"].loaded){
 		window["workerObject"].worker = new Worker();
@@ -317,9 +317,8 @@ export function validate(input, invocation, mode, callback?) : void { // mode 0 
 			}
 		};
 		window["workerObject"].loaded = true;
-		window["workerObject"].worker.postMessage({type:'input', input: input});
-		//worker.postMessage({type: 'primes', limit: 1000 });
+		window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data});
 	}
 	document.getElementById('interpolated').innerHTML = '';
-	window["workerObject"].worker.postMessage({type:'input', input: input});			
+	window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data});			
 }

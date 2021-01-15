@@ -51,6 +51,7 @@
 		monaco.languages.register({ id: 'texttemplate' });
 
 		let parserFacade;
+		let optionalData = null;
 
 		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());
 		let config = {
@@ -173,7 +174,7 @@
 					}
 				}
 				setTimeout(function(){
-					parserFacade.runValidation(input, mode);
+					parserFacade.runValidation(input, {mode: mode, data: optionalData});
 				},0);
 			}
 			editor.onDidChangeModelContent(runValidation);
@@ -384,6 +385,10 @@
 			$.ajax({
 				url: '/template/' + urlSplit[1],
 				success: function (data) {
+					if (typeof data == 'object' && data.template && data.data){
+						optionalData = data.data;
+						data = data.template;
+					}
 					if (typeof data == 'string'){
 						createEditor(data.replace(/\\\\n/g,"\0x01").replace(/\\n/g,"\n").replace(/\0x01/g,"\\n"));
 					} else {
