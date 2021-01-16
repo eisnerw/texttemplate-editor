@@ -174,7 +174,7 @@
 					}
 				}
 				setTimeout(function(){
-					parserFacade.runValidation(input, {mode: mode, data: optionalData});
+					parserFacade.runValidation(input, {mode: mode, data: optionalData, editor: editor});
 				},0);
 			}
 			editor.onDidChangeModelContent(runValidation);

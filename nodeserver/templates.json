@@ -738,7 +738,7 @@
 	]
 	,"simpledata":[
 		"{\"Hello\"} {lastName}, {firstName} with {pets=>",
-		"   [{pets:#formatPet.#anded()}]",
+		"   [{pets:#xformatPet.#anded()}].@Include('#doInclude')",
 		"   ,[no pets]",
 		"}!!",
 		"",
