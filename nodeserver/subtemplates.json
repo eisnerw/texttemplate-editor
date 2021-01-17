@@ -1,5 +1,5 @@
 {
-	"xformatPet": ["[a {type} named {namex}]"]
+	"xformatPet": ["[a {type} named {namex} {#a}]"]
 	,"xformatPets": ["[{pets:[a big {type} named \"{name}\"].Anded()}]"]
 	,"formatGitRepos": ["[{data:[{name}{description->[ ({description})]}]}]"]
 	,"formatGitReposAnded": ["[{data:[{name}{description->[ ({description})]}].Anded()}]"]
@@ -400,6 +400,10 @@
 		"]}",
 		"{#data:[/data/people]}]"
 	]
-	,"testInclude":"[\nSubtemplates:\n{#a:[THIS IS A]}\n{#b:[THIS IS B]}\n{#data:[/data/people]}].@MissingValue('N/A')"
-	,"doInclude":"[].@MissingValue('missing >>{key}<<')"
+	,"doInclude":[
+		"[",
+		"Subtemplates:",
+		"{#a:[THIS IS AN INCLUDED SUBTEMPLATE]}",
+		"].@MissingValue('missing --{key}--')"
+	]
 }

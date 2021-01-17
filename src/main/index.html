@@ -38,6 +38,7 @@
 	<input type="checkbox" checked=true id="autorun"><label for="vehicle1">Run automatically when editor content changes:</label>
 	<span style='font-size: 1.5em;font-weight: bold;'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
 	<button id='run' class='button' onclick='return window.runValidation("button");'>Run</button>
+	<button id='save' class='button' onclick='return window.saveTemplate();'>Save</button>
 </div>
 <div id="container" style="width:800px;height:600px;border:1px solid grey; float:left"></div>
 <div><pre id="interpolated"></pre></div>
@@ -176,6 +177,9 @@
 				setTimeout(function(){
 					parserFacade.runValidation(input, {mode: mode, data: optionalData, editor: editor});
 				},0);
+			}
+			saveTemplate = function(e){
+				alert("save:" + editor.getValue().length);
 			}
 			editor.onDidChangeModelContent(runValidation);
 			monaco.languages.registerDefinitionProvider('texttemplate', {

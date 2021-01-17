@@ -1593,6 +1593,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let templateName = argValues[0];
 					let oldAnnotations = this.annotations;
 					this.annotations = value; // this method is called on higher level template's annotations, so let any @ methods modify it
+					Object.keys(this.subtemplates).forEach((key)=>{
+						if (key.startsWith(templateName + '.')){
+							this.subtemplates[key.substr(templateName.length + 1)] = this.subtemplates[key];
+						}
+					});
 					this.visitNamedSubtemplate(args, templateName, true); // run the named subtemplate, preserving any loaded subtemplates
 					this.annotations = oldAnnotations;
 					break;
