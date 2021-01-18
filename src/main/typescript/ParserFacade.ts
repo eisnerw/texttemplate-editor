@@ -304,7 +304,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
 							window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
 							let splitPath = payload.path.split('/');
 							if (splitPath.length > 1 && splitPath[1] == 'subtemplate'){
-								editor.setValue(editor.getValue() + '\n/*SHARED*/{#' + splitPath[2] + ':' + data + '}');
+								editor.setValue(editor.getValue() + '\n/*SHARED*/{#' + splitPath[2] + ':' + data + '}/*SHARED*/');
 								editor.getAction('editor.foldAll').run();
 							}
 						}
