@@ -300,6 +300,9 @@ export function validate(input, invocation, options, callback?) : void { // opti
 					$.ajax({
 						url: urlPrefix + payload.path,
 						success: function (data) {
+							if (data.Result){
+								data = data.Result; // accomodate servers that pass back an object
+							}
 							document.getElementById('interpolated').innerHTML = payload.path + ' loaded'
 							window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
 							let splitPath = payload.path.split('/');
