@@ -259,6 +259,7 @@ function getSubtemplatePositions(positions : any[], processed, lineOffset : numb
 let folds : any = [];
 let urls = {};
 let invocations = 0;
+let callsToValidate = 0;
 
 export function runValidation(input, options) : void {
 	let invocation = ++invocations;
@@ -270,6 +271,7 @@ export function runValidation(input, options) : void {
 }
 
 export function validate(input, invocation, options, callback?) : void { // options.mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip, 3 = node
+	callsToValidate++;
 	let editor = options ? options.editor : null;
 	window["workerObject"] = window["workerObject"] || {loaded: false};
 	if (!window["workerObject"].loaded){
@@ -302,10 +304,17 @@ export function validate(input, invocation, options, callback?) : void { // opti
 						success: function (data) {
 							document.getElementById('interpolated').innerHTML = payload.path + ' loaded'
 							window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
-							let splitPath = payload.path.split('/');
-							if (splitPath.length > 1 && splitPath[1] == 'subtemplate'){
-								editor.setValue(editor.getValue() + '\n/*SHARED*/{#' + splitPath[2] + ':' + data + '}/*SHARED*/');
-								editor.getAction('editor.foldAll').run();
+							if (data && data.error){
+								window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
+							} else {
+								let splitPath = payload.path.split('/');
+								if (splitPath.length > 1 && splitPath[1] == 'subtemplate'){
+									editor.setValue(editor.getValue() + '\n/*SHARED*/{#' + splitPath[2] + ':' + data + '}/*SHARED*/');
+									if (callsToValidate < 2){
+										// only fold for the first pass
+										editor.getAction('editor.foldAll').run();
+									}
+								}
 							}
 						}
 						,error: function(obj, err, errorThrown){
