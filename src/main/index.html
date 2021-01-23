@@ -193,7 +193,7 @@
 							alert ('invalid shared subtemplate');
 							return;
 					}
-					let subtemplateName = ar[0].substr(1, iColon - 1);
+					let subtemplateName = ar[0].substr(2, iColon - 2);
 					let subtemplateText = ar[0].substr(iColon + 1, ar[0].length - iColon - 2);
 					shared.push({template: subtemplateName, text: subtemplateText});
 					if (ar.length > 1 && ar[1] != ""){

@@ -217,7 +217,7 @@ class BulletIndent {
 	}	
 }
 
-class TemplateData {
+export class TemplateData {
 	private dictionary = {};
 	private list: TemplateData[] = [];
 	private parent : TemplateData;

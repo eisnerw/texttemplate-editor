@@ -3,6 +3,7 @@ const express = require('express');
 const morgan = require('morgan');
 const app = express();
 const templates = require('./templates.json');
+const subtemplates = require('./subtemplates.json');
 
 // settings
 app.set('port', process.env.PORT || 3000);
@@ -40,7 +41,7 @@ app.post('/savetemplate',function(req,res){
 	templates[req.body.template] = req.body.text;
 	console.log('updating ' + req.body.template);
 	req.body.shared.forEach((shared)=>{
-		templates[shared.template] = shared.text;
+		subtemplates[shared.template] = shared.text;
 		console.log('updating shared ' + shared.template);
 	});
 	res.end('{"success":true}');
