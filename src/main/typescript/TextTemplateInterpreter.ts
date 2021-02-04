@@ -1209,7 +1209,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Case':
 					for (let i = 0; i < argValues.length; i+=2){
-						if ((!isNaN(parseIntargValues[i])) && !isNaN(parseInt(value)) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
+						if ((!isNaN(parseInt(argValues[i])) && !isNaN(parseInt(value)) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
 							value = argValues[i + 1];
 							break;
 						} else if ((i + 3) == argValues.length){
