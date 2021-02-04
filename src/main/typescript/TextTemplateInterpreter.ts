@@ -784,7 +784,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			return false;
 		}
-		if (!isNaN(leftValue) && !isNaN(rightValue)){
+		if (!isNaN(parseInt(leftValue)) && !isNaN(parseInt(rightValue))){
 			leftValue = parseInt(leftValue);
 			rightValue = parseInt(rightValue)
 		} else {
@@ -1197,7 +1197,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				case 'GreaterThan':
 				case 'LessThan':
 					let arg = argValues[0];
-					if (!isNaN(arg) && !isNaN(value)){
+					if (!isNaN(parseInt(arg)) && !isNaN(parseInt(value))){
 						arg = parseInt(arg);
 						value = parseInt(value)
 					} else {
@@ -1209,7 +1209,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Case':
 					for (let i = 0; i < argValues.length; i+=2){
-						if ((!isNaN(argValues[i]) && !isNaN(value) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
+						if ((!isNaN(parseIntargValues[i])) && !isNaN(parseInt(value)) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
 							value = argValues[i + 1];
 							break;
 						} else if ((i + 3) == argValues.length){
@@ -1239,7 +1239,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (arg != null && (method != 'Assert' || bFirst)){ // Assert only matches the first argument
 								if (arg.constructor.name == 'RegExp'){
 									matches = matches || arg.test(value);
-								} else if ((!isNaN(arg) && !isNaN(value) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
+								} else if ((!isNaN(parseInt(arg)) && !isNaN(parseInt(value)) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
 									matches = true;
 								} else if (typeof arg == 'string' && arg.includes('\x01{.}') && value == this.compose([arg], 1)){
 									matches = true;
@@ -1388,7 +1388,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'Align':
-					if (argValues.length > 3 || argValues.length == 0 || isNaN(argValues[0]) 
+					if (argValues.length > 3 || argValues.length == 0 || isNaN(parseInt(argValues[0])) 
 						   || (argValues.length > 1 && !(argValues[1] == 'L' || argValues[1] == 'R' || argValues[1] == 'C'))){
 						this.syntaxError('Incorrect arguments for ' + method, args);
 					} else {
@@ -1436,7 +1436,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'Substr':
-					if (argValues.length > 2 || isNaN(argValues[0]) || (argValues.length == 2 && isNaN(argValues[1]))){
+					if (argValues.length > 2 || isNaN(parseInt(argValues[0])) || (argValues.length == 2 && isNaN(parseInt(argValues[1])))){
 						this.syntaxError('Incorrect arguments for ' + method, args);
 					}
 					if (argValues.length == 1){
