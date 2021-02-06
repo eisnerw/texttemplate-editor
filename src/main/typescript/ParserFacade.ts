@@ -234,6 +234,8 @@ export function provideDefinition(model, position, token){
 			level = subtemplate.name + '.';
 		}
 	}
+	// The following doesn't work for complicated template/subtemplate relationships
+	/*
 	let definition = null;
 	let keyArray = (level + definitionName).split('.');
 	for (let i = 0; definition == null && i < keyArray.length; i++){
@@ -242,10 +244,22 @@ export function provideDefinition(model, position, token){
 	if (definition == null){
 		return;
 	}
-	return {
+	return [{
         range: new monaco.Range(definition.line, definition.column + 1, definition.endLine, definition.endColumn + 1),
         uri: model.uri
     };
+	*/
+	let defs = []; // return multiple ranges
+	Object.keys(subtemplateMap).forEach((key)=>{
+		if (key.endsWith(definitionName)){
+			let definition = subtemplateMap[key];
+			defs.push({
+				range: new monaco.Range(definition.line, definition.column + 1, definition.endLine, definition.endColumn + 1),
+				uri: model.uri
+			});
+		}
+	});
+	return defs;
 }
 function getSubtemplatePositions(positions : any[], processed, lineOffset : number, level : string){
 	if (processed.subtemplates != null){
