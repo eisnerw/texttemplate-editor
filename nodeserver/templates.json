@@ -670,8 +670,8 @@
 		"{#data:[/data/people]}"
 	]
 	,"events":[
-		"// {'/data/events':[{^.ToJson()}]} /* uncomment this line to see the data */",
-		"{'/data/events'.GroupBy(start.ToDate('YYYY-MM-DDT00:00:00'), 'group', 'start'):[ `",
+		"// {'/data/events':[{^.ToJson()}]} /* uncomment this line to see the raw data */",
+		"{^.GroupBy(start.ToDate('YYYY-MM-DDT00:00:00'), 'group', 'start'):[ `",
 		"{start.ToUpper()} ",
 		"   {group.OrderBy(start.ToDate('HHmm')):[{start.#formatTimes(end)}: {summary} ",
 		"      {.} Notes: {description}",

@@ -10,6 +10,7 @@ var parsedTemplates = {};
 var parsedTokens = {};
 let processedSubtemplates;
 let foundJsonObjects; // used by TemplateData to prevent loops
+const numericTest = /^[-+]?(\d+|\d+\.\d*|\d*\.\d+)$/;
 
 class ConsoleErrorListener extends error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
@@ -484,6 +485,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				context = ctx.children[0].accept(this);
 			} else {
 				context = ctx.children[0].children[0].accept(this);
+				if (this.context && typeof context == 'object' && context != null && context.type == 'argument'){
+					// special case when the existing context is a list.  Recompute without the context
+					this.context = undefined;
+					context = ctx.children[0].accept(this);
+				}
 			}
 			context = this.compose(context, 0);
 			if (Array.isArray(context) && context.length == 1){
@@ -607,7 +613,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 				});
 			}
-			if (this.context && this.context.type == 'list'){
+			if (this.context && this.context.type == 'list' && !valueContext.getText().startsWith('^')){
 				// for non-annotations and under special circumstances, depending on how it was parsed, we'll obtain a single value rather than a list
 				let bAggregatedResult : boolean = valueContext.constructor.name == 'InvokedTemplateSpecContext';  // only aggregate for this specific context
 				if (bAggregatedResult){
@@ -784,7 +790,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			return false;
 		}
-		if (!isNaN(parseInt(leftValue)) && !isNaN(parseInt(rightValue))){
+		if (numericTest.test(leftValue.toString().trim()) && numericTest.test(rightValue.toString().trim())){
 			leftValue = parseInt(leftValue);
 			rightValue = parseInt(rightValue)
 		} else {
@@ -1197,7 +1203,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				case 'GreaterThan':
 				case 'LessThan':
 					let arg = argValues[0];
-					if (!isNaN(parseInt(arg)) && !isNaN(parseInt(value))){
+					if (numericTest.test(arg.toString().trim()) && numericTest.test(value.toString().trim())){
 						arg = parseInt(arg);
 						value = parseInt(value)
 					} else {
@@ -1209,7 +1215,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Case':
 					for (let i = 0; i < argValues.length; i+=2){
-						if ((!isNaN(parseInt(argValues[i])) && !isNaN(parseInt(value)) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
+						if ((numericTest.test(argValues[i].toString().trim()) && numericTest.test(value.toString().trim()) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
 							value = argValues[i + 1];
 							break;
 						} else if ((i + 3) == argValues.length){
@@ -1239,7 +1245,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (arg != null && (method != 'Assert' || bFirst)){ // Assert only matches the first argument
 								if (arg.constructor.name == 'RegExp'){
 									matches = matches || arg.test(value);
-								} else if ((!isNaN(parseInt(arg)) && !isNaN(parseInt(value)) && parseInt(arg) == parseInt(value)) || arg.toString() == value.toString()){
+								} else if ((numericTest.test(arg.toString().trim()) && numericTest.test(value.toString().trim())) || arg.toString() == value.toString()){
 									matches = true;
 								} else if (typeof arg == 'string' && arg.includes('\x01{.}') && value == this.compose([arg], 1)){
 									matches = true;
