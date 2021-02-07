@@ -43,7 +43,12 @@ router.get('/:template', (req, res) => {
 		type:'url'
 		, 'path': '/template/' + template
 		, success: function(data){
-			//console.debug('templatedata='+data);
+            //console.debug('templatedata='+data);
+            if (data.startsWith('{')){
+                let dataObject = JSON.parse(data);
+                optionalData = dataObject.data;
+                textTemplateInterpreter.interpret(dataObject.template, processResult, {data: dataObject.data})
+            }
 			textTemplateInterpreter.interpret(data, processResult);
 		}
 		, error: function(error){
