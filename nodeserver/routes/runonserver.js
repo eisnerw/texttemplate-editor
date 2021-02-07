@@ -48,8 +48,9 @@ router.get('/:template', (req, res) => {
                 let dataObject = JSON.parse(data);
                 optionalData = dataObject.data;
                 textTemplateInterpreter.interpret(dataObject.template, processResult, {data: dataObject.data})
+            } else {
+                textTemplateInterpreter.interpret(data, processResult);
             }
-			textTemplateInterpreter.interpret(data, processResult);
 		}
 		, error: function(error){
 		}
