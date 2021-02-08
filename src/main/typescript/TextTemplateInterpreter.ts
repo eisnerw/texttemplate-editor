@@ -341,8 +341,8 @@ export class TemplateData {
 					} else if (value == null) {
 						result += 'null';
 					} else if (typeof value == 'string') {
-                        value = value.replace(/\n/g,'\\n').replace(/\r/g,'\\r');
-						result += ('"' + value.replace(/\\/g,'\\').replace(/"/g,'\\"') + '"');
+						value = value.replace(/\n/g,'\\n').replace(/\r/g,'\\r');
+						result += ('"' + value.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"');
 					} else {
 						result += value.toString();
 					}
@@ -2582,6 +2582,7 @@ function tokensAsString(ctx){
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
 export function interpret(input, callback, options?) : void { 
+	input = input.replace(/\r/g, '').replace(/\t/g, '    '); // TODO: option for controlling tab to spaces number
 	callback({type: 'status', status: 'parsing...'});
 	let errors : Error[] = [];
 	if (processedSubtemplates == null){  // non-null implies being called again
