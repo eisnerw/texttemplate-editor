@@ -1245,7 +1245,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (arg != null && (method != 'Assert' || bFirst)){ // Assert only matches the first argument
 								if (arg.constructor.name == 'RegExp'){
 									matches = matches || arg.test(value);
-								} else if ((numericTest.test(arg.toString().trim()) && numericTest.test(value.toString().trim())) || arg.toString() == value.toString()){
+								} else if ((numericTest.test(arg.toString().trim()) && numericTest.test(value.toString().trim()) && arg == value) || arg.toString() == value.toString()){
 									matches = true;
 								} else if (typeof arg == 'string' && arg.includes('\x01{.}') && value == this.compose([arg], 1)){
 									matches = true;
