@@ -278,7 +278,10 @@ export class TemplateData {
 	}
 	getKeys() : string[] {
 		return Object.keys(this.dictionary);
-	}
+    }
+    remove(key : string) : void {
+        delete this.dictionary[key];
+    }
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
 		let value = this.dictionary[keySplit[0]];
@@ -1359,7 +1362,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 										// the condition returned true; add a clone of the iteration 
 										Object.keys(dollarVariables).forEach((key)=>{
 											delete newContext.dictionary[key];  // remove the added $ variables
-										});
+                                        });
+                                        this.context.getKeys().forEach((key)=>{
+                                            if (key.startsWith('$')){
+                                                this.context.remove(key); // prevent clone from breaking
+                                            }
+                                        });
 										result.push(new TemplateData(this.context)); 
 									}
 									this.context = oldContext;
