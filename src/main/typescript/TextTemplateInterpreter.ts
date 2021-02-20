@@ -285,8 +285,12 @@ export class TemplateData {
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
 		let value = this.dictionary[keySplit[0]];
-		if (value == undefined && keySplit[0] == '^'){
-			value = this.parent; 
+		if (value == undefined && (keySplit[0] == '*' || keySplit[0] == '^')){
+			if (keySplit[0] == '*'){
+				value = this;
+			} else {
+				value = this.parent; 
+			}
 			if (value == undefined){
 				value = this; // allows ^.^... to get to the top
 			}
@@ -1121,7 +1125,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'EncodeFor'
 		)){
 			error = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
-		} else if (args.children && (method == 'ToUpper' || method == 'ToLower' || method == 'Trim')){
+		} else if (args.children && (method == 'ToUpper' || method == 'ToLower' || method == 'Trim' || method == 'Index')){
 			error = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 		} else if (argValues.length != 2 && (method == 'Replace')){
 			error = 'ERROR: wrong number of arguments for ' + method + ': ' + args.getText();
@@ -1712,6 +1716,26 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value['falsy'] = argValues[0];
 					}
 					break;
+					
+				case 'Index':
+					if (value == null || !(typeof value == 'object' && value.constructor.name == 'TemplateData')){
+						return 1;
+					}
+					let parent = value.parent;
+					let child = value;
+					while (parent != null && parent.type != 'list'){
+						child = parent;
+						parent = child.parent;
+					}
+					if (parent == null){
+						return 1;
+					}
+					for (let i = 0; i < parent.list.length; i++){
+						if (child === parent.list[i]){
+							return i + 1;
+						}
+					}
+					return 1;
 					
 				default:
 					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';

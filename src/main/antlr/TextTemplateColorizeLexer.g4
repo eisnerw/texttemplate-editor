@@ -157,4 +157,5 @@ fragment KEYWORDS: (
 	| 'Compose'
 	| '@DefaultIndent'
 	| '@ValueFunction'
+	| 'Index'
 );
