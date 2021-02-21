@@ -342,7 +342,9 @@ export class TemplateData {
 					let value : any = this.dictionary[keyname];
 					result += (this.indent(indentLevel + 1) + (bComma ? ',' : '') + '"' + keyname + '": ');
 					if (value instanceof TemplateData){
-						if (!TemplateData.foundObjects.includes(value)){
+						if (TemplateData.foundObjects.includes(value)){
+							result += 'null'; // don't include a value that has already been used
+						} else {
 							result += (<TemplateData>value).toJson(indentLevel + 1);
 						}
 					} else if (value == null) {
@@ -1125,7 +1127,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'EncodeFor'
 		)){
 			error = 'ERROR: invalid method, ' + method + ' for this data: ' + parentCtx.getText();
-		} else if (args.children && (method == 'ToUpper' || method == 'ToLower' || method == 'Trim' || method == 'Index')){
+		} else if (args.children && (method == 'ToUpper' || method == 'ToLower' || method == 'Trim')){
 			error = 'ERROR: invalid argument for ' + method + ': ' + args.getText();
 		} else if (argValues.length != 2 && (method == 'Replace')){
 			error = 'ERROR: wrong number of arguments for ' + method + ': ' + args.getText();
@@ -1332,6 +1334,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = 0;
 							} else if (value instanceof TemplateData && value.type == 'list'){
 								value = value.count();
+							} else if (value == null || (typeof value == 'object' && value.type == 'missing')){
+								value = 0;
 							} else {
 								value = 1;
 							}
@@ -1718,7 +1722,25 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 					
 				case 'Index':
-					if (value == null || !(typeof value == 'object' && value.constructor.name == 'TemplateData')){
+					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 || typeof value != 'object' && value.constructor.name != 'TemplateData'))){
+						this.syntaxError('Invalid argument for Index', args.parentCtx);
+						return null;
+					}
+					if (argValues.length > 0){
+						let index = parseInt(argValues[0]);
+						if (value.type == 'dictionary'){
+							if (index == 1){
+								return value;
+							} else {
+								return new TemplateData('[]', value);
+							}
+						}
+						if (value.list.length >= index){
+							return new TemplateData(value.list[index - 1], value);
+						}
+						return new TemplateData('[]', value);
+					}
+					if (value == null || typeof value != 'object' || value.constructor.name != 'TemplateData'){
 						return 1;
 					}
 					let parent = value.parent;
