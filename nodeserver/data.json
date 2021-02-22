@@ -322,6 +322,11 @@
 				  "text": "This method zero or a single argument, which is a predicate expression.  The method produces a number reflecting the number of items in the list that meet the conditions of the predicate.  With no arguments, this method produces the count of the number of items in the list.  "
 				},
 				{
+				  "name": "Index",
+				  "type": "dash",
+				  "text": "This method can be used to filter a list to a specific instance, typically, the first one, e.g., \"value.Index(1)\".  With no arguments, typically \"*.Index()\", the method produces a number reflecting the position in the list of a specific instance.  Both the single argument and the position number are one-base (the first instance is #1).  "
+				},
+				{
 				  "name": "OrderBy",
 				  "type": "dash",
 				  "text": "This method takes a single argument that specifies an attribute from the dictionaries in the list or any argument that results in a string, presumably calculated from attributes in the list's dictionaries.  The method produces a new list containing the original items, ordered by the specification.  Note that the original order of the list is retained for items that all match the same specification, so this method can be used multiple times to first order by a lower level attribute and then by successively higher level attributes to obtain a list ordered by multiple attributes.  "
@@ -454,7 +459,7 @@
 		{
 		  "name": "Data navigation",
 		  "type": "dash",
-		  "text": "The TextTemplate language is designed to process hierarchical data without limit.  Context tokens are used to descend in the hierarchy so that all identifiers in the context token's subtemplate reference attributes within that context.  In this way, most interpolation is likely to occur at a specific level, but occasionally a template will need to examine or emit a value from a higher level in the hierarchy.  The TextTemplate language provides the carat symbol, \"^\", to allow a template to access the parent of the current context.  A succession of carat symbols, as in \"^.^.^.attribute\" can be used to navigate to the top and, since the topmost caret points to itself, there is not concern about navigating above the top."
+		  "text": "The TextTemplate language is designed to process hierarchical data without limit.  Context tokens are used to descend in the hierarchy so that all identifiers in the context token's subtemplate reference attributes within that context.  In this way, most interpolation is likely to occur at a specific level, but occasionally a template will need to examine or emit a value from a higher level in the hierarchy.  The TextTemplate language provides the asterisk symbol, \"*\", to allow a template to access the current context and the carat symbol, \"^\", to allow a template to access the parent of the current context.  A succession of carat symbols, as in \"^.^.^.attribute\" can be used to navigate to the top and, since the topmost caret points to itself, there is not a concern about navigating above the top."
 		},
 		{
 		  "name": "Null evaluation",
