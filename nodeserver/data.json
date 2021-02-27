@@ -41,6 +41,7 @@
 				 ,"name": "Stripes"
 			  }
 		   ]
+		   ,"comment": "Doris seems to have a good relationship with her pets.\nShe is known to have multiple non-domesticated pets"
 		},
 		{
 		   "firstName": "John"
@@ -57,6 +58,7 @@
 				 ,"name": "Stripes"
 			  }
 		   ]
+		   ,"comment": "John mostly likes domesticated pets"
 		}
 	]
 	,"events": [
@@ -197,7 +199,12 @@
 				  "name": "number",
 				  "type": "dash",
 				  "text": "The TextTemplate language does not currently support arithmetic operations but it does support relative operators (e.g., greater than and less than).  Numerical values by themselves are treated as strings.  Numerical comparison uses a form of \"duck\" typing where values, including strings, that can be parsed as a number are treated as such in numerical comparisons if both comperands can be parsed as numbers.  "
-				}
+				},
+				{
+				  "name": "datetime",
+				  "type": "dash",
+				  "text": "The TextTemplate language does not utilize a specific datetime type, but it can process strings containing date and time specifications.  Date processing methods, e.g., ToDate(), can be applied to any string that represents a date/time.  In addition, the @DateTest annotation can be specified to recognize the name of variables that contain dates, which will be automatically formatted."
+				},
 			  ]
 			},
 			{
@@ -214,6 +221,11 @@
 				  "name": "list",
 				  "type": "dash",
 				  "text": "Lists (sometimes called \"arrays\") are typically ordered collections of dictionaries. The TextTemplate language also supports lists of scaler data types, such as strings, numbers, etc., by representing them as dictionaries, one per item, with the attribute of underscore (\"_\") mapping to one scalar value in each dictionary. "
+				},
+				{
+				  "name": "multiline strings",
+				  "type": "dash",
+				  "text": "Multiline strings are strings found in dictionary values (i.e., data) that contain one or more new line characters (\"\\n\").  Multiline data strings are recognized only when a multiline style is in effect (see @MultilineStyle, below), in which case the strings may be output tabbed, indented and/or followed by a blank line.  Note, string processing methods, e.g., ToLower(), Substr(), Trim(), etc. can be applied to multiline string variables and they will retain their multiline property.  However, when string processing methods are applied to the output of subtemplates containing multiline strings, the multiline properties will be lost, resulting in them no longer being styled by any multiline styles that may be in effect. "
 				}
 			  ]
 			}
@@ -222,7 +234,7 @@
 		{
 		  "name": "Multiple Occurrence",
 		  "type": "dash",
-		  "text": "TextTemplate Lists typically represent multiple occurrences an attribute in a parent dictionary.  Like dictionaries, lists require a context token to specify how the attributes in the listed dictionaries are to be interpolated.  A single dictionary is treated by the language as a degenerate case of a list with one element.  In this way, context tokens, whether lists or dictionaries, can be used  to interpolate data that is anticipated to sometimes have multiple values.  Multiple values are typically interpolated as indented lists (see next).  By invoking a value token on an indented line below the parent data, TextTemplate will always create a list, even if their is a single value.  If the value is invoked on the same line as the parent data, TextTemplate will only create an indented list for multiple values."
+		  "text": "TextTemplate Lists typically represent multiple occurrences of an attribute in a parent dictionary.  Like dictionaries, lists require a context token to specify how the attributes in the listed dictionaries are to be interpolated.  A single dictionary is treated by the language as a degenerate case of a list with one element.  In this way, context tokens, whether lists or dictionaries, can be used  to interpolate data that is anticipated to sometimes have multiple values.  Multiple values are typically interpolated as indented or bulleted text lines (see next).  By invoking a value token on an indented line below the parent data, TextTemplate will always create indented or bulleted text, even if there is only a single value.  If the value is invoked on the same line as the parent data, TextTemplate will only create an indented list for multiple values."
 		},
 		{
 		  "name": "Bulleting and indenting",
@@ -252,6 +264,11 @@
 				  "name": "ToUpper",
 				  "type": "dash",
 				  "text": "This method takes no arguments.  It converts any lower case characters within a string to upper case"
+				},
+				{
+				  "name": "ToLower",
+				  "type": "dash",
+				  "text": "This method takes no arguments.  It converts any upper case characters within a string to lower case"
 				},
 				{
 				  "name": "Trim",
@@ -378,7 +395,7 @@
 				{
 				  "name": "@MissingValue",
 				  "type": "dash",
-				  "text": "this annotation, which takes zero or one argument, specifies the string value that will be substituted for any missing, null or empty string value that is encountered when retrieving data from a TextTemplate context.  When specified without an argument, missing values remain missing or null.  The missing value can contain the string \"{key}\", which will be replaced by the key of the missing value. Note that @MissingValue can be explicitly overridden by the use of the IfMissing method"
+				  "text": "this annotation, which takes zero or one argument, specifies the string value that will be substituted for any missing, null or empty string value that is encountered when retrieving data from a TextTemplate context.  When specified without an argument, missing values remain missing or null.  The missing value can contain the string \"{key}\", which will be replaced by the key of the missing value. Note that @MissingValue can be explicitly overridden for a specific variable by invoking the IfMissing() method."
 				},
 				{
 				  "name": "@DateTest",
@@ -409,6 +426,11 @@
 				  "name": "@BulletMode",
 				  "type": "dash",
 				  "text": "this annotation takes a single argument that can be either \"implicit\" or \"explicit\".  TextTemplate bulleting supports a mix of bulleted and non-bulleted lines that are intermixed.  When calculating bullet numbering, TextTemplate can take into account the fact that a non-bulleted text line is indented less than some of the bullets in an outline.  Under this circumstance, it will reset the index of all bullets that are further to the right of an indented line, only if the bullet mode is \"implicit\" (the default).  When the mode is \"explicit\", the indeces of bullets that might have been interrupted by the non-bulleted line continue to advance."
+				},
+				{
+				  "name": "@MultilineStyle",
+				  "type": "dash",
+				  "text": "this annotation takes a variable number of arguments, limited to \"Indented\", \"IndentAllButFirst\", \"Tabbed\", and \"Padded\".  When in effect, multiline styles affect the output of multiline strings (see above).  \"Indent\" causes multiline strings to be displayed on new lines that are indented from the previous line.  \"IndentAllButFirst\" begins indenting starting with the second line.  \"Tabbed\" indents the strings four spaces from the left, and \"Padded\" causes a blank line to be added following the last line.  When invoked with no arguments, this annotation cancels multiline formatting."
 				},
 				{
 				  "name": "@Falsy",
@@ -445,7 +467,7 @@
 				{
 				  "name": "Debugging Notations",
 				  "type": "dash",
-				  "text": "In addition to the above, TextTemplate exposes the current annotations as the \"@\" variable and provides two special attributes, @.Tokens and @.Tree.  @Tokens displays the current lexical tokens used in parsing a template, and @.Tree emits a representation of the parse tree"
+				  "text": "In addition to the above, the TextTemplate designer exposes internal data structures such as the current annotations using the \"@\" variable and provides two special attributes, @.Tokens and @.Tree.  @.Tokens displays the current lexical tokens used in parsing a template, and @.Tree emits a representation of the parse tree"
 				}
 			  ]
 			},
@@ -464,7 +486,7 @@
 		{
 		  "name": "Null evaluation",
 		  "type": "dash",
-		  "text": "By default, will eliminate text lines that have a missing or null value anywhere in the line.  This is specifically designed to eliminate the necessity to test for the presence of all values necessary to fully interpolate a template and is similar to the way that databases typically deal with null results.  This behavior can cause confusion when text disappears possibly due to a mistaken variable referenc, but the behavior can be globally modified by temporarily or permanently applying a @MissingValue annotation."
+		  "text": "By default, TextTemplate will eliminate text lines that have a missing or null value anywhere in the line.  This is specifically designed to eliminate the necessity to test for the presence of all values used to fully interpolate a template and is similar to the way that SQL databases typically deal with nulls.  This behavior can cause confusion when text disappears possibly due to a mistaken variable reference.  The behavior can be globally modified by temporarily or permanently applying an @MissingValue annotation."
 		},
 		{
 		  "name": "Comments",

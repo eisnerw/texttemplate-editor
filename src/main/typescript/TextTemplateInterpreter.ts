@@ -350,8 +350,8 @@ export class TemplateData {
 					} else if (value == null) {
 						result += 'null';
 					} else if (typeof value == 'string') {
-						value = value.replace(/\n/g,'\\n').replace(/\r/g,'\\r');
-						result += ('"' + value.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"');
+						value = value.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/"/g,'\\"');
+						result += ('"' + value + '"');
 					} else {
 						result += value.toString();
 					}
@@ -447,6 +447,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				value = this.encodeXML(value);
 			} else if (this.annotations.encoding == 'uri') {
 				value = encodeURI(value);
+			}
+			if (value.includes('\n') && this.annotations['multilineStyle']){
+				return {type: 'multiline', multilines: value, multilineStyle: this.annotations['multilineStyle']};
 			}
 		}
 		return value;
@@ -668,7 +671,17 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				if (!method.startsWith('@')){ // annotations have already been processed
 					let args : any = child.children[1]; // passing the argument tree to CallMethod
-					value = this.callMethod(method, this.compose(value, 0), args);
+					if (typeof value && typeof value == 'object' && value.type == 'multiline'){
+						// run the method on the multiline string which is retained
+						let multilineValue = this.callMethod(method, value.multilines, args);
+						if (typeof multilineValue != "string" || !multilineValue.includes('\n')){
+							value = multilineValue;
+						} else {
+							value.multilines = multilineValue;
+						}
+					} else {
+						value = this.callMethod(method, this.compose(value, 0), args);
+					}
 				}
 			}
 		});
@@ -1721,6 +1734,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 					
+					
+					
 				case 'Index':
 					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 || typeof value != 'object' && value.constructor.name != 'TemplateData'))){
 						this.syntaxError('Invalid argument for Index', args.parentCtx);
@@ -1758,6 +1773,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 					}
 					return 1;
+					
+				case '@MultilineStyle':
+					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed'.split(',');
+					let bInvalid = argValues.includes('Tabbed') && (argValues.includes('Indented') || argValues.includes('IndentAllButFirst'));
+					for (let i = 0; i < argValues.length; i++){
+						if (typeof argValues[i] != 'string' || !validStyles.includes(argValues[i]) || bInvalid){
+							this.syntaxError('ERROR: invalid argument for multiline style', args.parentCtx);
+							argValues = [];
+							break;
+						}
+					}
+					if (argValues.length == 0){
+						delete value['multilineStyle'];
+					}
+					value['multilineStyle'] = argValues;
+					break;
 					
 				default:
 					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
@@ -2016,7 +2047,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				let bReplaceIndent = !!indent && indent.includes('\x01{.}') && !bulletInTheOutput.includes('\x01{.}') && bulletInTheOutput.length > 0;
 				indent = this.doCompose(item, output, bReplaceIndent ? bulletInTheOutput : indent);
 			} else if (typeof item == 'object' && item != null){
-				if (item.type == 'bullet'){
+				if (item.type == 'multiline'){
+					let multilines = item.multilines.trim().split('\n');
+					let bIndentAllButFirst = item.multilineStyle.includes('IndentAllButFirst');
+					let bPadded = item.multilineStyle.includes('Padded');
+					let bTabbed = item.multilineStyle.includes('Tabbed');
+					let bIndented = item.multilineStyle.includes('Indented');
+					let nIndent = 0;
+					if (bIndented || bIndentAllButFirst || bTabbed){
+						nIndent = 4;						
+						if (!bTabbed){
+							nIndent += output.lines.length > 1 ? output.lines[output.lines.length - 1].replace(/( *).*$/,'$1').length : 0;
+						}
+					}
+					let multilineIndent = ' '.repeat(nIndent);
+					this.addToOutput((bIndentAllButFirst ? '' : '\n' + multilineIndent) + multilines.join('\n' + multilineIndent) + (bPadded ? '\n' : ''), output)
+				} else if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
 					indent = item.bullet;
 					if (item.parts == null) {

@@ -158,4 +158,5 @@ fragment KEYWORDS: (
 	| '@DefaultIndent'
 	| '@ValueFunction'
 	| 'Index'
+	| '@MultilineStyle'
 );
