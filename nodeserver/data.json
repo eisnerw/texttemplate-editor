@@ -204,7 +204,7 @@
 				  "name": "datetime",
 				  "type": "dash",
 				  "text": "The TextTemplate language does not utilize a specific datetime type, but it can process strings containing date and time specifications.  Date processing methods, e.g., ToDate(), can be applied to any string that represents a date/time.  In addition, the @DateTest annotation can be specified to recognize the name of variables that contain dates, which will be automatically formatted."
-				},
+				}
 			  ]
 			},
 			{
