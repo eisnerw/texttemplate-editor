@@ -677,7 +677,21 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let args : any = child.children[1]; // passing the argument tree to CallMethod
 					if (value && typeof value == 'object' && value.type == 'multiline'){
 						// run the method on the multiline string which is retained
-						let multilineValue = this.callMethod(method, value.multilines, args);
+                        let multilineValue = this.callMethod(method, value.multilines, args);
+                        if (Array.isArray(multilineValue)){
+                            let multilineParts = [];
+                            for (let i = 0; i < multilineValue.length; i++){
+                                if (multilineValue[i] && typeof multilineValue[i] == "object" && multilineValue[i].type == 'multiline'){
+                                    multilineParts[i] = multilineValue[i].multilines;
+                                } else {
+                                    multilineParts[i] = multilineValue[i];
+                                }
+                            }
+                            let composedMultiline = this.compose(multilineParts, 0);
+                            if (typeof composedMultiline == 'string'){
+                                multilineValue = composedMultiline;
+                            }
+                        }
 						if (typeof multilineValue != "string" || !multilineValue.includes('\n')){
 							value = multilineValue;
 						} else {
