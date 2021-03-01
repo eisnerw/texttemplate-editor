@@ -675,7 +675,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				if (!method.startsWith('@')){ // annotations have already been processed
 					let args : any = child.children[1]; // passing the argument tree to CallMethod
-					if (value && typeof value && typeof value == 'object' && value.type == 'multiline'){
+					if (value && typeof value == 'object' && value.type == 'multiline'){
 						// run the method on the multiline string which is retained
 						let multilineValue = this.callMethod(method, value.multilines, args);
 						if (typeof multilineValue != "string" || !multilineValue.includes('\n')){
