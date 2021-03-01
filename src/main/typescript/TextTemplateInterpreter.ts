@@ -444,6 +444,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 		}
 		if (typeof value == 'string'){
+			value = value.replace(/\r/g, ''); // carriage return messes up regex
 			if (this.annotations.encoding == 'html'){
 				value = this.encodeHTML(value);
 			} else if (this.annotations.encoding == 'xml') {
