@@ -1795,8 +1795,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					if (argValues.length == 0){
 						delete value['multilineStyle'];
+					} else {
+						value['multilineStyle'] = argValues;
 					}
-					value['multilineStyle'] = argValues;
 					break;
 					
 				default:
