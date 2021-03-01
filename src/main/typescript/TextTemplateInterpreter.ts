@@ -284,7 +284,10 @@ export class TemplateData {
     }
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
-		let value = this.dictionary[keySplit[0]];
+        let value = this.dictionary[keySplit[0]];
+        if (value == null && this.type == 'list' && this.list.length > 0){
+            value = this.list[0].dictionary[keySplit[0]]; // special case for a list of common elements.  Use the first one.
+        }
 		if (value == undefined && (keySplit[0] == '*' || keySplit[0] == '^')){
 			if (keySplit[0] == '*'){
 				value = this;
@@ -427,7 +430,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			value = this.context.getValue(key);
 		}
-		if (value === undefined){
+		if (value === undefined || value == ''){ // Treat empty string as a missing value
 			console.debug('Missing value for ' + key);
 			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
 			return {type: 'missing', missingValue: missingValue, key: key};
@@ -671,7 +674,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else {
 				if (!method.startsWith('@')){ // annotations have already been processed
 					let args : any = child.children[1]; // passing the argument tree to CallMethod
-					if (typeof value && typeof value == 'object' && value.type == 'multiline'){
+					if (value && typeof value && typeof value == 'object' && value.type == 'multiline'){
 						// run the method on the multiline string which is retained
 						let multilineValue = this.callMethod(method, value.multilines, args);
 						if (typeof multilineValue != "string" || !multilineValue.includes('\n')){
@@ -1163,7 +1166,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == '@DefaultIndent'
 		)){
 			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
-		} else if ((args.children && args.children.length > 1 || argValues[0] == null) && (
+		} else if ((args.children && args.children.length > 1 || (argValues[0] == null && method != 'Contains')) && (
 			method == 'GreaterThan' 
 			|| method == 'LessThan' 
 			|| method == 'StartsWith' 
@@ -1394,11 +1397,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									this.context = oldContext;
 								});
 							} else {
+                                Object.keys(dollarVariables).forEach((key)=>{
+                                    this.context.dictionary[key] = dollarVariables[key]; // pass on the $ variables
+                                });
 								let filterResult = args.accept(this);
 								while (Array.isArray(filterResult) && filterResult.length == 1){
 									filterResult = filterResult[0];
 								}
-
+                                Object.keys(dollarVariables).forEach((key)=>{
+                                    delete this.context.dictionary[key]; // remove the added $ variables
+                                });
 								if (filterResult){
 									result.push(this.context); // no filtering (or cloning) necessary 
 								}
