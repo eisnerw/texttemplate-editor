@@ -296,6 +296,11 @@
 				  "text": "These methods are designed to mimic the corresponding substr(), indexOf, and lastIndexOf JavaScript functions.  Substr takes one or two arguments and extracts the contents of a string starting at the position of the first argument, which is zero-origined. The optional second argument specifies the maximum number of characters to be extracted. In the absence of a second argument, the method extracts all characters starting from the position of the first argument."
 				},
 				{
+				  "name": "EndIndexOf",
+				  "type": "dash",
+				  "text": "This method computes the index of argument and adds the length of the argument.  It is provide to be used as an argument to Substr, allowing that function to eliminate the text prior to and including the argument."
+				},
+				{
 				  "name": "IfMissing",
 				  "type": "dash",
 				  "text": "This method takes zero or one argument and only functions if the value to which it is being applied is null, an empty string, or missing.   In those cases, if there is an argument, the value of that argument is substituted for the missing value.  If the method has no arguments, the result is a null value.  Note that this method takes precedence over and @MissingValue annotation that may be in effect."

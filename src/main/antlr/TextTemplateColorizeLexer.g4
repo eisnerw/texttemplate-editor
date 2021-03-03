@@ -159,4 +159,5 @@ fragment KEYWORDS: (
 	| '@ValueFunction'
 	| 'Index'
 	| '@MultilineStyle'
+    | 'EndIndexOf'
 );

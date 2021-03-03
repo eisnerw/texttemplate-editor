@@ -1172,6 +1172,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'Contains' 
 			|| method == 'Substr' 
 			|| method == 'IndexOf'
+			|| method == 'EndIndexOf'
 			|| method == 'EncodeFor'
 		)){
 			error = 'ERROR: missing argument for ' + method + ': ' + args.getText();
@@ -1187,7 +1188,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'StartsWith' 
 			|| method == 'EndsWith' 
 			|| method == 'Contains' 
-			|| method == 'IndexOf'
+            || method == 'IndexOf'
+			|| method == 'EndIndexOf'            
 			|| method == 'EncodeFor'
 			|| method == '@EncodeDataFor'
 		)){
@@ -1209,7 +1211,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'Contains'
 			|| method == 'Substr'
 			|| method == 'LastIndexOf'
-			|| method == 'IndexOf'
+            || method == 'IndexOf'
+            || method == 'EndIndexOf'
 			|| method == 'EncodeFor'
 		))){
 			value = null;
@@ -1512,6 +1515,15 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					value = value.toString().indexOf(argValues[0])
 					break;
 
+                case 'EndIndexOf':
+                    let indexOf = value.toString().indexOf(argValues[0]);
+                    if (indexOf == -1){
+                        value = -1;
+                    } else {
+                        value = Math.min(value.length, indexOf + argValues[0].length);
+                    }
+                    break;
+
 				case 'OrderBy':
 				case 'GroupBy':
 					if (method == 'OrderBy'){
@@ -1760,7 +1772,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					
 					
 				case 'Index':
-					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 || typeof value != 'object' && value.constructor.name != 'TemplateData'))){
+					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0) || typeof value != 'object' && value.constructor.name != 'TemplateData')){
 						this.syntaxError('Invalid argument for Index', args.parentCtx);
 						return null;
 					}
@@ -1798,7 +1810,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					return 1;
 					
 				case '@MultilineStyle':
-					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed'.split(',');
+					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed,Trimmed'.split(',');
 					let bInvalid = argValues.includes('Tabbed') && (argValues.includes('Indented') || argValues.includes('IndentAllButFirst'));
 					for (let i = 0; i < argValues.length; i++){
 						if (typeof argValues[i] != 'string' || !validStyles.includes(argValues[i]) || bInvalid){
@@ -2076,7 +2088,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let bIndentAllButFirst = item.multilineStyle.includes('IndentAllButFirst');
 					let bPadded = item.multilineStyle.includes('Padded');
 					let bTabbed = item.multilineStyle.includes('Tabbed');
-					let bIndented = item.multilineStyle.includes('Indented');
+                    let bIndented = item.multilineStyle.includes('Indented');
+                    let bTrimmed = item.multilineStyle.includes('Trimmed');
 					let nIndent = 0;
 					if (bIndented || bIndentAllButFirst || bTabbed){
 						nIndent = 4;						
@@ -2084,7 +2097,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							nIndent += output.lines.length > 1 ? output.lines[output.lines.length - 1].replace(/( *).*$/,'$1').length : 0;
 						}
 					}
-					let multilineIndent = ' '.repeat(nIndent);
+                    let multilineIndent = ' '.repeat(nIndent);
+                    if (bTrimmed){
+                        for (let i = 0; i < multilines.length; i++){
+                            multilines[i] = multilines[i].trim();
+                        }
+                    }
 					this.addToOutput((bIndentAllButFirst ? '' : '\n' + multilineIndent) + multilines.join('\n' + multilineIndent) + (bPadded ? '\n' : ''), output)
 				} else if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
@@ -2093,7 +2111,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else if (typeof item.parts == 'string' || typeof item.parts == 'number'){
 						this.addToOutput(item.parts.toString(), output);
 					} else if (typeof item.parts == 'object' && item.parts != null && item.constructor.name != ''){
-						if (Array.isArray(item.parts) || item.parts.type == 'bullet' || item.parts.type == 'missing'){
+						if (Array.isArray(item.parts) || item.parts.type == 'bullet' || item.parts.type == 'missing' || item.parts.type == 'multiline'){
 							this.doCompose([item.parts], output, item.bullet);
 						} else {
 							// list
