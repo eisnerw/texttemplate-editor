@@ -2072,7 +2072,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				indent = this.doCompose(item, output, bReplaceIndent ? bulletInTheOutput : indent);
 			} else if (typeof item == 'object' && item != null){
 				if (item.type == 'multiline'){
-					let multilines = item.multilines.trim().split('\n');
+					let multilines = item.multilines.split('\n');
 					let bIndentAllButFirst = item.multilineStyle.includes('IndentAllButFirst');
 					let bPadded = item.multilineStyle.includes('Padded');
 					let bTabbed = item.multilineStyle.includes('Tabbed');
