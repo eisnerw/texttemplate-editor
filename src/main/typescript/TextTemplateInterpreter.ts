@@ -430,7 +430,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		} else {
 			value = this.context.getValue(key);
 		}
-		if (value === undefined || value == ''){ // Treat empty string as a missing value
+		if (value === undefined || value === ''){ // Treat empty string as a missing value
 			console.debug('Missing value for ' + key);
 			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
 			return {type: 'missing', missingValue: missingValue, key: key};
@@ -812,6 +812,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitRelationalOperand = function(ctx){
 		return ctx.children[0].accept(this);
 	}
+	visitPredicateArgument = function(ctx) {
+		return this.visitChildren(ctx)[0];
+	};
 	visitRelationalOperation = function(ctx) {
 		let leftValue = ctx.children[0].accept(this);
 		let rightValue = ctx.children[2].accept(this);
@@ -1086,7 +1089,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				} else {
 					let arg = args.children[i].accept(this);
 					if (arg !== undefined){ // remove result of commas
-						if (arg.constructor.name == 'RegExp'){
+						if (arg.constructor.name == 'RegExp' ){
 							argValues.push(arg);
 						} else {
 							argValues.push(this.compose(arg, 0));
@@ -1772,7 +1775,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					
 					
 				case 'Index':
-					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0) || typeof value != 'object' && value.constructor.name != 'TemplateData')){
+					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 || typeof value != 'object' && value.constructor.name != 'TemplateData'))){
 						this.syntaxError('Invalid argument for Index', args.parentCtx);
 						return null;
 					}
