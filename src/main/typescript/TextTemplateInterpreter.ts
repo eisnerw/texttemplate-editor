@@ -226,6 +226,10 @@ export class TemplateData {
 	type: string;
 	constructor(jsonData: string | {} | [], parent?: TemplateData) {
         let json: {};
+        if (Array.isArray(jsonData) && (<any[]>jsonData).length == 1){
+            // don't create a list for a single value
+            jsonData = (<any[]>jsonData)[0];
+        }
 		if (typeof jsonData == 'string') {
 			if (jsonData.startsWith('{') || jsonData.startsWith('[')){
 				json = JSON.parse(jsonData);
