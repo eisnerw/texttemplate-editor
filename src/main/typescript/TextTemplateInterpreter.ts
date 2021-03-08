@@ -1775,7 +1775,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					
 					
 				case 'Index':
-					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0) || typeof value != 'object' && value.constructor.name != 'TemplateData')){
+					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 || typeof value != 'object' && value.constructor.name != 'TemplateData'))){
 						this.syntaxError('Invalid argument for Index', args.parentCtx);
 						return null;
 					}
