@@ -225,7 +225,7 @@ export class TemplateData {
 	static foundObjects : any; // used to protect against ToJson loops
 	type: string;
 	constructor(jsonData: string | {} | [], parent?: TemplateData) {
-		let json: {};
+        let json: {};
 		if (typeof jsonData == 'string') {
 			if (jsonData.startsWith('{') || jsonData.startsWith('[')){
 				json = JSON.parse(jsonData);
