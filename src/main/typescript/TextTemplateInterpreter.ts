@@ -289,8 +289,28 @@ export class TemplateData {
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
         let value = this.dictionary[keySplit[0]];
-        if (value == null && this.type == 'list' && this.list.length > 0){
-            value = this.list[0].dictionary[keySplit[0]]; // special case for a list of common elements.  Use the first one.
+        if (value == null && this.type == 'list' && this.list.length > 0 && this.list[0].dictionary[keySplit[0]]){
+            // extract each element from the list and return a dictionary or a list
+            value = [];
+            this.list.forEach((l)=>{
+                let element = l.dictionary[keySplit[0]];
+                if (element){
+                    if (element.type == 'dictionary'){
+                        value.push(element);
+                    } else if (element.type == 'list' && element.list.length > 0){
+                        element.list.forEach((subelement)=>{
+                            value.push(element);
+                        });
+                    }
+                }
+            });
+            if (value.length == 0){
+                return undefined;
+            }
+            if (value.length == 1){
+                return value[0];
+            }
+            return new TemplateData(value);
         }
 		if (value == undefined && (keySplit[0] == '*' || keySplit[0] == '^')){
 			if (keySplit[0] == '*'){
@@ -1547,7 +1567,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						this.syntaxError('An alias (third parameter) must be provided for the GroupBy name', args.children[0]);
 					} else if (!(<any>value instanceof TemplateData)){
 						this.syntaxError('Invalid data type for ' + method, args.parentCtx);
-					} else if ((method == 'GroupBy' && argValues.length < 2) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D')))){
+					} else if ((method == 'GroupBy' && argValues.length < 2) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D' || argValues[1] == 'U')))){
 						this.syntaxError('Invalid arguments for ' + method, args.parentCtx);
 					} else {
 						// temporarily set the context to the value being ordered or grouped
@@ -1593,10 +1613,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							let group = groups[key];
 							if (method == 'OrderBy'){
 								if (Array.isArray(group)){
-									group.forEach((member)=>{
-										
-										result.push(member); // if there is more than one, they are key duplicates
-									});
+                                    if (argValues[1] == 'U'){
+                                        result.push(group[0]); // Unique, so only use the first one
+                                    } else {
+                                        group.forEach((member)=>{
+                                            result.push(member); // if there is more than one, they are key duplicates
+                                        });
+                                    }
 								} else {
 									result.push(group);
 								}
