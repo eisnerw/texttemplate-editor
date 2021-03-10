@@ -1423,7 +1423,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 									Object.keys(dollarVariables).forEach((key)=>{
 										newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables
 									});
-									let addToResult = args.children[0].accept(this)[0];
+                                    let addToResult = args.children[0].accept(this);
+                                    if (Array.isArray(addToResult)){
+                                        addToResult = addToResult[0];
+                                    }
 									if (this.valueIsMissing(addToResult) || (typeof addToResult == "string" && this.annotations.falsy && this.annotations.falsy.test(addToResult))){
 										addToResult = false;
 									}
