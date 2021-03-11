@@ -219,7 +219,7 @@ class BulletIndent {
 }
 
 export class TemplateData {
-	public dictionary = {};
+	private dictionary = {};
 	private list: TemplateData[] = [];
 	private parent : TemplateData;
 	static foundObjects : any; // used to protect against ToJson loops
