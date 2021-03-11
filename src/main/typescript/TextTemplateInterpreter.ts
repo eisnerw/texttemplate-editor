@@ -219,7 +219,7 @@ class BulletIndent {
 }
 
 export class TemplateData {
-	private dictionary = {};
+	public dictionary = {};
 	private list: TemplateData[] = [];
 	private parent : TemplateData;
 	static foundObjects : any; // used to protect against ToJson loops
@@ -330,19 +330,16 @@ export class TemplateData {
 		}
 	}
 	iterateList(fn: (TemplateData) => any) {
-		this.list.forEach((item : TemplateData)=>{
-			fn(item);
-		});
+        if (this.type == 'list'){
+            this.list.forEach((item : TemplateData)=>{
+                fn(item);
+            });
+        } else {
+            fn(this);
+        }
 	}
 	count(){
 		return this.list.length;
-	}
-	asList() : TemplateData {
-		if (this.type == 'list'){
-			// already a list, so just clone it
-			return new TemplateData(this);
-		}
-		return new TemplateData([JSON.parse(this.toJson())]);
 	}
 	toJson(indentLevel? : number) : string {
 		let result : string = '';
@@ -1455,7 +1452,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
                                 Object.keys(dollarVariables).forEach((key)=>{
                                     delete this.context.dictionary[key]; // remove the added $ variables
                                 });
-								if (filterResult){
+								if (filterResult && !(typeof filterResult == 'object' && filterResult.type == 'missing')){
 									result.push(this.context); // no filtering (or cloning) necessary 
 								}
 							}
@@ -1583,7 +1580,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								}
 							});
 						}
-						this.context.asList().iterateList((newContext)=>{
+						this.context.iterateList((newContext)=>{
 							this.context = newContext;
 							Object.keys(dollarVariables).forEach((key)=>{
 								newContext.dictionary[key] = dollarVariables[key]; // pass on the $ variables in case they are needed for a calculaton
