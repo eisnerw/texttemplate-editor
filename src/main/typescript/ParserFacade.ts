@@ -274,6 +274,7 @@ let folds : any = [];
 let urls = {};
 let invocations = 0;
 let callsToValidate = 0;
+let nStage = 0;
 
 export function runValidation(input, options) : void {
 	let invocation = ++invocations;
@@ -285,6 +286,11 @@ export function runValidation(input, options) : void {
 }
 
 export function validate(input, invocation, options, callback?) : void { // options.mode 0 = immediate, 1 = delay (autorun when data changes), 2 = skip, 3 = node
+	if (nStage == 1){
+		return; // avoid processing due to editor changes on the first invocation
+	} else if (nStage == 0){
+		nStage++;
+	}
 	callsToValidate++;
 	let editor = options ? options.editor : null;
 	window["workerObject"] = window["workerObject"] || {loaded: false};
@@ -294,6 +300,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
 			let payload = event.data;
 			switch (payload.type){
 				case 'result':
+					nStage = 2; // indicates that any changes will now be interpreted
 					let monacoErrors = [];
 					for (let e of payload.errors) {
 						monacoErrors.push({
@@ -311,15 +318,14 @@ export function validate(input, invocation, options, callback?) : void { // opti
 
 				case 'url':
                     let urlPrefix = (payload.path.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
-                    console.debug('loading ' + urlPrefix + payload.path);
-					document.getElementById('interpolated').innerHTML = 'loading ' + payload.path;
+                    logit('loading ' + urlPrefix + payload.path + '...');
 					$.ajax({
 						url: urlPrefix + payload.path,
 						success: function (data) {
 							if (data.Result){
 								data = data.Result; // accomodate servers that pass back an object
 							}
-							document.getElementById('interpolated').innerHTML = payload.path + ' loaded'
+							logit('received ' + payload.path);
 							window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
 							if (data && data.error){
 								window["workerObject"].worker.postMessage({type:'url', data: data, id: payload.id});
@@ -335,7 +341,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
 							}
 						}
 						,error: function(obj, err, errorThrown){
-							document.getElementById('interpolated').innerHTML = payload.path + ' ERROR: ' + errorThrown;
+							logit(payload.path + ' ERROR: ' + errorThrown);
 							let msg = 'Unable to GET ' + this.url + '. Received error: "' + err + ' ' + errorThrown + '"';
 							window["workerObject"].worker.postMessage({type:'url', data: {error: msg}, id: payload.id});
 							console.error(msg);
@@ -344,7 +350,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
 					break;
 				
 				case 'status':
-					document.getElementById('interpolated').innerHTML = payload.status;
+					logit(payload.status);
 					break;
 			}
 		};
@@ -353,4 +359,9 @@ export function validate(input, invocation, options, callback?) : void { // opti
 	}
 	document.getElementById('interpolated').innerHTML = '';
 	window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data});			
+}
+function logit(text){
+	console.debug(text);
+	let currentOutput = document.getElementById('interpolated').innerHTML;
+	document.getElementById('interpolated').innerHTML = currentOutput + (currentOutput == '' ? '' : '\n') + text;
 }

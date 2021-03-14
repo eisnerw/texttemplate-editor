@@ -2754,6 +2754,15 @@ function tokensAsString(ctx){
 	return parsed.replace(/\n/g,'\\n').replace(/\t/g,'\\t');
 }
 export function interpret(input, callback, options?) : void { 
+	let bWaiting = false;
+	Object.keys(urls).forEach((key)=>{
+		if (urls[key].loading && !urls[key].data){
+			bWaiting = true;
+		}
+	});
+	if (bWaiting){
+		return;
+	}
 	input = input.replace(/\r/g, '').replace(/\t/g, '    '); // TODO: option for controlling tab to spaces number
 	callback({type: 'status', status: 'parsing...'});
 	let errors : Error[] = [];
@@ -2823,7 +2832,7 @@ export function interpret(input, callback, options?) : void {
 		}
 	});
 	if (urlsBeingLoaded.length > 0){
-		callback({type: 'status', status: (urlsBeingLoaded.length == 1 ? urlsBeingLoaded[0] + '...' : (':\n  ' + (urlsBeingLoaded.join('\n  '))))});
+		callback({type: 'status', status: 'requesting ' + urlsBeingLoaded.join(',') + '...'});
 	} else {
 		callback({type: 'result', result: result, errors:visitor.errors});
 		processedSubtemplates = null; // remove memory of the previous template
