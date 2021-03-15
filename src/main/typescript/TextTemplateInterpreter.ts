@@ -2410,7 +2410,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (levels.length != 0){
 							lineOffset = 0;
 							columnOffset = 0;
-							processed = processSubtemplates;
+							processed = processedSubtemplates;
 						}
 						break;
 					}
