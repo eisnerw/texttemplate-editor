@@ -323,7 +323,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
 						url: urlPrefix + payload.path,
 						success: function (data) {
 							if (data.Result === null){
-								logit('Unable to GET ' + this.url = ': NOT FOUND.');
+								logit('Unable to GET ' + this.url + ': NOT FOUND.');
 							}
 							if (data.Result){
 								data = data.Result.replace(/\r/g,''); // accomodate servers that pass back an object

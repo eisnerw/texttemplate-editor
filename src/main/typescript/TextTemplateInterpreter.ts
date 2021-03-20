@@ -265,6 +265,10 @@ export class TemplateData {
 			});
 		} else {
 			this.type = 'dictionary';
+			if (typeof json == 'string'){
+				// handle clone of scalar
+				json = JSON.parse('{"_": "' + json.replace('"','\\"') + '"}');
+			}
 			Object.keys(json).forEach((keyname) => {
 				let value: any = json[keyname];
 				if (typeof value == 'object' && value != null) {
@@ -289,29 +293,6 @@ export class TemplateData {
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
         let value = this.dictionary[keySplit[0]];
-        if (value == null && this.type == 'list' && this.list.length > 0 && this.list[0].dictionary[keySplit[0]]){
-            // extract each element from the list and return a dictionary or a list
-            value = [];
-            this.list.forEach((l)=>{
-                let element = l.dictionary[keySplit[0]];
-                if (element){
-                    if (element.type == 'dictionary'){
-                        value.push(element);
-                    } else if (element.type == 'list' && element.list.length > 0){
-                        element.list.forEach((subelement)=>{
-                            value.push(subelement);
-                        });
-                    }
-                }
-            });
-            if (value.length == 0){
-                return undefined;
-            }
-            if (value.length == 1){
-                return value[0];
-            }
-            return new TemplateData(value);
-        }
 		if (value == undefined && (keySplit[0] == '*' || keySplit[0] == '^')){
 			if (keySplit[0] == '*'){
 				value = this;
@@ -322,6 +303,23 @@ export class TemplateData {
 				value = this; // allows ^.^... to get to the top
 			}
 		}
+        if (value == null && this.type == 'list' && this.list.length > 0){
+			// extract each element from the list and return a dictionary or a list
+			value = [];
+			this.list.forEach((item)=>{
+				let listValue = item.getValue(key);
+				if (listValue){
+					value.push(listValue);
+				}
+			});
+            if (value.length == 0){
+                return undefined;
+            }
+            if (value.length == 1){
+                return value[0];
+            }
+            return new TemplateData(value);
+        }
 		if (keySplit.length == 1 || value === undefined){
 			return value;
 		}
@@ -340,6 +338,18 @@ export class TemplateData {
 	}
 	count(){
 		return this.list.length;
+	}
+	isScalarList(){
+		if (this.type != 'list' || this.list.length == 0){
+			return false;
+		}
+		let bOnlyContainsScalar = true;
+		this.list.forEach((listItem)=>{
+			if (!listItem.dictionary['_']){
+				bOnlyContainsScalar = false;
+			}
+		});
+		return bOnlyContainsScalar;
 	}
 	toJson(indentLevel? : number) : string {
 		let result : string = '';
@@ -894,9 +904,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		for (let i : number = 1; i <= lastChildIndex; i++){
 			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
 				let childResult = ctx.children[i].accept(this);
-				if (lastChildIndex != 1 && typeof childResult == 'object' && childResult != null && childResult.constructor.name == 'TemplateData'){
-					this.syntaxError('Data needs to be interpolated with a subtemplate', ctx.children[i]);
-					childResult = childResult.toJson();
+				if (typeof childResult == 'object' && childResult != null && childResult.constructor.name == 'TemplateData'){
+					if (childResult.isScalarList()){
+						let list = [];
+						childResult.list.forEach((item)=>{
+							list.push(item.getValue('_').toString())
+						});
+						childResult = list.join(', ');
+					} else if (childResult.type == 'dictionary' && childResult.getValue('_')){
+						childResult = childResult.getValue('_');
+					} else if (lastChildIndex != 1){
+						this.syntaxError('Data needs to be interpolated with a subtemplate', ctx.children[i]);
+						childResult = childResult.toJson();
+					}
 				}
 				result.push(childResult);
 			}
@@ -1358,20 +1378,34 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (argValues.length > 2){
 						this.syntaxError('Too many arguments for the Join method', args);
 					}
-					if (typeof value == 'object' && value != null && value.type == 'argument'){
-						let joiner = ', ';
-						if (argValues.length > 0){
-							joiner = argValues[0];
-						}	
-						let list = value.list;
-						for (let i : number = 0; i < list.length - 1; i++){
-							if (argValues.length > 1 && i == (list.length - 2)){
-								list[i] += argValues[1];
-							} else {
-								list[i] += joiner;
+					if (value && typeof value == 'object'){
+						if (value.type == 'argument' || (value.constructor.name == 'TemplateData' && value.isScalarList())){
+							let joiner = ', ';
+							if (argValues.length > 0){
+								joiner = argValues[0];
+							}	
+							let list = value.list;
+							if (value.type == 'list'){
+								list = [];
+								value.list.forEach((item)=>{
+									list.push(item.getValue('_').toString()); // '_' is the attribute name for a list of scalars
+								});
 							}
+							for (let i : number = 0; i < list.length - 1; i++){
+								if (argValues.length > 1 && i == (list.length - 2)){
+									list[i] += argValues[1];
+								} else {
+									list[i] += joiner;
+								}
+							}
+							if (list.length == 0){
+								value = '';
+							} else {
+								value = list.join('');
+							}
+						} else {
+							this.syntaxError('Invalid data for Join', args.parentCtx);
 						}
-						value = list.join('');
 					}
 					break;
 				
@@ -1566,7 +1600,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// A formula or other non-identifier must be aliased
 						this.syntaxError('An alias (third parameter) must be provided for the GroupBy name', args.children[0]);
 					} else if (!(<any>value instanceof TemplateData)){
-						this.syntaxError('Invalid data type for ' + method, args.parentCtx);
+						this.syntaxError('Invalid data for ' + method, args.parentCtx);
 					} else if ((method == 'GroupBy' && argValues.length < 2) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D' || argValues[1] == 'U')))){
 						this.syntaxError('Invalid arguments for ' + method, args.parentCtx);
 					} else {
@@ -1802,23 +1836,29 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					
 					
 				case 'Index':
-					if (argValues.length > 1 || (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 || typeof value != 'object' || value.constructor.name != 'TemplateData'))){
+					if (argValues.length > 2
+							|| typeof value != 'object' 
+							|| value.constructor.name != 'TemplateData'
+							|| (argValues.length > 0 && (isNaN(parseInt(argValues[0])) || parseInt(argValues[0]) == 0 ))
+							|| (argValues.length > 1 && (isNaN(parseInt(argValues[1])) || parseInt(argValues[1]) == 0 ))){
 						this.syntaxError('Invalid argument for Index', args.parentCtx);
 						return null;
 					}
 					if (argValues.length > 0){
-						let index = parseInt(argValues[0]);
+						let index = parseInt(argValues[0]) - 1;
+						let endIndex = index + (argValues.length == 1 ? 1 : parseInt(argValues[1]));
 						if (value.type == 'dictionary'){
 							if (index == 1){
 								return value;
 							} else {
-								return new TemplateData('[]', value);
+								return null;
 							}
 						}
-						if (value.list.length >= index){
-							return new TemplateData(value.list[index - 1], value);
+						let slicedList = value.list.slice(index, endIndex);
+						if (slicedList.length == 0){
+							return null;
 						}
-						return new TemplateData('[]', value);
+						return new TemplateData(slicedList, value);
 					}
 					if (value == null || typeof value != 'object' || value.constructor.name != 'TemplateData'){
 						return 1;

@@ -346,7 +346,7 @@
 				{
 				  "name": "Index",
 				  "type": "dash",
-				  "text": "This method can be used to filter a list to a specific instance, typically, the first one, e.g., \"value.Index(1)\".  With no arguments, typically \"*.Index()\", the method produces a number reflecting the position in the list of a specific instance.  Both the single argument and the position number are one-base (the first instance is #1).  "
+				  "text": "This method can be used to filter a list to a specific instance, typically, the first one, e.g., \"value.Index(1)\", or, using a second length parameter, a range from the list, e.g., \"value.Index(2,4)\".  With no arguments, typically \"*.Index()\", the method produces a number reflecting the position in the list of a specific instance.  Both the single argument and the position number are one-base (the first instance is #1).  "
 				},
 				{
 				  "name": "OrderBy",
