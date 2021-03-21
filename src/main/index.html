@@ -194,6 +194,30 @@
 					parserFacade.runValidation(input, {mode: mode, data: optionalData, editor: editor});
 				},0);
 			}
+			editor.addAction({
+				id: 'custom-fold-all-id',
+				label: 'Fold All',
+				precondition: null,
+				keybindingContext: null,
+				contextMenuGroupId: 'navigation',
+				contextMenuOrder: 1.5,
+				run: function(ed) {
+					editor.getAction('editor.foldAll').run();
+					return null;
+				}
+			});
+			editor.addAction({
+				id: 'custom-go-to-bracket-id',
+				label: 'Go to Bracket',
+				precondition: null,
+				keybindingContext: null,
+				contextMenuGroupId: 'navigation',
+				contextMenuOrder: 1.5,
+				run: function(ed) {
+					editor.getAction('editor.action.jumpToBracket').run();
+					return null;
+				}
+			});
 			saveTemplate = function(e){
 				let arShared = editor.getValue().split("\n/*SHARED*/");
 				let shared = [];
