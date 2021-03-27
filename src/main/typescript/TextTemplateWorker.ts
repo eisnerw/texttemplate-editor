@@ -10,7 +10,7 @@ let queuedInput = null;
 function processResult(parm){
 	switch (parm.type){
 		case 'result':
-			ctx.postMessage({type: 'result', result: parm.result, errors: parm.errors });
+			ctx.postMessage({type: 'result', result: parm.result, errors: parm.errors, hoverPositions: parm.hoverPositions});
 			if (queuedInput != null){
 				input = queuedInput;
 				queuedInput = null;
@@ -39,7 +39,7 @@ ctx.addEventListener("message", (event) => {
 			} else {
 				input = payload.input;
 				bProcessing = true;
-				interpret(input, {data: payload.data});
+				interpret(input, {data: payload.data, computeHoverPositions: payload.computeHoverPositions});
 			}
 			break;
 

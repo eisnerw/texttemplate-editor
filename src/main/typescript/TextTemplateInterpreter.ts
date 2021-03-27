@@ -418,6 +418,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	recursionLevel = 0;
 	annotations = {bulletStyles: null, bulletMode: 'implicit'};
 	subtemplateLevel = ''; // keeps track of subtemplates with subtemplates
+	hoverPositions : {} = null;
 	
 	visitText = function(ctx){
 		if (ctx.children[0].constructor.name == 'ContinuationContext'){
@@ -433,6 +434,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			delete this.annotations.valueFunction;
 			let retValue = valueFunction(ctx, this);
 			this.annotations.valueFunction = valueFunction;
+			this.setHoverPositions(ctx, retValue);
 			return retValue;
 		}
 		let value = undefined;
@@ -464,6 +466,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (value === undefined || value === ''){ // Treat empty string as a missing value
 			console.debug('Missing value for ' + key);
 			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
+			this.setHoverPositions(ctx, '(missing)');
 			return {type: 'missing', missingValue: missingValue, key: key};
 		} else if (this.annotations.dateTest != null && this.annotations.dateTest.test(key)){
 			value = {type: 'date', moment: moment(value), string: value, format: this.annotations['dateFormat']};
@@ -487,6 +490,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				return {type: 'multiline', multilines: value, multilineStyle: this.annotations['multilineStyle']};
 			}
 		}
+		this.setHoverPositions(ctx, value);
 		return value;
 	};
 	visitTemplateToken = function(ctx) {
@@ -1991,6 +1995,50 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			});
 		}
 	}
+	setHoverPositions = function(ctx, value){
+		if (!this.hoverPositions){
+			return;
+		}
+		let offsets = this.getOffsetsFromProcessedSubtemplates(this.subtemplateLevel);
+		let text = ctx.getText();
+		let start = ctx.start;
+		let ctxSourceText = start.source && start.source[1] ? ctx.start.source[1].strdata : null;
+		if (value == null){
+			value = 'null';
+		}
+		let valueText = value.toString();
+		if (!this.isScalar(value)){
+			if (value.constructor.name == 'TemplateData'){
+				valueText = value.toJson();
+			} else if (value && typeof value == 'object' && value.type == 'missing'){
+				valueText = '(missing)';
+			} else {
+				valueText = this.valueAsString(value);
+			}
+		}
+		let column = start.column;
+		if (start.line == 1){
+			column += offsets.columnOffset;
+			column -= (ctxSourceText && ctxSourceText.indexOf(offsets.text) != -1 ? ctxSourceText.indexOf(offsets.text) : 0);
+		}
+		let line = start.line + offsets.lineOffset;
+		let length = start.stop - start.start + 1;
+		let hoverPositionLine = this.hoverPositions[line];
+		if (!hoverPositionLine){
+			hoverPositionLine = {columns:{}};
+			this.hoverPositions[line] = hoverPositionLine;
+		}
+		let descriptor = hoverPositionLine.columns[column];
+		if (!descriptor){
+			descriptor = {variable: text, values: []};
+			for (let i = column; i < (column + length); i++){
+				hoverPositionLine.columns[i] = descriptor;
+			}
+		}
+		if (!descriptor.values.includes(valueText)){
+			descriptor.values.push(valueText);
+		}
+	}
 	getParseTree = function(ctx, indent?){
 		const indentBlanks = '   ';
 		if (indent === undefined){
@@ -2433,6 +2481,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let lineOffset = 0;
 		let columnOffset = 0;
 		let processed = processedSubtemplates;
+		let text = ''; // needed by setHoverPositions
 		if (subtemplateLevel != ''){
 			let levels = subtemplateLevel.split('.');
 			while (levels.length > 0){
@@ -2441,6 +2490,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (processed != null){
 						lineOffset += (processed.line - 1);
 						columnOffset = processed.column;
+						text = processed.text;
 						if (iLevel == (levels.length - 1)){
 							levels = []; // all done
 						}
@@ -2457,7 +2507,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				}
 			}
 		}
-		return {lineOffset: lineOffset, columnOffset: columnOffset};
+		return {lineOffset: lineOffset, columnOffset: columnOffset, text: text};
 	}
 	encodeHTML (str) {
 	  const replacements = {
@@ -2818,6 +2868,7 @@ export function interpret(input, callback, options?) : void {
 	}
 	callback({type: 'status', status: 'interpolating...'});
 	var visitor = new TextTemplateVisitor();
+	visitor.hoverPositions = options  && options.computeHoverPositions ?  {} : null;
 	if (options && options.data){
 		try{
 			visitor.context = new TemplateData(options.data, null);
@@ -2863,7 +2914,7 @@ export function interpret(input, callback, options?) : void {
 							try{
 								interpret(input, callback, options);
 							} catch (e) {
-								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: []});
+								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions});
 							}
 						}
 					});
@@ -2874,7 +2925,7 @@ export function interpret(input, callback, options?) : void {
 	if (urlsBeingLoaded.length > 0){
 		callback({type: 'status', status: 'requesting ' + urlsBeingLoaded.join(',') + '...'});
 	} else {
-		callback({type: 'result', result: result, errors:visitor.errors});
+		callback({type: 'result', result: result, errors:visitor.errors, hoverPositions: visitor.hoverPositions});
 		processedSubtemplates = null; // remove memory of the previous template
 	}
 }

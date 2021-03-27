@@ -93,6 +93,11 @@
 				return parserFacade.provideFoldingRanges(model, context, token);
 			}
 		});
+		monaco.languages.registerHoverProvider("texttemplate", {
+			provideHover: function(model, position) {
+				return parserFacade.provideHover(model, position);
+			}
+		});
 		let commentFg= '008000'; //  green
 		let textFg = 'A9A9A9'; // greyish
 		let symbolsFg = '0000ff'; // blue

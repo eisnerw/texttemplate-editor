@@ -202,6 +202,20 @@ export function provideFoldingRanges(model, context, token) {
 	return folds;
 }
 
+export  function provideHover(model, position) {
+	let lineHoverPosition = hoverPositions[position.lineNumber];
+	if (!lineHoverPosition || !lineHoverPosition.columns[position.column]){
+		return null;
+	}
+	return {
+		range: new monaco.Range(1, 1, model.getLineCount(), model.getLineMaxColumn(model.getLineCount())),
+		contents: [
+			{ value: '**' + lineHoverPosition.columns[position.column].variable + '**'},
+			{ value: '```html\n' + lineHoverPosition.columns[position.column].values.join(', ') + '\n```' }
+		]
+	}
+}
+
 export function provideDefinition(model, position, token){
 	let currentLine : string = model.getLinesContent()[position.lineNumber - 1];
 	let tokenArray = getTokensWithSymbols(model.getValue());
@@ -275,6 +289,7 @@ let urls = {};
 let invocations = 0;
 let callsToValidate = 0;
 let nStage = 0;
+let hoverPositions = {};
 
 export function runValidation(input, options) : void {
 	let invocation = ++invocations;
@@ -314,6 +329,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
 					};
 					monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
 					document.getElementById('interpolated').innerHTML = payload.result;
+					hoverPositions = payload.hoverPositions;
 					break;
 
 				case 'url':
@@ -358,10 +374,10 @@ export function validate(input, invocation, options, callback?) : void { // opti
 			}
 		};
 		window["workerObject"].loaded = true;
-		window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data});
+		window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data, computeHoverPositions: true});
 	}
 	document.getElementById('interpolated').innerHTML = '';
-	window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data});			
+	window["workerObject"].worker.postMessage({type:'input', input: input, data: options.data, computeHoverPositions: true});			
 }
 function logit(text){
 	console.debug(text);
