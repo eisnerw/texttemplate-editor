@@ -328,7 +328,8 @@ export function validate(input, invocation, options, callback?) : void { // opti
 						});
 					};
 					monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
-					document.getElementById('interpolated').innerHTML = payload.result;
+                    document.getElementById('interpolated').innerHTML = payload.result;
+                    document.getElementById('debuglog').innerHTML = payload.debugLog.join('<br />');
 					hoverPositions = payload.hoverPositions;
 					break;
 

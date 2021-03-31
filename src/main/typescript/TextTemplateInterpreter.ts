@@ -416,8 +416,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	input;
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
-	annotations = {bulletStyles: null, bulletMode: 'implicit'};
-	subtemplateLevel = ''; // keeps track of subtemplates with subtemplates
+	annotations = {bulletStyles: null, bulletMode: 'implicit', debugLevel: 0};
+    subtemplateLevel = ''; // keeps track of subtemplates with subtemplates
+    debugLog =[];
 	hoverPositions : {} = null;
 	
 	visitText = function(ctx){
@@ -466,7 +467,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (value === undefined || value === ''){ // Treat empty string as a missing value
 			console.debug('Missing value for ' + key);
 			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
-			this.setHoverPositions(ctx, '(missing)');
+            this.setHoverPositions(ctx, '(missing)');
+            this.logForDebug(1,'Missing value for ' + key);
 			return {type: 'missing', missingValue: missingValue, key: key};
 		} else if (this.annotations.dateTest != null && this.annotations.dateTest.test(key)){
 			value = {type: 'date', moment: moment(value), string: value, format: this.annotations['dateFormat']};
@@ -490,7 +492,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				return {type: 'multiline', multilines: value, multilineStyle: this.annotations['multilineStyle']};
 			}
 		}
-		this.setHoverPositions(ctx, value);
+        this.setHoverPositions(ctx, value);
+        if (this.annotations.debugLevel > 4){
+            this.logForDebug(5, ctx.children[0].getText() + ' has a value of ' + this.valueAsText(value));
+        }
 		return value;
 	};
 	visitTemplateToken = function(ctx) {
@@ -511,9 +516,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	visitTemplateContextToken = function(ctx){
 		return ctx.children[1].accept(this); // ignore the information in the brackets
 	}
-	visitTemplateContextCommaToken = function(ctx) {
+	visitTemplateContextCommaToken = function(ctx) { 
 		let result = ctx.children[1].accept(this);
 		if (result != null && typeof result == 'object' && result.type == 'missing'){
+            this.logForDebug(2, ctx.children[0].getText() + 'missing, causing alternate choice');
 			result = ctx.children[3].accept(this); // when there is no context, run the second template
 		}
 		return result;
@@ -524,7 +530,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		//}
 		let oldContext : TemplateData = this.context;
 		let bHasContext : boolean = ctx.children[0].getText() != ':'; // won't change context if format {:[template]}
-		if (bHasContext && ctx.children[0].children){  // ctx.children[0].children protects against invalid spec
+        if (bHasContext && ctx.children[0].children){  // ctx.children[0].children protects against invalid spec
+            this.logForDebug(3, 'changing context to ' + ctx.children[0].getText());
 			let context : any;
 			// (Not sure why we were ignoring url errors)
 			let oldErrors = [];
@@ -605,7 +612,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		result = ctx.children[bHasContext ?  2 : 1].accept(this);
 		if (this.context != null && typeof this.context == 'object' && this.context.type == 'missing'){
 			result = this.context; // can't return a value from a missing context although we still need to visit children
-		}
+        }
+        if (bHasContext){
+            this.logForDebug(3, 'return from context ' + ctx.children[0].getText());
+        }
 		this.context = oldContext;
 		return result;
 	};
@@ -794,10 +804,12 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		delete this.annotations.missingValue; // predicates need to see the absense of a value
 		let result : any = ctx.children[0].accept(this);
 		this.annotations.missingValue = oldMissingValue;
-		if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
+        if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
+            this.logForDebug(2, ctx.children[0].getText() + '-> succeeded');
 			return this.visitChildren(ctx.children[2].children[0]); // true
 		}
 		if (typeof result == 'string' && result.startsWith('ERROR:')){
+            this.logForDebug(2, ctx.children[0].getText() + '-> failed');
 			return result;
 		}
 		return ''; // false means ignore this token
@@ -811,11 +823,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			result = result[0]; // TODO:why is this one level deep????
 		}
 		if (result){
+            this.logForDebug(2, ctx.children[0].getText() + '=> succeeded');
 			return this.visitChildren(ctx.children[2].children[0]); // true
 		}
 		if (ctx.children[2].children.length < 3){
+            this.logForDebug(2, ctx.children[0].getText() + '=> failed resulting in null');
 			return null; // only true condition specified
-		}
+        }
+        this.logForDebug(2, ctx.children[0].getText() + '-> failed, resulting in second choice');
 		return this.visitChildren(ctx.children[2].children[2]) // false
 	};
 	visitIdentifierCondition = function(ctx) {
@@ -963,7 +978,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return value;
 	}
 	visitNamedSubtemplate = function(ctx, name = null, bInclude = false){
-		let subtemplateName : string = name != null ? name : ctx.getText();
+        let subtemplateName : string = name != null ? name : ctx.getText();
+        this.logForDebug(4, 'invoking subtemplate ' + subtemplateName);
 		if (!this.subtemplates[subtemplateName]){
 			// load the subtemplate from the server
 			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
@@ -1032,6 +1048,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (typeof result == 'string'){
 			result = [result]; // return in an array for consistency
 		}
+        this.logForDebug(4, 'returned from subtemplate ' + subtemplateName);
 		return result;  
 	}
 	// TODO: this should go away because subtemplates are now preprocessed
@@ -1118,6 +1135,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return this.visitBullet(ctx);
 	};
 	callMethod = function(method : string, value : any, args: any){
+        this.logForDebug(6, 'Invoking method ' + method);
 		let externalMethod = Externals.getMethod(method);
 		if (externalMethod){
 			return externalMethod(value, args, this);
@@ -1604,7 +1622,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						// A formula or other non-identifier must be aliased
 						this.syntaxError('An alias (third parameter) must be provided for the GroupBy name', args.children[0]);
 					} else if (!(<any>value instanceof TemplateData)){
-						this.syntaxError('Invalid data for ' + method, args.parentCtx);
+                        if (!(typeof value == 'string' && (value.startsWith('/') || value.startsWith('http')))){
+                            this.syntaxError('Invalid data for ' + method, args.parentCtx);
+                        }
 					} else if ((method == 'GroupBy' && argValues.length < 2) || (method == 'OrderBy' && (argValues.length != 2 || !(argValues[1] == 'A' || argValues[1] == 'D' || argValues[1] == 'U')))){
 						this.syntaxError('Invalid arguments for ' + method, args.parentCtx);
 					} else {
@@ -1837,8 +1857,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 					break;
 					
-					
-					
+				case '@Debug':
+                    if (argValues.length != 1 || isNaN(parseInt(argValues[0]))){
+                        this.syntaxError('Invalid argument for @Debug', args.parentCtx);
+                        return null;
+                    }
+                    value.debugLevel = parseInt(argValues[0]);
+                    break;
+                    
 				case 'Index':
 					if (argValues.length > 2
 							|| typeof value != 'object' 
@@ -2006,16 +2032,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (value == null){
 			value = 'null';
 		}
-		let valueText = value.toString();
-		if (!this.isScalar(value)){
-			if (value.constructor.name == 'TemplateData'){
-				valueText = value.toJson();
-			} else if (value && typeof value == 'object' && value.type == 'missing'){
-				valueText = '(missing)';
-			} else {
-				valueText = this.valueAsString(value);
-			}
-		}
+		let valueText = this.valueAsText(value);
 		let column = start.column;
 		if (start.line == 1){
 			column += offsets.columnOffset;
@@ -2469,7 +2486,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 	}
 	syntaxError(msg, ctx){
-		console.error(msg);
+        console.error(msg);
+        this.logForDebug(0, msg);
 		let offset = this.getOffsetsFromProcessedSubtemplates(this.subtemplateLevel);
 		let startColumnOffset = ctx.start.line == 1 ? offset.columnOffset : 0;
 		let stopColumnOffset = ctx.stop.line == 1 ? offset.columnOffset : 0;
@@ -2535,7 +2553,26 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		  '\'' : '&apos;'
 	  };
 	  return str.replace(/[<>=&']/gm, (c)=>replacements[c]);
-	}
+    }
+    logForDebug (level : number, text : string) {
+        if (this.annotations.debugLevel < level){
+            return;
+        }
+        this.debugLog.push(level + '\t' + text);
+    }
+    valueAsText (value){
+		let valueText = value.toString();
+		if (!this.isScalar(value)){
+			if (value.constructor.name == 'TemplateData'){
+				valueText = value.toJson();
+			} else if (value && typeof value == 'object' && value.type == 'missing'){
+				valueText = '(missing)';
+			} else {
+				valueText = this.valueAsString(value);
+			}
+		}
+        return valueText;
+    }
 }
 
 interface TextTemplateVisitor {
@@ -2914,7 +2951,7 @@ export function interpret(input, callback, options?) : void {
 							try{
 								interpret(input, callback, options);
 							} catch (e) {
-								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions});
+								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions, debugLog: visitor.debugLog});
 							}
 						}
 					});
@@ -2925,7 +2962,7 @@ export function interpret(input, callback, options?) : void {
 	if (urlsBeingLoaded.length > 0){
 		callback({type: 'status', status: 'requesting ' + urlsBeingLoaded.join(',') + '...'});
 	} else {
-		callback({type: 'result', result: result, errors:visitor.errors, hoverPositions: visitor.hoverPositions});
+		callback({type: 'result', result: result, errors:visitor.errors, hoverPositions: visitor.hoverPositions, debugLog: visitor.debugLog});
 		processedSubtemplates = null; // remove memory of the previous template
 	}
 }

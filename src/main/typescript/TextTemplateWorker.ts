@@ -10,7 +10,7 @@ let queuedInput = null;
 function processResult(parm){
 	switch (parm.type){
 		case 'result':
-			ctx.postMessage({type: 'result', result: parm.result, errors: parm.errors, hoverPositions: parm.hoverPositions});
+			ctx.postMessage({type: 'result', result: parm.result, errors: parm.errors, hoverPositions: parm.hoverPositions, debugLog: parm.debugLog});
 			if (queuedInput != null){
 				input = queuedInput;
 				queuedInput = null;
