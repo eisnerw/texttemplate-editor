@@ -336,8 +336,14 @@ export function validate(input, invocation, options, callback?) : void { // opti
 				case 'url':
                     let urlPrefix = (payload.path.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
                     logit('loading ' + urlPrefix + payload.path + '...');
+                    let authRegex = /https{0,1}:\/\/([^:]+):([^@]+)@.*$/;
+                    let url = urlPrefix = payload.path;
+                    if (authRegex.test(url)){
+                        let auth = btoa(url.replace(authRegex,"$1")+':'+url.replace(authRegex,"$2"));
+                        $.ajaxSetup({headers: {'Authorization': auth}});
+                    }
 					$.ajax({
-						url: urlPrefix + payload.path,
+						url: url,
 						success: function (data) {
 							if (data.Result === null){
 								logit('Unable to GET ' + this.url + ': NOT FOUND.');
