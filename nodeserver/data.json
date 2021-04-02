@@ -465,6 +465,10 @@
 				  "text": "The method, which takes no arguments, can be invoked on any specification in a template.  In this way, the contents of variables, context variables, and even templates can be emited within the output of a template.  "
 				},
 				{
+				  "name": "@Debug",
+				  "type": "dash",
+				  "text": "The annotation, which takes a single numeric argument, can be invoked on any subtemplate template.  The number specifies the level of tracing that will occur, with -1 meaning no trace.  Each level encludes the tracing of lower levels.  The other levels are: Leve1 0 - Errors; Level 1 - Missing values; Level 2 - decisions (arrow, case); Level 3 - context change; Level 4 - Calling named subtemplates; Level 5 - Values; Level 6 - Method call; Level 7 - Calling unnamed subtemplates."
+				},				{
 				  "name": "Assert",
 				  "type": "dash",
 				  "text": "This method is designed to confirm that the output of a template has remained a predicted value.  The method takes between one and three arguments.  With one argument, the method is essentially the same as the Match method with a single operator, comparing the argument.  If the value matches the argument, the value remains the same.  If it does not match, the method emits an \"ASSERT FAILURE\" message followed by an indication of the mismatch.  An optional second argument can be specified as a substitute value for a true comparison and an optional thir argument can be provided to specify a replacement for the \"ASSERT FAILURE\" sequence.  "
