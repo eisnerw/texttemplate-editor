@@ -413,7 +413,8 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	context : TemplateData;
 	subtemplates = {};
 	errors = [];
-	input;
+    input;
+    bLoadingInclude = false;
 	bulletIndent : BulletIndent;
 	recursionLevel = 0;
 	annotations = {bulletStyles: null, bulletMode: 'implicit', debugLevel: 0};
@@ -981,12 +982,18 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
         let subtemplateName : string = name != null ? name : ctx.getText();
         this.logForDebug(4, 'invoking subtemplate ' + subtemplateName);
 		if (!this.subtemplates[subtemplateName]){
+            if (this.bLoadingInclude){
+                return ''; // give priority to includes
+            }
 			// load the subtemplate from the server
 			let subtemplateUrl = '/subtemplate/' + subtemplateName.substr(1); // remove the #
 			if (!urls[subtemplateUrl]){
 				urls[subtemplateUrl] = {};
 			}
 			if (!urls[subtemplateUrl].data){
+                if (bInclude){
+                    this.bLoadingInclude = true;
+                }
 				return 'loading subtemplate "' + subtemplateName + '"';
 			}
 			// process the loaded subtemplate
@@ -2917,7 +2924,8 @@ export function interpret(input, callback, options?) : void {
 	errors.forEach((error)=>{
 		visitor.errors.push(error);
 	});
-	visitor.input = input;
+    visitor.input = input;
+    visitor.bLoadingInclude = false;
 	visitor.bulletIndent = null; // start bulleting from 0,0
 	// parse and cache subtemplates found by processSubtemplates and add the text to the visitor (a TextTemplateVisitor instance)
 	Object.keys(processedSubtemplates.subtemplates).forEach((key)=>{
