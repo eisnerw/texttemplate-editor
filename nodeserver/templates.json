@@ -749,4 +749,17 @@
 		"{#formatPet:[a {type} named {name}]}",
 		"{#anded:[{$0.Join(', ',' and ')}]}"				
 	]
+	,"elastic":[
+		"{[{'fname,lname,isAlive'.#elasticSpec('lname:c* AND fname:c*',1000)}]:[/*{*.ToJson()}*/]}`",
+		"{[{'fname,lname,isAlive'",
+		"  .#elasticQuery(",
+		"     'lname:c* AND fname:c*',1000",
+		").OrderBy(lname):",
+		"   [{fname} {lname} {!isAlive->[(dead)]}].@Falsy(/0/)}].@Debug(0)}",
+		"Subtemplates:",
+		"{#elasticQuery:[{#elasticSpec:[{hits.hits._source}]}]}",
+		"{#elasticSpec:[{#elasticUrl}{#elasticQueryString}&q={$1}]}",
+		"{#elasticUrl:[{'https://7303xa0iq9:4cdkz0o14@texttemplate-testing-7087740692.us-east-1.bonsaisearch.net:443'}]}",
+		"{#elasticQueryString:[{'/_search?from=0&size='}{$2=>[{$2}],[1000]}{'&_source='}{$0}{'&filter_path=hits.hits._source'}]}"
+	]
 }
