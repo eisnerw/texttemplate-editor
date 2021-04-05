@@ -327,17 +327,18 @@ export function validate(input, invocation, options, callback?) : void { // opti
 							severity: monaco.MarkerSeverity.Error
 						});
 					};
-					monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
-                    document.getElementById('interpolated').innerHTML = payload.result;
+                    monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
+                    let bEscapeHtml = window['textTemplateOptions'] && window['textTemplateOptions'].bEscapeHtml;
+                    document.getElementById('interpolated').innerHTML = bEscapeHtml ? payload.result.replace(/\</g,'&lt;') : payload.result;
                     document.getElementById('debuglog').innerHTML = payload.debugLog.join('<br />');
 					hoverPositions = payload.hoverPositions;
 					break;
 
 				case 'url':
                     let urlPrefix = (payload.path.startsWith('/') && window['textTemplateOptions'] && window['textTemplateOptions']['urlPrefix']) ? window['textTemplateOptions']['urlPrefix'] : '';
-                    logit('loading ' + urlPrefix + payload.path + '...');
-                    let authRegex = /https{0,1}:\/\/([^:]+):([^@]+)@.*$/;
                     let url = urlPrefix + payload.path;
+                    logit('loading ' + url + '...');
+                    let authRegex = /https{0,1}:\/\/([^:]+):([^@]+)@.*$/;
                     if (authRegex.test(url)){
                         let auth = btoa(url.replace(authRegex,"$1")+':'+url.replace(authRegex,"$2"));
                         $.ajaxSetup({headers: {'Authorization': auth}});
