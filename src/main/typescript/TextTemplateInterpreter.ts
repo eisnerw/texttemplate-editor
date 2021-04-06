@@ -1347,11 +1347,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							val = val == null ? '' : val.toString();
 							if ((numericTest.test(val.trim()) && numericTest.test(value.toString().trim()) && parseInt(val) == parseInt(value)) || val == value.toString()){
 								this.logForDebug(2, 'Case of ' + value.toString().trim() + ' resulted in ' + caseArgs[i+1].getText() + ' being selected');
-								value = this.compose(caseArgs[i+1].accept(this));
+								value = this.compose(caseArgs[i+1].accept(this), 0);
 								break;
 							} else if ((i + 3) == caseArgs.length){
 								this.logForDebug(2, 'Case of ' + value.toString().trim() + ' resulted in default of ' + caseArgs[i+2].getText() + ' being selected');
-								value = this.compose(caseArgs[i+2].accept(this)); // default
+								value = this.compose(caseArgs[i+2].accept(this), 0); // default
 								break;
 							}
 						}
