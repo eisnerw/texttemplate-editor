@@ -330,7 +330,7 @@ export function validate(input, invocation, options, callback?) : void { // opti
                     monaco.editor.setModelMarkers(monaco.editor.getModels()[0], "owner", monacoErrors);
                     let bEscapeHtml = window['textTemplateOptions'] && window['textTemplateOptions'].bEscapeHtml;
                     document.getElementById('interpolated').innerHTML = bEscapeHtml ? payload.result.replace(/\</g,'&lt;') : payload.result;
-                    document.getElementById('debuglog').innerHTML = payload.debugLog.join('<br />');
+                    document.getElementById('debuglog').innerHTML = payload.debugLog ? payload.debugLog.join('<br />') : '';
 					hoverPositions = payload.hoverPositions;
 					break;
 

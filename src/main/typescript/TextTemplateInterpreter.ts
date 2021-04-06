@@ -603,7 +603,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				//} else {
 				//	this.context = new TemplateData({}); // provide an empty context for lookups
 				//}
-			}
+            }
+            if (this.context && this.context.constructor.name == 'TemplateData' && ctx.children[0]){
+                this.setHoverPositions(ctx.children[0], this.context.toJson());
+            }
 		}
 		var result = [];
 		if (bHasContext && !ctx.children[2]){ // note: this used to check  || !ctx.children[2].getText() || ctx.children[2].exception
