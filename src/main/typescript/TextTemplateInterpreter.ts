@@ -1056,6 +1056,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			result = [result]; // return in an array for consistency
 		}
         this.logForDebug(4, 'returned from subtemplate ' + subtemplateName);
+		this.setHoverPositions(ctx, this.compose(result, 2));
 		return result;  
 	}
 	// TODO: this should go away because subtemplates are now preprocessed
@@ -1151,7 +1152,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (args.constructor.name == 'ConditionContext'){
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
-		} else if (args.constructor.name == 'ArgumentsContext'){
+		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case'){
 			for (let i = 0; i < args.children.length; i++){
 				if ((method == 'GroupBy' || method == 'OrderBy') && i == 0){
 					// defer evaluation of the first parameter of a Group
@@ -1267,8 +1268,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == '@EncodeDataFor'
 		)){
 			error = 'ERROR: invalid arguments for ' + method + ': ' + args.getText();
-		} else if (args.children && args.children.length < 3 && method == 'Case'){
-			error = 'ERROR: too few arguments for ' + method + ': ' + args.getText();
 		} else if (value == null || (typeof value == 'object' && (value.constructor.name == 'TemplateData' || value.type == 'argument') && (
 			method == ''
 			|| method == 'ToUpper'
@@ -1330,13 +1329,28 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					break;
 
 				case 'Case':
-					for (let i = 0; i < argValues.length; i+=2){
-						if ((numericTest.test(argValues[i].toString().trim()) && numericTest.test(value.toString().trim()) && parseInt(argValues[i]) == parseInt(value)) || argValues[i].toString() == value.toString()){
-							value = argValues[i + 1];
-							break;
-						} else if ((i + 3) == argValues.length){
-							value = argValues[i + 2]; // default
-							break;
+					let caseArgs = [];
+					args.children.forEach((child)=>{
+						if (child.constructor.name != 'TerminalNodeImpl'){
+							caseArgs.push(child);
+						}
+					});
+					if (args.constructor.name != 'ArgumentsContext' || caseArgs.length < 3){
+						this.syntaxError('Too few arguments for the Case method', args);
+					} else {
+						for (let i = 0; i < caseArgs.length; i+=2){
+							let arg = caseArgs[i].accept(this);
+							let val = this.compose(arg, 0);
+							val = val == null ? '' : val.toString();
+							if ((numericTest.test(val.trim()) && numericTest.test(value.toString().trim()) && parseInt(val) == parseInt(value)) || val == value.toString()){
+								this.logForDebug(2, 'Case of ' + value.toString().trim() + ' resulted in ' + caseArgs[i+1].getText() + ' being selected');
+								value = this.compose(caseArgs[i+1].accept(this));
+								break;
+							} else if ((i + 3) == caseArgs.length){
+								this.logForDebug(2, 'Case of ' + value.toString().trim() + ' resulted in default of ' + caseArgs[i+2].getText() + ' being selected');
+								value = this.compose(caseArgs[i+2].accept(this)); // default
+								break;
+							}
 						}
 					}
 					break;
@@ -2035,6 +2049,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let offsets = this.getOffsetsFromProcessedSubtemplates(this.subtemplateLevel);
 		let text = ctx.getText();
 		let start = ctx.start;
+		let stop = ctx.stop;
 		let ctxSourceText = start.source && start.source[1] ? ctx.start.source[1].strdata : null;
 		if (value == null){
 			value = 'null';
@@ -2046,7 +2061,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			column -= (ctxSourceText && ctxSourceText.indexOf(offsets.text) != -1 ? ctxSourceText.indexOf(offsets.text) : 0);
 		}
 		let line = start.line + offsets.lineOffset;
-		let length = start.stop - start.start + 1;
+		let length = stop.stop - start.start + 1;
 		let hoverPositionLine = this.hoverPositions[line];
 		if (!hoverPositionLine){
 			hoverPositionLine = {columns:{}};
