@@ -1156,6 +1156,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
 		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case'){
+			let methodContext = this.context;
+			// temporarily bury the current context to insure that template arguments aren't processed by lists
+			this.context = new TemplateData('{}', this.context);
 			for (let i = 0; i < args.children.length; i++){
 				if ((method == 'GroupBy' || method == 'OrderBy') && i == 0){
 					// defer evaluation of the first parameter of a Group
@@ -1171,6 +1174,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 				}
 			}
+			this.context = methodContext;
 		}
 		let parentCtx : any = args.parentCtx;
 		if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (
