@@ -1338,11 +1338,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Case':
 					let caseArgs = [];
-					args.children.forEach((child)=>{
-						if (child.constructor.name != 'TerminalNodeImpl'){
-							caseArgs.push(child);
-						}
-					});
+					if (args.children){
+						args.children.forEach((child)=>{
+							if (child.constructor.name != 'TerminalNodeImpl'){
+								caseArgs.push(child);
+							}
+						});
+					}
 					if (args.constructor.name != 'ArgumentsContext' || caseArgs.length < 3){
 						this.syntaxError('Too few arguments for the Case method', args);
 					} else {
@@ -1435,13 +1437,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (argValues.length > 0){
 								joiner = argValues[0];
 							}	
-							let list = value.list;
+							let valList = value.list;
 							if (value.type == 'list'){
-								list = [];
+								valList = [];
 								value.list.forEach((item)=>{
-									list.push(item.getValue('_').toString()); // '_' is the attribute name for a list of scalars
+									valList.push(item.getValue('_').toString()); // '_' is the attribute name for a list of scalars
 								});
 							}
+							let list = [];
+							valList.forEach((listItem)=>{
+								if (listItem && !(typeof listItem == 'object' && listItem.type == 'missing')){
+									list.push(listItem);
+								}
+							});
 							for (let i : number = 0; i < list.length - 1; i++){
 								if (argValues.length > 1 && i == (list.length - 2)){
 									list[i] += argValues[1];
@@ -1477,6 +1485,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = 0;
 							} else if (value instanceof TemplateData && value.type == 'list'){
 								value = value.count();
+							} else if (value && typeof value == 'object' && value.type == 'argument'){
+								let list = [];
+								value.list.forEach((item)=>{
+									if (item && !(typeof item == 'object' && item.type == 'missing')){
+										list.push(item);
+									}
+								});
+								value = list.length;
 							} else if (value == null || (typeof value == 'object' && value.type == 'missing')){
 								value = 0;
 							} else {
