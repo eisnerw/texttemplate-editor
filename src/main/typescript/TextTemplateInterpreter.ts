@@ -467,7 +467,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		if (value === undefined || value === ''){ // Treat empty string as a missing value
 			console.debug('Missing value for ' + key);
-			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
+			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : this.annotations.missingValue;
             this.setHoverPositions(ctx, '(missing)');
             this.logForDebug(1,'Missing value for ' + key);
 			return {type: 'missing', missingValue: missingValue, key: key};
@@ -673,7 +673,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (false && method == '@Include'){
 							this.callMethod(method, oldAnnotations, args); // let include modify the annotations that will be restored
 						} else {
-							this.callMethod(method, this.annotations, args); // modify the current annotations so that existing annotations are inherited
+							let annotations = this.annotations;
+							this.callMethod(method, annotations, args); // modify the current annotations so that existing annotations are inherited
+							this.annotations = annotations;
 						}
 					}
 				});
@@ -747,7 +749,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							value.multilines = multilineValue;
 						}
 					} else {
-						value = this.callMethod(method, this.compose(value, 0), args);
+						value = this.callMethod(method, method == 'Log' ? value : this.compose(value, 0), args);
 					}
 				}
 			}
@@ -1059,7 +1061,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			result = [result]; // return in an array for consistency
 		}
         this.logForDebug(4, 'returned from subtemplate ' + subtemplateName);
-		this.setHoverPositions(ctx, this.compose(result, 2));
+		this.setHoverPositions(ctx, this.compose(result, 0));
 		return result;  
 	}
 	// TODO: this should go away because subtemplates are now preprocessed
@@ -1155,7 +1157,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (args.constructor.name == 'ConditionContext'){
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
-		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case'){
+		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case' && method != 'Log'){
 			let oldContext = this.context;
 			if (this.context && this.context.type == 'list'){
 				this.context = new TemplateData('{}', this.context); // bury lists to keep templates arguments from evaluating multiple times
@@ -1184,7 +1186,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'Trim' 
 			|| method == 'EncodeFor'
 		)){
-			value = this.compose(value, 2); // turn the value into a string
+			value = this.compose(value, 0); // turn the value into a string
 		}
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "InvokedTemplateSpecContext";
@@ -1231,6 +1233,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'ToJson' 
 			|| method == 'Matches' 
 			|| method == 'IfMissing'
+			|| method == 'Log'
 		)){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (
@@ -1970,6 +1973,43 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						value['multilineStyle'] = argValues;
 					}
 					break;
+				
+				case 'Log':
+					let logValue
+					if (!args.children || args.children.length == 0){
+						logValue = value;
+					} else {
+						logValue = args.children[0].accept(this);
+					}
+					let logData = logValue ? logValue.toString() : null;
+					if (logValue instanceof TemplateData){
+						logData = logValue.toJson();
+					} else if (typeof logValue === "boolean"){
+						logData = logValue ? 'true' : 'false';
+					} else if (logValue == null){
+						logData == 'null';
+					} else if (typeof logValue == "object"){
+						if (logValue.type == 'missing'){
+							logData = this.compose([logValue], 2);
+						} else if (logValue.type == 'argument'){
+							logData = JSON.stringify(logValue.list);
+						} else if (logValue.type == 'date'){
+							logData = 'Date: ' + logValue.string + ' formatted with ' + logValue.format;
+						} else if (logValue.type == 'multiline'){
+							logData = logValue.multilines;
+						} else if (Array.isArray(logValue)){
+							logData = this.compose(logValue, 2);
+						}
+						if (typeof logData != 'string'){
+							logData = JSON.stringify(logValue);
+						}
+					}
+					if (args.children && args.children.length > 1) {
+						this.syntaxError('ERROR: too many arguments for Log()', args.parentCtx);
+					} else {
+						this.logForDebug(0,'logging: ' + logData);
+					}
+					break;
 					
 				default:
 					value = value + '[.' + method + '(' + argValues.join(', ') + ')]';
@@ -2178,7 +2218,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result; 
 	}
 	compose = function(parts, mode){
-		// mode 0 is intermediate without resolving the bullets; mode 1 resolves bullets
+		// mode 0 is intermediate without resolving the bullets; mode 1 resolves bullets; mode 2 exposes missing values (for Log())
 		if (typeof parts == 'object' && parts != null && !Array.isArray(parts)){
 			if (mode == 0 && (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing' || parts.type == 'date')){
 				return parts; // don't compose if not appropriate
@@ -2191,7 +2231,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			parts = [parts];
 		}
-		let output = {lines: [""], skipping: false, mode: 0, bullets: {}};
+		let output = {lines: [""], skipping: false, mode: (mode == 2 ? 2 : 0), bullets: {}};
 		this.doCompose(parts, output, null);
 		if (output.skipping){
 			// never encountered a new line while skipping
@@ -2245,7 +2285,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 						break;
 					case 'missing':
-						item = item.missingValue;
+						if (output.mode == 2){
+							item = '***Missing value for ' + item.key + ' which would ' + (!item.missingValue ? 'cause the line to be skipped' : "be replaced by '" + item.missingValue + "'") + '***';
+						} else {
+							item = item.missingValue;
+						}
 						break;
 					case 'date':
 						item = this.valueAsString(item);
