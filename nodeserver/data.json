@@ -472,7 +472,7 @@
 				{
 				  "name": "Log",
 				  "type": "dash",
-				  "text": "This method creates an @Debug() logging event at level 0, which is the default level. (Log methods are intended to be used only for debugging, but can be retained without creating log entries if the @Debug level is set to -1).  The Log method takes zero or one argument.  With no argument (e.g. '{name.Log()}'), the method will create a log entry reflecting the value upon which the Log() has been invoked.  Alternatively, the Log method argument, which can be an value but is most useful if it is a template, will be logged, (e.g., '{name.Log([name={name}])}').  In either form, the Log method leaves the value upon which it has been invoked unaltered. "
+				  "text": "This method creates an @Debug() logging event at level 0, which is the default level. (Log methods are intended to be used only for debugging, but can be retained without creating log entries if the @Debug level is set to -1).  The Log method takes zero or one argument.  With no argument (e.g. '{name.Log()}'), the method will create a log entry reflecting the value upon which the Log() has been invoked.  Alternatively, the Log method argument, which can be an value but is most useful if it is a template, will be logged, (e.g., '{name.Log([name={name}])}').  In either form, the Log method leaves the value upon which it has been invoked unaltered.  Values logged by the Log method will show missing values to help in debugging."
 				},				
 				{
 				  "name": "Assert",

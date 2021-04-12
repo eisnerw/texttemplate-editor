@@ -1992,13 +1992,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (logValue.type == 'missing'){
 							logData = this.compose([logValue], 2);
 						} else if (logValue.type == 'argument'){
-							logData = JSON.stringify(logValue.list);
+							logData = JSON.stringify(logValue.list).replace(/\\u0001/g,'');
 						} else if (logValue.type == 'date'){
 							logData = 'Date: ' + logValue.string + ' formatted with ' + logValue.format;
 						} else if (logValue.type == 'multiline'){
 							logData = logValue.multilines;
 						} else if (Array.isArray(logValue)){
-							logData = this.compose(logValue, 2);
+							logData = this.compose(logValue, 2).replace(/\x01/g,'');
 						}
 						if (typeof logData != 'string'){
 							logData = JSON.stringify(logValue);
