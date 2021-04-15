@@ -1958,7 +1958,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					return 1;
 					
 				case '@MultilineStyle':
-					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed,Trimmed'.split(',');
+					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed,Trimmed,Offset'.split(',');
 					let bInvalid = argValues.includes('Tabbed') && (argValues.includes('Indented') || argValues.includes('IndentAllButFirst'));
 					for (let i = 0; i < argValues.length; i++){
 						if (typeof argValues[i] != 'string' || !validStyles.includes(argValues[i]) || bInvalid){
@@ -2315,6 +2315,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let bTabbed = item.multilineStyle.includes('Tabbed');
                     let bIndented = item.multilineStyle.includes('Indented');
                     let bTrimmed = item.multilineStyle.includes('Trimmed');
+					let bOffset = item.multilineStyle.includes('Offset');
 					let nIndent = 0;
 					if (bIndented || bIndentAllButFirst || bTabbed){
 						nIndent = 4;						
@@ -2322,13 +2323,26 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							nIndent += output.lines.length > 1 ? output.lines[output.lines.length - 1].replace(/( *).*$/,'$1').length : 0;
 						}
 					}
-                    let multilineIndent = ' '.repeat(nIndent);
-                    if (bTrimmed){
+					if (bIndented || bIndentAllButFirst){
                         for (let i = 0; i < multilines.length; i++){
                             multilines[i] = multilines[i].trim();
-                        }
-                    }
-					this.addToOutput((bIndentAllButFirst ? '' : '\n' + multilineIndent) + multilines.join('\n' + multilineIndent) + (bPadded ? '\n' : ''), output)
+						}							
+					}
+                    let multilineIndent = ' '.repeat(nIndent);
+					if (bPadded)
+					{
+						while (multilines.length > 1 && multilines[multilines.length - 1].trim() == '')
+						{
+							// avoid extra blank lines by eliminatng training blank lines
+							multilines.length = multilines.length - 1;
+						}
+					}
+					let multilineJoined = multilines.join('\n' + multilineIndent);
+					if (bTrimmed) // remove spaces in front of carriage returns
+					{
+						multilineJoined = multilineJoined.replace(/ *\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+					}
+					this.addToOutput((bIndentAllButFirst ? '' : (bOffset ? '\n' : '')	 + multilineIndent) + multilineJoined + (bPadded ? '\n' : ''), output)
 				} else if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
 					indent = item.bullet;
