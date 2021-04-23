@@ -673,9 +673,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						if (false && method == '@Include'){
 							this.callMethod(method, oldAnnotations, args); // let include modify the annotations that will be restored
 						} else {
-							let annotations = this.annotations;
-							this.callMethod(method, annotations, args); // modify the current annotations so that existing annotations are inherited
-							this.annotations = annotations;
+							this.callMethod(method, this.annotations, args); // modify the current annotations so that existing annotations are inherited
 						}
 					}
 				});
@@ -812,12 +810,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.annotations.missingValue = oldMissingValue;
         if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
             this.logForDebug(2, ctx.children[0].getText() + '-> succeeded');
-			return this.visitChildren(ctx.children[2].children[0]); // true
+			return this.visitChildren(ctx.children[2]); // true
 		}
 		if (typeof result == 'string' && result.startsWith('ERROR:')){
-            this.logForDebug(2, ctx.children[0].getText() + '-> failed');
+            this.logForDebug(2, ctx.children[0].getText() + '-> ERROR');
 			return result;
 		}
+		this.logForDebug(2, ctx.children[0].getText() + '-> failed');
 		return ''; // false means ignore this token
 	};
 	visitBracedArrow = function(ctx) {
@@ -987,7 +986,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
         let subtemplateName : string = name != null ? name : ctx.getText();
         this.logForDebug(4, 'invoking subtemplate ' + subtemplateName);
 		if (!this.subtemplates[subtemplateName]){
-            if (this.bLoadingInclude){
+            if (this.bLoadingInclude && !bInclude){
                 return ''; // give priority to includes
             }
 			// load the subtemplate from the server
@@ -2284,12 +2283,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}
 						break;
-					case 'missing':
+					case 'missing':7
+						let msg = 'Missing value for ' + item.key + ' which would ' + (!item.missingValue ? 'cause the line to be skipped' : "be replaced by '" + item.missingValue + "'");7
 						if (output.mode == 2){
-							item = '***Missing value for ' + item.key + ' which would ' + (!item.missingValue ? 'cause the line to be skipped' : "be replaced by '" + item.missingValue + "'") + '***';
+							item = '***' + msg + '***';
 						} else {
 							item = item.missingValue;
 						}
+						this.logForDebug(1, msg);
 						break;
 					case 'date':
 						item = this.valueAsString(item);
@@ -2665,6 +2666,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
         this.debugLog.push(level + '\t' + text);
     }
     valueAsText (value){
+		if (value == null){
+			return 'null';
+		}
 		let valueText = value.toString();
 		if (!this.isScalar(value)){
 			if (value.constructor.name == 'TemplateData'){
@@ -3053,10 +3057,18 @@ export function interpret(input, callback, options?) : void {
 						, urls: urls
 						, success: (data)=>{
 							urls[key].data = data;
-							try{
-								interpret(input, callback, options);
-							} catch (e) {
-								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions, debugLog: visitor.debugLog});
+							let bOkToInterpret = true;
+							Object.keys(urls).forEach((key)=>{
+								if (urls[key].loading && !urls[key].data){
+									bOkToInterpret = false; // wait until all urls have come back
+								}
+							});
+							if (bOkToInterpret){	
+								try{
+									interpret(input, callback, options);
+								} catch (e) {
+									callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions, debugLog: visitor.debugLog});
+								}
 							}
 						}
 					});
