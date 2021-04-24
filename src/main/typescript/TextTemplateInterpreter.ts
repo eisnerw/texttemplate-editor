@@ -1980,7 +1980,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					} else {
 						logValue = args.children[0].accept(this);
 					}
-					let logData = logValue ? logValue.toString() : null;
+					let logData = logValue != null ? logValue.toString() : null;
 					if (logValue instanceof TemplateData){
 						logData = logValue.toJson();
 					} else if (typeof logValue === "boolean"){
