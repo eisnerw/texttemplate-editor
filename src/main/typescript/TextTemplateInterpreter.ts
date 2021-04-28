@@ -235,7 +235,7 @@ export class TemplateData {
 				json = JSON.parse(jsonData);
 			} else {
 				// TemplateData supports arrays of strings by making them lists of dictionaries with a single 
-				json = JSON.parse('{"_": "' + jsonData.replace('"','\\"') + '"}');
+				json = JSON.parse('{"_": "' + jsonData.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t').replace(//g,'') + '"}');
 			}
 		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
@@ -2283,7 +2283,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							}
 						}
 						break;
-					case 'missing':7
+					case 'missing':
 						let msg = 'Missing value for ' + item.key + ' which would ' + (!item.missingValue ? 'cause the line to be skipped' : "be replaced by '" + item.missingValue + "'");7
 						if (output.mode == 2){
 							item = '***' + msg + '***';
@@ -2343,7 +2343,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					{
 						multilineJoined = multilineJoined.replace(/ *\n/g, '\n').replace(/\n{3,}/g, '\n\n');
 					}
-					this.addToOutput((bIndentAllButFirst ? '' : (bOffset ? '\n' : '')	 + multilineIndent) + multilineJoined + (bPadded ? '\n' : ''), output)
+					this.addToOutput((bIndentAllButFirst ? '' : (bOffset ? '\n' : '') + multilineIndent) + multilineJoined + (bPadded ? '\n' : ''), output)
 				} else if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
 					indent = item.bullet;
@@ -2660,6 +2660,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	  return str.replace(/[<>=&']/gm, (c)=>replacements[c]);
     }
     logForDebug (level : number, text : string) {
+	// 0-Errors;1-Missing values;2-decisions (arrow, case);3-context;4-Calling named subtemplates;5-Values;6-Method call;7-Calling unnamed subtemplates
         if (this.annotations.debugLevel < level){
             return;
         }
