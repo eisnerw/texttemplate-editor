@@ -235,7 +235,7 @@ export class TemplateData {
 				json = JSON.parse(jsonData);
 			} else {
 				// TemplateData supports arrays of strings by making them lists of dictionaries with a single 
-				json = JSON.parse('{"_": "' + jsonData.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t').replace(//g,'') + '"}');
+				json = JSON.parse('{"_": "' + jsonData.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t') + '"}');
 			}
 		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
