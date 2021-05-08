@@ -235,7 +235,7 @@ export class TemplateData {
 				json = JSON.parse(jsonData);
 			} else {
 				// TemplateData supports arrays of strings by making them lists of dictionaries with a single 
-				json = JSON.parse('{"_": "' + jsonData.replace('"','\\"') + '"}');
+				json = JSON.parse('{"_": "' + jsonData.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t').replace(//g,'') + '"}');
 			}
 		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
@@ -467,7 +467,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		}
 		if (value === undefined || value === ''){ // Treat empty string as a missing value
 			console.debug('Missing value for ' + key);
-			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : null;
+			let missingValue = this.annotations.missingValue ? this.annotations.missingValue.replace(/\{key\}/g, key) : this.annotations.missingValue;
             this.setHoverPositions(ctx, '(missing)');
             this.logForDebug(1,'Missing value for ' + key);
 			return {type: 'missing', missingValue: missingValue, key: key};
@@ -747,7 +747,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							value.multilines = multilineValue;
 						}
 					} else {
-						value = this.callMethod(method, this.compose(value, 0), args);
+						value = this.callMethod(method, method == 'Log' ? value : this.compose(value, 0), args);
 					}
 				}
 			}
@@ -810,12 +810,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		this.annotations.missingValue = oldMissingValue;
         if (typeof result == 'boolean' && result && ctx.children[2].children){ // protect against invalid syntax
             this.logForDebug(2, ctx.children[0].getText() + '-> succeeded');
-			return this.visitChildren(ctx.children[2].children[0]); // true
+			return this.visitChildren(ctx.children[2]); // true
 		}
 		if (typeof result == 'string' && result.startsWith('ERROR:')){
-            this.logForDebug(2, ctx.children[0].getText() + '-> failed');
+            this.logForDebug(2, ctx.children[0].getText() + '-> ERROR');
 			return result;
 		}
+		this.logForDebug(2, ctx.children[0].getText() + '-> failed');
 		return ''; // false means ignore this token
 	};
 	visitBracedArrow = function(ctx) {
@@ -985,7 +986,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
         let subtemplateName : string = name != null ? name : ctx.getText();
         this.logForDebug(4, 'invoking subtemplate ' + subtemplateName);
 		if (!this.subtemplates[subtemplateName]){
-            if (this.bLoadingInclude){
+            if (this.bLoadingInclude && !bInclude){
                 return ''; // give priority to includes
             }
 			// load the subtemplate from the server
@@ -1059,7 +1060,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			result = [result]; // return in an array for consistency
 		}
         this.logForDebug(4, 'returned from subtemplate ' + subtemplateName);
-		this.setHoverPositions(ctx, this.compose(result, 2));
+		this.setHoverPositions(ctx, this.compose(result, 0));
 		return result;  
 	}
 	// TODO: this should go away because subtemplates are now preprocessed
@@ -1155,7 +1156,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		if (args.constructor.name == 'ConditionContext'){
 			// the argument is a boolean
 			argValues[0] = args.accept(this);
-		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case'){
+		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case' && method != 'Log'){
+			let oldContext = this.context;
+			if (this.context && this.context.type == 'list'){
+				this.context = new TemplateData('{}', this.context); // bury lists to keep templates arguments from evaluating multiple times
+			}
 			for (let i = 0; i < args.children.length; i++){
 				if ((method == 'GroupBy' || method == 'OrderBy') && i == 0){
 					// defer evaluation of the first parameter of a Group
@@ -1171,6 +1176,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					}
 				}
 			}
+			this.context = oldContext;
 		}
 		let parentCtx : any = args.parentCtx;
 		if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (
@@ -1179,7 +1185,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'Trim' 
 			|| method == 'EncodeFor'
 		)){
-			value = this.compose(value, 2); // turn the value into a string
+			value = this.compose(value, 0); // turn the value into a string
 		}
 		// TODO: table driven argmument handling
 		let bTemplate = parentCtx.children[1] && parentCtx.children[1].constructor.name == "InvokedTemplateSpecContext";
@@ -1226,6 +1232,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			|| method == 'ToJson' 
 			|| method == 'Matches' 
 			|| method == 'IfMissing'
+			|| method == 'Log'
 		)){
 			value = value; // null with most methods returns null
 		} else if (typeof value != 'string' && !(value != null && typeof value == 'object' && value.type == 'date') && (
@@ -1333,11 +1340,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 
 				case 'Case':
 					let caseArgs = [];
-					args.children.forEach((child)=>{
-						if (child.constructor.name != 'TerminalNodeImpl'){
-							caseArgs.push(child);
-						}
-					});
+					if (args.children){
+						args.children.forEach((child)=>{
+							if (child.constructor.name != 'TerminalNodeImpl'){
+								caseArgs.push(child);
+							}
+						});
+					}
 					if (args.constructor.name != 'ArgumentsContext' || caseArgs.length < 3){
 						this.syntaxError('Too few arguments for the Case method', args);
 					} else {
@@ -1347,11 +1356,11 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							val = val == null ? '' : val.toString();
 							if ((numericTest.test(val.trim()) && numericTest.test(value.toString().trim()) && parseInt(val) == parseInt(value)) || val == value.toString()){
 								this.logForDebug(2, 'Case of ' + value.toString().trim() + ' resulted in ' + caseArgs[i+1].getText() + ' being selected');
-								value = this.compose(caseArgs[i+1].accept(this));
+								value = this.compose(caseArgs[i+1].accept(this), 0);
 								break;
 							} else if ((i + 3) == caseArgs.length){
 								this.logForDebug(2, 'Case of ' + value.toString().trim() + ' resulted in default of ' + caseArgs[i+2].getText() + ' being selected');
-								value = this.compose(caseArgs[i+2].accept(this)); // default
+								value = this.compose(caseArgs[i+2].accept(this), 0); // default
 								break;
 							}
 						}
@@ -1430,13 +1439,19 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							if (argValues.length > 0){
 								joiner = argValues[0];
 							}	
-							let list = value.list;
+							let valList = value.list;
 							if (value.type == 'list'){
-								list = [];
+								valList = [];
 								value.list.forEach((item)=>{
-									list.push(item.getValue('_').toString()); // '_' is the attribute name for a list of scalars
+									valList.push(item.getValue('_').toString()); // '_' is the attribute name for a list of scalars
 								});
 							}
+							let list = [];
+							valList.forEach((listItem)=>{
+								if (listItem && !(typeof listItem == 'object' && listItem.type == 'missing')){
+									list.push(listItem);
+								}
+							});
 							for (let i : number = 0; i < list.length - 1; i++){
 								if (argValues.length > 1 && i == (list.length - 2)){
 									list[i] += argValues[1];
@@ -1472,6 +1487,14 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 								value = 0;
 							} else if (value instanceof TemplateData && value.type == 'list'){
 								value = value.count();
+							} else if (value && typeof value == 'object' && value.type == 'argument'){
+								let list = [];
+								value.list.forEach((item)=>{
+									if (item && !(typeof item == 'object' && item.type == 'missing')){
+										list.push(item);
+									}
+								});
+								value = list.length;
 							} else if (value == null || (typeof value == 'object' && value.type == 'missing')){
 								value = 0;
 							} else {
@@ -1934,7 +1957,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					return 1;
 					
 				case '@MultilineStyle':
-					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed,Trimmed'.split(',');
+					let validStyles = 'Indented,IndentAllButFirst,Padded,Tabbed,Trimmed,Offset'.split(',');
 					let bInvalid = argValues.includes('Tabbed') && (argValues.includes('Indented') || argValues.includes('IndentAllButFirst'));
 					for (let i = 0; i < argValues.length; i++){
 						if (typeof argValues[i] != 'string' || !validStyles.includes(argValues[i]) || bInvalid){
@@ -1947,6 +1970,43 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						delete value['multilineStyle'];
 					} else {
 						value['multilineStyle'] = argValues;
+					}
+					break;
+				
+				case 'Log':
+					let logValue
+					if (!args.children || args.children.length == 0){
+						logValue = value;
+					} else {
+						logValue = args.children[0].accept(this);
+					}
+					let logData = logValue != null ? logValue.toString() : null;
+					if (logValue instanceof TemplateData){
+						logData = logValue.toJson();
+					} else if (typeof logValue === "boolean"){
+						logData = logValue ? 'true' : 'false';
+					} else if (logValue == null){
+						logData == 'null';
+					} else if (typeof logValue == "object"){
+						if (logValue.type == 'missing'){
+							logData = this.compose([logValue], 2);
+						} else if (logValue.type == 'argument'){
+							logData = JSON.stringify(logValue.list).replace(/\\u0001/g,'');
+						} else if (logValue.type == 'date'){
+							logData = 'Date: ' + logValue.string + ' formatted with ' + logValue.format;
+						} else if (logValue.type == 'multiline'){
+							logData = logValue.multilines;
+						} else if (Array.isArray(logValue)){
+							logData = this.compose(logValue, 2).replace(/\x01/g,'');
+						}
+						if (typeof logData != 'string'){
+							logData = JSON.stringify(logValue);
+						}
+					}
+					if (args.children && args.children.length > 1) {
+						this.syntaxError('ERROR: too many arguments for Log()', args.parentCtx);
+					} else {
+						this.logForDebug(0,'logging: ' + logData);
 					}
 					break;
 					
@@ -2157,7 +2217,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		return result; 
 	}
 	compose = function(parts, mode){
-		// mode 0 is intermediate without resolving the bullets; mode 1 resolves bullets
+		// mode 0 is intermediate without resolving the bullets; mode 1 resolves bullets; mode 2 exposes missing values (for Log())
 		if (typeof parts == 'object' && parts != null && !Array.isArray(parts)){
 			if (mode == 0 && (parts instanceof TemplateData || parts.type == 'argument' || parts.type == 'missing' || parts.type == 'date')){
 				return parts; // don't compose if not appropriate
@@ -2170,7 +2230,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			}
 			parts = [parts];
 		}
-		let output = {lines: [""], skipping: false, mode: 0, bullets: {}};
+		let output = {lines: [""], skipping: false, mode: (mode == 2 ? 2 : 0), bullets: {}};
 		this.doCompose(parts, output, null);
 		if (output.skipping){
 			// never encountered a new line while skipping
@@ -2224,7 +2284,13 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						}
 						break;
 					case 'missing':
-						item = item.missingValue;
+						let msg = 'Missing value for ' + item.key + ' which would ' + (!item.missingValue ? 'cause the line to be skipped' : "be replaced by '" + item.missingValue + "'");7
+						if (output.mode == 2){
+							item = '***' + msg + '***';
+						} else {
+							item = item.missingValue;
+						}
+						this.logForDebug(1, msg);
 						break;
 					case 'date':
 						item = this.valueAsString(item);
@@ -2250,6 +2316,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let bTabbed = item.multilineStyle.includes('Tabbed');
                     let bIndented = item.multilineStyle.includes('Indented');
                     let bTrimmed = item.multilineStyle.includes('Trimmed');
+					let bOffset = item.multilineStyle.includes('Offset');
 					let nIndent = 0;
 					if (bIndented || bIndentAllButFirst || bTabbed){
 						nIndent = 4;						
@@ -2257,13 +2324,26 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							nIndent += output.lines.length > 1 ? output.lines[output.lines.length - 1].replace(/( *).*$/,'$1').length : 0;
 						}
 					}
-                    let multilineIndent = ' '.repeat(nIndent);
-                    if (bTrimmed){
+					if (bIndented || bIndentAllButFirst){
                         for (let i = 0; i < multilines.length; i++){
                             multilines[i] = multilines[i].trim();
-                        }
-                    }
-					this.addToOutput((bIndentAllButFirst ? '' : '\n' + multilineIndent) + multilines.join('\n' + multilineIndent) + (bPadded ? '\n' : ''), output)
+						}							
+					}
+                    let multilineIndent = ' '.repeat(nIndent);
+					if (bPadded)
+					{
+						while (multilines.length > 1 && multilines[multilines.length - 1].trim() == '')
+						{
+							// avoid extra blank lines by eliminatng training blank lines
+							multilines.length = multilines.length - 1;
+						}
+					}
+					let multilineJoined = multilines.join('\n' + multilineIndent);
+					if (bTrimmed) // remove spaces in front of carriage returns
+					{
+						multilineJoined = multilineJoined.replace(/ *\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+					}
+					this.addToOutput((bIndentAllButFirst ? '' : (bOffset ? '\n' : '') + multilineIndent) + multilineJoined + (bPadded ? '\n' : ''), output)
 				} else if (item.type == 'bullet'){
 					this.addToOutput(item.bullet, output);
 					indent = item.bullet;
@@ -2580,12 +2660,16 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	  return str.replace(/[<>=&']/gm, (c)=>replacements[c]);
     }
     logForDebug (level : number, text : string) {
+	// 0-Errors;1-Missing values;2-decisions (arrow, case);3-context;4-Calling named subtemplates;5-Values;6-Method call;7-Calling unnamed subtemplates
         if (this.annotations.debugLevel < level){
             return;
         }
         this.debugLog.push(level + '\t' + text);
     }
     valueAsText (value){
+		if (value == null){
+			return 'null';
+		}
 		let valueText = value.toString();
 		if (!this.isScalar(value)){
 			if (value.constructor.name == 'TemplateData'){
@@ -2974,10 +3058,18 @@ export function interpret(input, callback, options?) : void {
 						, urls: urls
 						, success: (data)=>{
 							urls[key].data = data;
-							try{
-								interpret(input, callback, options);
-							} catch (e) {
-								callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions, debugLog: visitor.debugLog});
+							let bOkToInterpret = true;
+							Object.keys(urls).forEach((key)=>{
+								if (urls[key].loading && !urls[key].data){
+									bOkToInterpret = false; // wait until all urls have come back
+								}
+							});
+							if (bOkToInterpret){	
+								try{
+									interpret(input, callback, options);
+								} catch (e) {
+									callback({type: 'result', result: 'EXCEPTION ' + e.stack, errors: [], hoverPositions: this.hoverPositions, debugLog: visitor.debugLog});
+								}
 							}
 						}
 					});

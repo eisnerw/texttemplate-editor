@@ -223,6 +223,18 @@
 					return null;
 				}
 			});
+			editor.addAction({
+				id: 'custom-go-to-error-id',
+				label: 'Go to Error',
+				precondition: null,
+				keybindingContext: null,
+				contextMenuGroupId: 'navigation',
+				contextMenuOrder: 1.5,
+				run: function(ed) {
+					editor.getAction('editor.action.marker.next').run();
+					return null;
+				}
+			});
 			saveTemplate = function(e){
 				let arShared = editor.getValue().split("\n/*SHARED*/");
 				let shared = [];

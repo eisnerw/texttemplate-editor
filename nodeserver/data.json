@@ -468,7 +468,13 @@
 				  "name": "@Debug",
 				  "type": "dash",
 				  "text": "The annotation, which takes a single numeric argument, can be invoked on any subtemplate template.  The number specifies the level of tracing that will occur, with -1 meaning no trace.  Each level encludes the tracing of lower levels.  The other levels are: Leve1 0 - Errors; Level 1 - Missing values; Level 2 - decisions (arrow, case); Level 3 - context change; Level 4 - Calling named subtemplates; Level 5 - Values; Level 6 - Method call; Level 7 - Calling unnamed subtemplates."
-				},				{
+				},
+				{
+				  "name": "Log",
+				  "type": "dash",
+				  "text": "This method creates an @Debug() logging event at level 0, which is the default level. (Log methods are intended to be used only for debugging, but can be retained without creating log entries if the @Debug level is set to -1).  The Log method takes zero or one argument.  With no argument (e.g. '{name.Log()}'), the method will create a log entry reflecting the value upon which the Log() has been invoked.  Alternatively, the Log method argument, which can be an value but is most useful if it is a template, will be logged, (e.g., '{name.Log([name={name}])}').  In either form, the Log method leaves the value upon which it has been invoked unaltered.  Values logged by the Log method will show missing values to help in debugging."
+				},				
+				{
 				  "name": "Assert",
 				  "type": "dash",
 				  "text": "This method is designed to confirm that the output of a template has remained a predicted value.  The method takes between one and three arguments.  With one argument, the method is essentially the same as the Match method with a single operator, comparing the argument.  If the value matches the argument, the value remains the same.  If it does not match, the method emits an \"ASSERT FAILURE\" message followed by an indication of the mismatch.  An optional second argument can be specified as a substitute value for a true comparison and an optional thir argument can be provided to specify a replacement for the \"ASSERT FAILURE\" sequence.  "

@@ -161,4 +161,5 @@ fragment KEYWORDS: (
 	| '@MultilineStyle'
     | 'EndIndexOf'
     | '@Debug'
+	| 'Log'
 );
