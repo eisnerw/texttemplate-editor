@@ -10,6 +10,7 @@
     "@webpack-cli/init": "^0.3.0",
     "antlr4": "^4.8.0",
     "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
     "express": "^4.17.1",
     "moment": "^2.29.0",
     "morgan": "^1.10.0",

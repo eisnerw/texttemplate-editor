@@ -4,9 +4,16 @@ const morgan = require('morgan');
 const app = express();
 const templates = require('./templates.json');
 const subtemplates = require('./subtemplates.json');
+const cors = require('cors');
 
 // settings
 app.set('port', process.env.PORT || 3000);
+
+// cors
+app.use(cors({
+    origin: 'https://en.wikipedia.org'
+}));
+
 
 // middlewares
 app.use(morgan('dev'));
@@ -26,7 +33,6 @@ app.use(express.static(path.join(__dirname, '../src/main')));
 app.use("/node_modules", express.static(path.join(__dirname, '../node_modules')));
 app.use("/js", express.static(path.join(__dirname, '../dist')));
 app.use('/docs', express.static(path.join(__dirname, '../nodeserver/docs')));
-
 
 // start the server
 app.listen(app.get('port'), () => {
