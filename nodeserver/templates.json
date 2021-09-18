@@ -764,4 +764,12 @@
 		"{#colon:[:]}",
 		"{#at:[@]}"
 	]
+	,"wikipedia":[
+	" {'Paul Simon'.#getWiki()}",
+	"",
+	"Subtemplates:",
+	"{#getWiki:[{#Wiki:[{key.extract}]}]}",
+	"{#Wiki:[{#wikiapi:[{query.pages:[{*.ToJson().Replace(/\"\\d+\"/,'\"key\"')}]}]}]}",
+	"{#wikiapi:[{'https://en.wikipedia.org/w/api.php?action=query&prop=extracts&format=json&exintro=&titles='}{$0}]}"	
+	]
 }

@@ -345,9 +345,6 @@ export function validate(input, invocation, options, callback?) : void { // opti
                     }
 					$.ajax({
 						url: url,
-						dataType : 'jsonp',
-						type: 'GET',
-						xhrFields: { withCredentials: true },
 						success: function (data) {
 							if (data.Result === null){
 								logit('Unable to GET ' + this.url + ': NOT FOUND.');
