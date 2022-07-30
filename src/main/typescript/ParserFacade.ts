@@ -19,7 +19,7 @@ export function createColorizeLexer(input: String) {
     const lexer = new TextTemplateColorizeLexer(chars);
 
     lexer.strictMode = false;
-	window['ParserFacade'] = this;
+	window['ParserFacade'] = require('../../main-generated/javascript/ParserFacade.js');
     return lexer;
 }
 
