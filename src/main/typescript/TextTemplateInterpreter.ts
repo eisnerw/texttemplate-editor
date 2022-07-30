@@ -488,6 +488,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				value = this.encodeXML(value);
 			} else if (this.annotations.encoding == 'uri') {
 				value = encodeURI(value);
+			} else if (this.annotations.encoding == 'json') {
+				const quotedEscaped = JSON.stringify(value);
+				value = quotedEscaped.substring(1, quotedEscaped.length - 1);
 			}
 			if (value.includes('\n') && this.annotations['multilineStyle']){
 				return {type: 'multiline', multilines: value, multilineStyle: this.annotations['multilineStyle']};
@@ -1887,7 +1890,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let encoding = argValues[0];
 					if (argValues.length == 0){
 						delete this.annotations['encoding'];
-					} else if (encoding != 'html' && encoding != 'xml' && encoding != 'uri'){
+					} else if (encoding != 'html' && encoding != 'xml' && encoding != 'uri' && encoding != 'json'){
 						this.syntaxError("Parameter must be 'xml', 'html' or 'uri'", args.parentCtx);
 					} else {
 						this.annotations['encoding'] = encoding;

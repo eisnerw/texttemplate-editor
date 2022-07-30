@@ -415,7 +415,7 @@
 				{
 				  "name": "@EncodeDataFor",
 				  "type": "dash",
-				  "text": "this annotation, which takes a single argument that must be 'html', 'xml' or 'uri', is used to automatically encode any data values encountered during the processing of a template.  Since templates consist of literal strings that can be encoded when they are specified, this annotation insures that data values are similarly encoded.  Note that the EncodeFor method does not override the effects of this annotation; the two are intended to be used together"
+				  "text": "this annotation, which takes a single argument that must be 'html', 'xml', 'uri' or 'json', is used to automatically encode any data values encountered during the processing of a template.  Since templates consist of literal strings that can be encoded when they are specified, this annotation insures that data values are similarly encoded.  Note that the EncodeFor method does not override the effects of this annotation; the two are intended to be used together"
 				},
 				{
 				  "name": "@DefaultIndent",
