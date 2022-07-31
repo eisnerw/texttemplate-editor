@@ -9,6 +9,16 @@
 		  }
 	   ]
 	}
+	,"escapeTest":{
+		"firstName": "John \"Big John\""
+		,"lastName": "Smith"
+		,"pets": [
+		   {
+			  "type": "dog"
+			  ,"name": "Toto"
+		   }
+		]
+	 }
 	,"simpledata":{
 	   "firstName": "John"
 	   ,"lastName": "Smith"
@@ -319,7 +329,7 @@
 				{
 				  "name": "EncodeFor",
 				  "type": "dash",
-				  "text": "This method takes a single argument that must be 'html', 'xml' or 'uri'.  The method encodes a string by replacing appropriate characters within the string so they will be accurately represented when rendered html, xml, or uri strings.  Note that the @EncodeDataFor() annotation should be used to encode data."
+				  "text": "This method takes a single argument that must be 'html', 'xml', 'uri', or 'json'.  The method encodes a string by replacing appropriate characters within the string so they will be accurately represented when rendered html, xml, or uri strings.  Note that the @EncodeDataFor() annotation should be used to encode data."
 				},
 				{
 				  "name": "Compose",

@@ -44,8 +44,10 @@ ctx.addEventListener("message", (event) => {
 			break;
 
 		case 'url':
-			urlParms[payload.id].success(payload.data);
-			delete urlParms[payload.id];
+			if (urlParms[payload.id]){
+				urlParms[payload.id].success(payload.data);
+				delete urlParms[payload.id];
+			}
 			break;
 	}
 });

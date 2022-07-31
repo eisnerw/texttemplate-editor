@@ -480,8 +480,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				value.moment.utc();
 			}
 		}
-		if (typeof value == 'string'){
+		// don't encode $n variables because they have already been encoded
+		if (typeof value == 'string' && !/^\$\d+$/.test(key)){
 			value = value.replace(/\r/g, ''); // carriage return messes up regex
+			const unencodedValue = value;
 			if (this.annotations.encoding == 'html'){
 				value = this.encodeHTML(value);
 			} else if (this.annotations.encoding == 'xml') {
@@ -491,6 +493,9 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			} else if (this.annotations.encoding == 'json') {
 				const quotedEscaped = JSON.stringify(value);
 				value = quotedEscaped.substring(1, quotedEscaped.length - 1);
+			}
+			if (value !== unencodedValue){
+				this.logForDebug(6, ctx.children[0].getText() + ' encoded for ' + this.annotations.encoding + ' to ' + this.valueAsText(value));
 			}
 			if (value.includes('\n') && this.annotations['multilineStyle']){
 				return {type: 'multiline', multilines: value, multilineStyle: this.annotations['multilineStyle']};
@@ -1161,17 +1166,22 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			argValues[0] = args.accept(this);
 		} else if (args.constructor.name == 'ArgumentsContext' && method != 'Case' && method != 'Log'){
 			let oldContext = this.context;
+			/*
 			if (this.context && this.context.type == 'list'){
 				this.context = new TemplateData('{}', this.context); // bury lists to keep templates arguments from evaluating multiple times
 			}
+			*/
 			for (let i = 0; i < args.children.length; i++){
 				if ((method == 'GroupBy' || method == 'OrderBy') && i == 0){
 					// defer evaluation of the first parameter of a Group
 					argValues.push(null); // placeholder
 				} else {
 					let arg = args.children[i].accept(this);
+					if (Array.isArray(arg) && arg.length == 1){
+						arg = arg[0];
+					}
 					if (arg !== undefined){ // remove result of commas
-						if (arg.constructor.name == 'RegExp' ){
+						if (arg.constructor.name == 'RegExp' || arg.constructor.name == 'TemplateData'){
 							argValues.push(arg);
 						} else {
 							argValues.push(this.compose(arg, 0));
@@ -1210,7 +1220,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 				if (argObject != null && typeof argObject == 'object' && !Array.isArray(argObject)){
 					if (argObject.type == 'date'){
 						newContext.add('$' + (i + 1), argObject.string); // provide the original string value
-					} else if (argObject.type == 'list'){
+					} else if (argObject.constructor.name == 'TemplateData' || argObject.type == 'list'){
 						newContext.add('$' + (i + 1), argValues[i]);
 					}
 					// if the type is 'missing', don't add it
@@ -1322,6 +1332,10 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 						case 'uri':
 							value = encodeURIComponent(value);
 							break;
+						case 'json':
+							const quotedEscaped = JSON.stringify(value);
+							value = quotedEscaped.substring(1, quotedEscaped.length - 1);
+							break;							
 						default:
 							this.syntaxError("Parameter must be 'xml', 'html' or 'uri'", args);
 							break;
