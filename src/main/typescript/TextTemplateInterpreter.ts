@@ -234,8 +234,8 @@ export class TemplateData {
 			if (jsonData.startsWith('{') || jsonData.startsWith('[')){
 				json = JSON.parse(jsonData);
 			} else {
-				// TemplateData supports arrays of strings by making them lists of dictionaries with a single 
-				json = JSON.parse('{"_": "' + jsonData.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t') + '"}');
+				// TemplateData supports arrays of strings by making them lists of dictionaries with a single ('_') attribute
+				json = JSON.parse('{"_": "' + jsonData.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t') + '"}');
 			}
 		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
@@ -497,7 +497,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			if (value !== unencodedValue){
 				this.logForDebug(6, ctx.children[0].getText() + ' encoded for ' + this.annotations.encoding + ' to ' + this.valueAsText(value));
 			}
-			if (value.includes('\n') && this.annotations['multilineStyle']){
+			if (value.includes('\n') && this.annotations['multilineStyle'] && !/^\$\d+^/.test(key)){ // internal ($) values shouldn't be treated as multiline
 				return {type: 'multiline', multilines: value, multilineStyle: this.annotations['multilineStyle']};
 			}
 		}
@@ -1905,7 +1905,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (argValues.length == 0){
 						delete this.annotations['encoding'];
 					} else if (encoding != 'html' && encoding != 'xml' && encoding != 'uri' && encoding != 'json'){
-						this.syntaxError("Parameter must be 'xml', 'html' or 'uri'", args.parentCtx);
+						this.syntaxError("Parameter must be 'xml', 'html', 'uri' or 'json'", args.parentCtx);
 					} else {
 						this.annotations['encoding'] = encoding;
 					}
@@ -2677,7 +2677,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 	  return str.replace(/[<>=&']/gm, (c)=>replacements[c]);
     }
     logForDebug (level : number, text : string) {
-	// 0-Errors;1-Missing values;2-decisions (arrow, case);3-context;4-Calling named subtemplates;5-Values;6-Method call;7-Calling unnamed subtemplates
+	// 0-Errors;1-Missing values;2-decisions (arrow, case);3-context change;4-Calling named subtemplates;5-Values;6-Method call;7-Calling unnamed subtemplates
         if (this.annotations.debugLevel < level){
             return;
         }
