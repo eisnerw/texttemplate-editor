@@ -239,7 +239,7 @@ export class TemplateData {
 			}
 		} else if (Array.isArray(jsonData)) {
 			this.type = 'list';
-			let array: [] = jsonData;
+			let array: any = jsonData;
 			array.forEach((item) => {
 				this.list.push(new TemplateData(item, this));
 			});
@@ -3051,7 +3051,7 @@ export function interpret(input, callback, options?) : void {
 		let subtemplateObject = processedSubtemplates.subtemplates[key];
 		visitor.parseSubtemplates(subtemplateObject, key, subtemplateObject.line - 1, subtemplateObject.column);
 	});
-	var result = visitor.visitCompilationUnit(tree);
+	var result : any = visitor.visitCompilationUnit(tree);
 	if (result != null && !Array.isArray(result) && typeof result == 'object'){
 		result = [result];
 	}

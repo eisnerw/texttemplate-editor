@@ -23,6 +23,10 @@ The first version of the language has been completed and can be experienced in t
 ```
 
 ## Build everything and run the server
+Note that prior to running, you may need to run:
+```
+ export NODE_OPTIONS=--openssl-legacy-provider
+```
 
 ```
 npm install
