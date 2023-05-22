@@ -66,7 +66,7 @@
 	require(['vs/editor/editor.main'], function() {
 		monaco.languages.register({ id: 'texttemplate' });
 
-		let parserFacade;
+		let parserFacade = require['ParserFacade'];
 		let optionalData = null;
 
 		monaco.languages.setTokensProvider('texttemplate', new TextTemplateTokensProvider.TextTemplateTokensProvider());

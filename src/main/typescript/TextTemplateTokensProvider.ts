@@ -1,6 +1,6 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
-import {createColorizeLexer} from './ParserFacade'
-import {CommonTokenStream, error, InputStream} from '../../../node_modules/antlr4/index.js'
+import * as ParserFacade from '../../main-generated/javascript/ParserFacade.js'
+import antlr4 from 'antlr4';
 import ILineTokens = monaco.languages.ILineTokens;
 import IToken = monaco.languages.IToken;
 
@@ -58,13 +58,13 @@ class TextTemplateLineTokens implements ILineTokens {
 export function tokensForLine(input: string, bMultilineComment : boolean, sOpenBrackets : string): monaco.languages.ILineTokens {
     let errorStartingPoints: number[] = [];
 
-    class ErrorCollectorListener extends error.ErrorListener {
+    class ErrorCollectorListener extends antlr4.error.ErrorListener {
         syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
             errorStartingPoints.push(column)
         }
     }
 	let relocate = bMultilineComment ? 2 : sOpenBrackets.length;
-    const lexer = createColorizeLexer((bMultilineComment ? '/*' : sOpenBrackets)  + input);
+    const lexer = ParserFacade.createColorizeLexer((bMultilineComment ? '/*' : sOpenBrackets)  + input);
     lexer.removeErrorListeners();
     let errorListener = new ErrorCollectorListener();
     lexer.addErrorListener(errorListener);
@@ -80,7 +80,7 @@ export function tokensForLine(input: string, bMultilineComment : boolean, sOpenB
                 done = true;
             } else {
  				if (token.column >= relocate || bMultilineComment){ // only look at tokens after the artificial tokens created by text in front of the input
-					let tokenTypeName = lexer.symbolicNames[token.type];
+					let tokenTypeName = lexer.getSymbolicNames()[token.type];
 					let myToken = new TextTemplateToken(tokenTypeName, bMultilineComment && token.column < 2 ? token.column : (token.column - relocate));
 					myTokens.push(myToken);
 					let lastOpenBracket = sOpenBrackets.length == 0 ? '' : sOpenBrackets[sOpenBrackets.length - 1];

@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
-const templates = require('../templates.json');
-const data = require('../data.json');
+import templates from '../templates.json' assert { type: 'json' };
+import data from '../data.json' assert { type: 'json' };
 
 
 router.get('/:name', (req, res) => {
@@ -24,4 +24,4 @@ router.get('/:name', (req, res) => {
 	}
 });
 
-module.exports = router;
+export { router };

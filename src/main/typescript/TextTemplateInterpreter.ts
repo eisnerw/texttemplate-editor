@@ -1,9 +1,10 @@
-import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
-import {DefaultErrorStrategy} from '../../../node_modules/antlr4/error/ErrorStrategy.js'
-import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
-import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
-import {TextTemplateParserVisitor} from "../../main-generated/javascript/TextTemplateParserVisitor.js"
-import moment = require('moment');
+//import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from 'antlr4';
+//import {DefaultErrorStrategy} from 'antlr4'
+import antlr4 from 'antlr4';
+import TextTemplateLexer from "../../main-generated/javascript/TextTemplateLexer.js"
+import TextTemplateParser from "../../main-generated/javascript/TextTemplateParser.js"
+import TextTemplateParserVisitor from "../../main-generated/javascript/TextTemplateParserVisitor.js"
+import * as moment from 'moment';
 import {Externals} from "../../main-generated/javascript/Externals.js"
 
 var parsedTemplates = {};
@@ -12,7 +13,7 @@ let processedSubtemplates;
 let foundJsonObjects; // used by TemplateData to prevent loops
 const numericTest = /^[-+]?(\d+|\d+\.\d*|\d*\.\d+)$/;
 
-class ConsoleErrorListener extends error.ErrorListener {
+class ConsoleErrorListener extends antlr4.error.ErrorListener {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
         console.log('ERROR ' + msg);
     }
@@ -1793,6 +1794,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (value != null && typeof value == 'object' && value.type == 'date'){
 						value = value.moment.toObject();
 					}
+					/*
 					let date = moment(value);
 					if (date.isValid){
 						if (argValues.length == 0){
@@ -1809,6 +1811,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							value = date.format(argValues[0]);
 						}
 					}
+					*/
 					break;		
 
 				case '@Include':
@@ -2722,7 +2725,7 @@ class Error {
 
 }
 
-class CollectorErrorListener extends error.ErrorListener {
+class CollectorErrorListener extends antlr4.error.ErrorListener {
 
     private errors : Error[] = []
 
@@ -2753,8 +2756,8 @@ class RelocatingCollectorErrorListener extends CollectorErrorListener {
     }
 }
 
-function createLexer(input: String) {
-    const chars = new InputStream(input);
+function createLexer(input: string) {
+    const chars = new antlr4.InputStream(input);
     const lexer = new TextTemplateLexer(chars);
 
     lexer.strictMode = false;
@@ -2861,12 +2864,12 @@ function processSubtemplates(input: string, lineOffset: number) : {} {
 	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
 }
 function getTokensWithSymbols(input : string){
-	const chars = new InputStream(input);
+	const chars = new antlr4.InputStream(input);
 	const lexer = new TextTemplateLexer(chars);
 	lexer.strictMode = false;
-	const tokens = new CommonTokenStream(lexer);
+	const tokens = new antlr4.CommonTokenStream(lexer);
 	tokens.fill();
-	let treeTokens : CommonToken[] = tokens.tokens;
+	let treeTokens : any = tokens.getTokens(0, 99999999, undefined);
 	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
 	let tokenArray = [];
 	if (input.length == 0){
@@ -2911,7 +2914,7 @@ function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	}
 }
 
-function getTokens(input: String) : Token[] {
+function getTokens(input: string) : antlr4.Token[] {
     return createLexer(input).getAllTokens()
 }
 
@@ -2922,7 +2925,7 @@ function createParser(input) {
 }
 
 function createParserFromLexer(lexer) {
-    const tokens = new CommonTokenStream(lexer);
+    const tokens = new antlr4.CommonTokenStream(lexer);
     return new TextTemplateParser(tokens);
 }
 
@@ -2946,13 +2949,13 @@ export function parseTreeStr(input) {
     return tree.toStringTree(parser.ruleNames);
 }
 
-class TextTemplateErrorStrategy extends DefaultErrorStrategy {
+class TextTemplateErrorStrategy extends antlr4.error.DefaultErrorStrategy {
 
-     reportUnwantedToken(recognizer: Parser) {
+     reportUnwantedToken(recognizer: antlr4.Parser) {
          return super.reportUnwantedToken(recognizer);
      }
 
-    singleTokenDeletion(recognizer: Parser) {
+    singleTokenDeletion(recognizer: antlr4.Parser) {
         var nextTokenType = recognizer.getTokenStream().LA(2);
         if (recognizer.getTokenStream().LA(1) == TextTemplateParser.NL) {
             return null;
@@ -2991,7 +2994,7 @@ function getSubtemplatePositions(positions : any[], processed, lineOffset : numb
 let urls = {};
 
 function tokensAsString(ctx){
-	let treeTokens : CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
+	let treeTokens : antlr4.CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
 	let symbolicNames : string[] = ctx.parser.symbolicNames
 	let parsed = '';
 	try{

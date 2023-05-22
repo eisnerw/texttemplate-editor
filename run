@@ -1,4 +1,5 @@
 #!/bin/bash
+export NODE_OPTIONS=--openssl-legacy-provider
 if ./gradlew generateColorizeLexer; then 
 	echo "generating parser..."
 else

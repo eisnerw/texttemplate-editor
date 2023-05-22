@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",
+    "module": "ESNext",
     "target": "es2016",
     "sourceMap": true,
-    "outDir": "src/main-generated/javascript"
+    "outDir": "src/main-generated/javascript",
+    "moduleResolution": "node"
   },
   "exclude": [
     "node_modules"

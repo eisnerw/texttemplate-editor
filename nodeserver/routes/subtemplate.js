@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
-const subtemplates = require('../subtemplates.json');
+import subtemplates from '../subtemplates.json' assert { type: 'json' };
 
 router.get('/:name', (req, res) => {
 	const { name } = req.params 
@@ -51,4 +51,4 @@ router.delete('/:id', (req, res) => {
   res.json('Successfully deleted');
 });
 
-module.exports = router;
+export {router};

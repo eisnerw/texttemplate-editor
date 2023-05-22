@@ -1,4 +1,4 @@
-const TextTemplateTokensProvider = require('../../main-generated/javascript/TextTemplateTokensProvider.js');
+import * as TextTemplateTokensProvider from '../../main-generated/javascript/TextTemplateTokensProvider.js';
 
 if (typeof window === 'undefined') {
 

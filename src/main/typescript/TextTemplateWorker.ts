@@ -1,6 +1,6 @@
 /// <reference path="./TextTemplateInterpreter.ts" />
 const ctx: Worker = self as any;
-import textTemplateInterpreter = require("../../main-generated/javascript/TextTemplateInterpreter.js");
+import { interpret as textTemplateInterpret } from  "../../main-generated/javascript/TextTemplateInterpreter.js";
 
 let urlParms = {};
 let parmId = 0;
@@ -53,7 +53,7 @@ ctx.addEventListener("message", (event) => {
 });
 function interpret(input, options?){
 	try{
-		textTemplateInterpreter.interpret(input, processResult, options);
+		textTemplateInterpret(input, processResult, options);
 	} catch (e){
 		processResult({type: 'result', result: 'EXCEPTION ' + e.stack, errors: []});
 	}

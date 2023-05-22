@@ -1,10 +1,11 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
 /// <reference path="./TextTemplateWorker.ts" />
-import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from '../../../node_modules/antlr4/index.js'
-import {TextTemplateLexer} from "../../main-generated/javascript/TextTemplateLexer.js"
-import {TextTemplateColorizeLexer} from "../../main-generated/javascript/TextTemplateColorizeLexer.js"
-import {TextTemplateParser} from "../../main-generated/javascript/TextTemplateParser.js"
+import antlr4 from 'antlr4';
+import TextTemplateLexer from "../../main-generated/javascript/TextTemplateLexer.js"
+import TextTemplateColorizeLexer from "../../main-generated/javascript/TextTemplateColorizeLexer.js"
+import TextTemplateParser from "../../main-generated/javascript/TextTemplateParser.js"
 import Worker from "worker-loader!../../main-generated/javascript/TextTemplateWorker.js";
+import * as ParserFacadeObject from "../../main-generated/javascript/ParserFacade.js";
 
 var processedSubtemplates = null; // keeps a tree of the latest subtemplates and any local subtemplates within them, including where they were found in the editor
 
@@ -14,17 +15,17 @@ declare global {
   }
 }
 
-export function createColorizeLexer(input: String) {
-    const chars = new InputStream(input);
+export function createColorizeLexer(input: string) {
+    const chars = new antlr4.InputStream(input);
     const lexer = new TextTemplateColorizeLexer(chars);
 
     lexer.strictMode = false;
-	window['ParserFacade'] = require('../../main-generated/javascript/ParserFacade.js');
+	window['ParserFacade'] = ParserFacadeObject;
     return lexer;
 }
 
-export function createLexer(input: String) {
-    const chars = new InputStream(input);
+export function createLexer(input: string) {
+    const chars = new antlr4.InputStream(input);
     const lexer = new TextTemplateLexer(chars);
 
     lexer.strictMode = false;
@@ -125,22 +126,22 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
 }
 export function getTokensWithSymbols(input : string){
-	const chars = new InputStream(input);
+	const chars = new antlr4.InputStream(input);
 	const lexer = new TextTemplateLexer(chars);
 	lexer.strictMode = false;
-	const tokens = new CommonTokenStream(lexer);
+	const tokens = new antlr4.CommonTokenStream(lexer);
 	tokens.fill();
-	let treeTokens : CommonToken[] = tokens.tokens;
+	//let treeTokens : antlr4.CommonToken[] = tokens.getTokens();
 	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
 	let tokenArray = [];
 	if (input.length == 0){
 		return input;
 	}
-	for (let e of treeTokens){
+	tokens.getTokens(0, 99999999, undefined).forEach(e => {
 		if (e.type != -1) {
 			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop, column: e.column, line: e.line});
 		}
-	}
+	});
 	return tokenArray;
 }
 
@@ -175,7 +176,7 @@ function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	}
 }
 
-export function getTokens(input: String) : Token[] {
+export function getTokens(input: string) : antlr4.Token[] {
     return createLexer(input).getAllTokens()
 }
 
@@ -186,7 +187,7 @@ function createParser(input) {
 }
 
 function createParserFromLexer(lexer) {
-    const tokens = new CommonTokenStream(lexer);
+    const tokens = new antlr4.CommonTokenStream(lexer);
     return new TextTemplateParser(tokens);
 }
 

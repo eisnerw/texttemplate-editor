@@ -23,16 +23,5 @@ module.exports = {
         extensions: [ '.tsx', '.ts', '.js']
     },
     devtool: 'source-map',
-    mode: 'development',
-    node: {
-        fs: 'empty',
-        global: true,
-        crypto: 'empty',
-        tls: 'empty',
-        net: 'empty',
-        process: true,
-        module: false,
-        clearImmediate: false,
-        setImmediate: false
-    }
+    mode: 'development'
 }

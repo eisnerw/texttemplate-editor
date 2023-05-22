@@ -1,9 +1,10 @@
-const path = require('path');
-const express = require('express');
+import path from 'path';
+import express from 'express';
 const router = express.Router();
-const fs = require('fs');
-const http = require('http');
-const textTemplateInterpreter = require('../../src/main-generated/javascript/TextTemplateInterpreter.js');
+import fs from 'fs';
+import http from 'http';
+import * as textTemplateInterpreter from '../../src/main-generated/javascript/TextTemplateInterpreter.js';
+
 let requestResponse;
 const processResult = function(parm){
 	switch (parm.type){
@@ -57,4 +58,4 @@ router.get('/:template', (req, res) => {
 	});
 });		
 
-module.exports = router;
+export {router};
