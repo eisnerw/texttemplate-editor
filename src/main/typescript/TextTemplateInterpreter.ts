@@ -4,7 +4,7 @@ import antlr4 from 'antlr4';
 import TextTemplateLexer from "../../main-generated/javascript/TextTemplateLexer.js"
 import TextTemplateParser from "../../main-generated/javascript/TextTemplateParser.js"
 import TextTemplateParserVisitor from "../../main-generated/javascript/TextTemplateParserVisitor.js"
-import * as moment from 'moment';
+import moment from 'moment';
 import {Externals} from "../../main-generated/javascript/Externals.js"
 
 var parsedTemplates = {};
@@ -1794,7 +1794,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					if (value != null && typeof value == 'object' && value.type == 'date'){
 						value = value.moment.toObject();
 					}
-					/*
 					let date = moment(value);
 					if (date.isValid){
 						if (argValues.length == 0){
@@ -1811,7 +1810,6 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 							value = date.format(argValues[0]);
 						}
 					}
-					*/
 					break;		
 
 				case '@Include':
