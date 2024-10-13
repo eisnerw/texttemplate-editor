@@ -385,7 +385,7 @@ export class TemplateData {
 					} else if (value == null) {
 						result += 'null';
 					} else if (typeof value == 'string') {
-						value = value.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/"/g,'\\"');
+						value = value.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\r/g,'\\r').replace(/"/g,'\\"');
 						result += ('"' + value + '"');
 					} else {
 						result += value.toString();
