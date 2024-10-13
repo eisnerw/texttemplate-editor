@@ -1,0 +1,4 @@
+Eliminate the need for ^ by having the symbol resolver automatically move up the tree
+Change handling of arrays to make use the name of the array in any iteration
+Insure that split and join work everywhere
+Think about a better way of keeping white space, such as [[]]
