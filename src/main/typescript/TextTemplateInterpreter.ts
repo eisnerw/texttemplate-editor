@@ -1,6 +1,6 @@
 //import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from 'antlr4';
 //import {DefaultErrorStrategy} from 'antlr4'
-import antlr4 from 'antlr4';
+import {CommonTokenStream, Token, Parser, RecognitionException, ErrorListener, DefaultErrorStrategy, CommonToken, InputStream} from 'antlr4'
 import TextTemplateLexer from "../../main-generated/javascript/TextTemplateLexer.js"
 import TextTemplateParser from "../../main-generated/javascript/TextTemplateParser.js"
 import TextTemplateParserVisitor from "../../main-generated/javascript/TextTemplateParserVisitor.js"
@@ -13,7 +13,7 @@ let processedSubtemplates;
 let foundJsonObjects; // used by TemplateData to prevent loops
 const numericTest = /^[-+]?(\d+|\d+\.\d*|\d*\.\d+)$/;
 
-class ConsoleErrorListener extends antlr4.error.ErrorListener {
+class ConsoleErrorListener { // extends ErrorListener<Token> {
     syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
         console.log('ERROR ' + msg);
     }
@@ -2723,7 +2723,7 @@ class Error {
 
 }
 
-class CollectorErrorListener extends antlr4.error.ErrorListener {
+class CollectorErrorListener extends ErrorListener<Token> {
 
     private errors : Error[] = []
 
@@ -2741,6 +2741,7 @@ class CollectorErrorListener extends antlr4.error.ErrorListener {
     }
 
 }
+
 class RelocatingCollectorErrorListener extends CollectorErrorListener {
 	private _line : number
 	private _column : number;
@@ -2755,7 +2756,7 @@ class RelocatingCollectorErrorListener extends CollectorErrorListener {
 }
 
 function createLexer(input: string) {
-    const chars = new antlr4.InputStream(input);
+    const chars = new InputStream(input);
     const lexer = new TextTemplateLexer(chars);
 
     lexer.strictMode = false;
@@ -2862,12 +2863,12 @@ function processSubtemplates(input: string, lineOffset: number) : {} {
 	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
 }
 function getTokensWithSymbols(input : string){
-	const chars = new antlr4.InputStream(input);
+	const chars = new InputStream(input);
 	const lexer = new TextTemplateLexer(chars);
 	lexer.strictMode = false;
-	const tokens = new antlr4.CommonTokenStream(lexer);
+	const tokens = new CommonTokenStream(lexer);
 	tokens.fill();
-	let treeTokens : any = tokens.getTokens(0, 99999999, undefined);
+	let treeTokens : any = tokens.tokens;
 	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
 	let tokenArray = [];
 	if (input.length == 0){
@@ -2912,7 +2913,7 @@ function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	}
 }
 
-function getTokens(input: string) : antlr4.Token[] {
+function getTokens(input: string) : Token[] {
     return createLexer(input).getAllTokens()
 }
 
@@ -2923,7 +2924,7 @@ function createParser(input) {
 }
 
 function createParserFromLexer(lexer) {
-    const tokens = new antlr4.CommonTokenStream(lexer);
+    const tokens = new CommonTokenStream(lexer);
     return new TextTemplateParser(tokens);
 }
 
@@ -2947,20 +2948,19 @@ export function parseTreeStr(input) {
     return tree.toStringTree(parser.ruleNames);
 }
 
-class TextTemplateErrorStrategy extends antlr4.error.DefaultErrorStrategy {
+class TextTemplateErrorStrategy extends DefaultErrorStrategy {
+	reportUnwantedTokenError(recognizer: Parser){
+		super.reportError(recognizer, new RecognitionException({message: "Unwanted token", recognizer:recognizer, input: recognizer._input, ctx: recognizer._ctx}))
+	}
 
-     reportUnwantedToken(recognizer: antlr4.Parser) {
-         return super.reportUnwantedToken(recognizer);
-     }
-
-    singleTokenDeletion(recognizer: antlr4.Parser) {
+    singleTokenDeletion(recognizer: Parser) {
         var nextTokenType = recognizer.getTokenStream().LA(2);
         if (recognizer.getTokenStream().LA(1) == TextTemplateParser.NL) {
             return null;
         }
         var expecting = this.getExpectedTokens(recognizer);
         if (expecting.contains(nextTokenType)) {
-            this.reportUnwantedToken(recognizer);
+            this.reportUnwantedTokenError(recognizer);
             recognizer.consume(); // simply delete extra token
             // we want to return the token we're actually matching
             var matchedSymbol = recognizer.getCurrentToken();
@@ -2992,7 +2992,7 @@ function getSubtemplatePositions(positions : any[], processed, lineOffset : numb
 let urls = {};
 
 function tokensAsString(ctx){
-	let treeTokens : antlr4.CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
+	let treeTokens : CommonToken[] = ctx.parser.getTokenStream().getTokens(ctx.getSourceInterval().start,ctx.getSourceInterval().stop)
 	let symbolicNames : string[] = ctx.parser.symbolicNames
 	let parsed = '';
 	try{

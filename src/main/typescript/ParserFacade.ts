@@ -137,7 +137,7 @@ export function getTokensWithSymbols(input : string){
 	if (input.length == 0){
 		return input;
 	}
-	tokens.getTokens(0, 99999999, undefined).forEach(e => {
+	tokens.tokens.forEach(e => { // changed in Antlr 4.13.2
 		if (e.type != -1) {
 			tokenArray.push({name: symbolicNames[e.type], text: input.substring(e.start, e.stop + 1), start: e.start, stop: e.stop, column: e.column, line: e.line});
 		}
@@ -176,7 +176,7 @@ function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	}
 }
 
-export function getTokens(input: string) : antlr4.Token[] {
+export function getTokens(input: string) : antlr4.Token {
     return createLexer(input).getAllTokens()
 }
 

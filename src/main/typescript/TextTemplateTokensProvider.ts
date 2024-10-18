@@ -58,7 +58,7 @@ class TextTemplateLineTokens implements ILineTokens {
 export function tokensForLine(input: string, bMultilineComment : boolean, sOpenBrackets : string): monaco.languages.ILineTokens {
     let errorStartingPoints: number[] = [];
 
-    class ErrorCollectorListener extends antlr4.error.ErrorListener {
+    class ErrorCollectorListener extends antlr4.ErrorListener<TextTemplateToken> {
         syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
             errorStartingPoints.push(column)
         }

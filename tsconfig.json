@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "ESNext",
-    "target": "es2016",
+    "target": "es2018",
     "sourceMap": true,
     "outDir": "src/main-generated/javascript",
     "moduleResolution": "node",
