@@ -1,6 +1,6 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
 /// <reference path="./TextTemplateWorker.ts" />
-import antlr4 from 'antlr4';
+import {InputStream, CommonTokenStream, Token} from 'antlr4';
 import TextTemplateLexer from "../../main-generated/javascript/TextTemplateLexer.js"
 import TextTemplateColorizeLexer from "../../main-generated/javascript/TextTemplateColorizeLexer.js"
 import TextTemplateParser from "../../main-generated/javascript/TextTemplateParser.js"
@@ -16,7 +16,7 @@ declare global {
 }
 
 export function createColorizeLexer(input: string) {
-    const chars = new antlr4.InputStream(input);
+    const chars = new InputStream(input);
     const lexer = new TextTemplateColorizeLexer(chars);
 
     lexer.strictMode = false;
@@ -25,7 +25,7 @@ export function createColorizeLexer(input: string) {
 }
 
 export function createLexer(input: string) {
-    const chars = new antlr4.InputStream(input);
+    const chars = new InputStream(input);
     const lexer = new TextTemplateLexer(chars);
 
     lexer.strictMode = false;
@@ -126,10 +126,10 @@ export function processSubtemplates(input: string, lineOffset: number) : {} {
 	return {input: (bFound ? newInput : input), subtemplates: subtemplates};
 }
 export function getTokensWithSymbols(input : string){
-	const chars = new antlr4.InputStream(input);
+	const chars = new InputStream(input);
 	const lexer = new TextTemplateLexer(chars);
 	lexer.strictMode = false;
-	const tokens = new antlr4.CommonTokenStream(lexer);
+	const tokens = new CommonTokenStream(lexer);
 	tokens.fill();
 	//let treeTokens : antlr4.CommonToken[] = tokens.getTokens();
 	let symbolicNames : string[] = new TextTemplateParser(null).symbolicNames
@@ -176,7 +176,7 @@ function findMatching(tokenName : string, tokenArray, iTokenIn: number){
 	}
 }
 
-export function getTokens(input: string) : antlr4.Token {
+export function getTokens(input: string) : Token {
     return createLexer(input).getAllTokens()
 }
 
@@ -187,7 +187,7 @@ function createParser(input) {
 }
 
 function createParserFromLexer(lexer) {
-    const tokens = new antlr4.CommonTokenStream(lexer);
+    const tokens = new CommonTokenStream(lexer);
     return new TextTemplateParser(tokens);
 }
 

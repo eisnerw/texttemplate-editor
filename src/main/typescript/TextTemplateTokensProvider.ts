@@ -1,6 +1,6 @@
 /// <reference path="../../../node_modules/monaco-editor/monaco.d.ts" />
 import * as ParserFacade from '../../main-generated/javascript/ParserFacade.js'
-import antlr4 from 'antlr4';
+import {ErrorListener} from 'antlr4';
 import ILineTokens = monaco.languages.ILineTokens;
 import IToken = monaco.languages.IToken;
 
@@ -58,7 +58,7 @@ class TextTemplateLineTokens implements ILineTokens {
 export function tokensForLine(input: string, bMultilineComment : boolean, sOpenBrackets : string): monaco.languages.ILineTokens {
     let errorStartingPoints: number[] = [];
 
-    class ErrorCollectorListener extends antlr4.ErrorListener<TextTemplateToken> {
+    class ErrorCollectorListener extends ErrorListener<TextTemplateToken> {
         syntaxError(recognizer, offendingSymbol, line, column, msg, e) {
             errorStartingPoints.push(column)
         }
