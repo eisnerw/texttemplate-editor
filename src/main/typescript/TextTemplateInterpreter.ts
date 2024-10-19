@@ -321,6 +321,16 @@ export class TemplateData {
             }
             return new TemplateData(value);
         }
+		if (value === undefined && this.parent){
+			let testDict = this.parent;
+			while (testDict && testDict.type == 'list'){
+				// only look at dictionaries
+				testDict = testDict.parent;
+			}
+			if (testDict){
+				return testDict.getValue(key);
+			}
+		}
 		if (keySplit.length == 1 || value === undefined){
 			return value;
 		}
