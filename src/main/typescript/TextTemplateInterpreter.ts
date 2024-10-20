@@ -321,16 +321,6 @@ export class TemplateData {
             }
             return new TemplateData(value);
         }
-		if (value === undefined && this.parent){
-			let testDict = this.parent;
-			while (testDict && testDict.type == 'list'){
-				// only look at dictionaries
-				testDict = testDict.parent;
-			}
-			if (testDict){
-				return testDict.getValue(key);
-			}
-		}
 		if (keySplit.length == 1 || value === undefined){
 			return value;
 		}
@@ -1370,7 +1360,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let caseArgs = [];
 					if (args.children){
 						args.children.forEach((child)=>{
-							if (child.constructor.name != 'TerminalNodeImpl'){
+							if (child.constructor.name != 'TerminalNodeImpl' && child.constructor.name != 'Me'){
 								caseArgs.push(child);
 							}
 						});
