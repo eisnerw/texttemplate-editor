@@ -1,6 +1,6 @@
 //import {CommonTokenStream, InputStream, Token, error, Parser, CommonToken} from 'antlr4';
 //import {DefaultErrorStrategy} from 'antlr4'
-import {CommonTokenStream, Token, Parser, RecognitionException, ErrorListener, DefaultErrorStrategy, CommonToken, InputStream} from 'antlr4'
+import {CommonTokenStream, Token, Parser, RecognitionException, ErrorListener, DefaultErrorStrategy, CommonToken, InputStream, ParserRuleContext} from 'antlr4'
 import TextTemplateLexer from "../../main-generated/javascript/TextTemplateLexer.js"
 import TextTemplateParser from "../../main-generated/javascript/TextTemplateParser.js"
 import TextTemplateParserVisitor from "../../main-generated/javascript/TextTemplateParserVisitor.js"
@@ -935,7 +935,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 		let result = [];
 		// skipping the first and last children (and the subtemplates) because the are the surrounding brackets
 		for (let i : number = 1; i <= lastChildIndex; i++){
-			if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
+			if (ctx.children[i] instanceof ParserRuleContext){ // skip over unparsed (probably comments)
 				let childResult = ctx.children[i].accept(this);
 				if (typeof childResult == 'object' && childResult != null && childResult.constructor.name == 'TemplateData'){
 					if (childResult.isScalarList()){
@@ -1360,7 +1360,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 					let caseArgs = [];
 					if (args.children){
 						args.children.forEach((child)=>{
-							if (child.constructor.name != 'TerminalNodeImpl' && child.constructor.name != 'Me'){
+							if (child instanceof ParserRuleContext){
 								caseArgs.push(child);
 							}
 						});
@@ -2077,7 +2077,7 @@ class TextTemplateVisitor extends TextTemplateParserVisitor {
 			case "BracketedTemplateSpec":
 				templateParts.push('[');
 				for (let i : number = 1; i < ctx.children.length - 1; i++){
-					if (ctx.children[i].constructor.name != 'TerminalNodeImpl'){ // skip over unparsed (probably comments)
+					if (ctx.children[i] instanceof ParserRuleContext){ // skip over unparsed (probably comments)
 						templateParts.push(this.getTemplateWithoutComments(ctx.children[i]))
 					}
 				}
