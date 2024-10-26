@@ -293,6 +293,10 @@ export class TemplateData {
     }
 	getValue(key : string) : any {
 		let keySplit = key.split('.');
+		const bAsterisk = keySplit[0] == '*' && keySplit.length > 1;
+		if (bAsterisk){
+			keySplit.shift();
+		}
         let value = this.dictionary[keySplit[0]];
 		if (value == undefined && (keySplit[0] == '*' || keySplit[0] == '^')){
 			if (keySplit[0] == '*'){
@@ -321,6 +325,16 @@ export class TemplateData {
             }
             return new TemplateData(value);
         }
+		if (value === undefined && this.parent && !bAsterisk){
+			let testDict = this.parent;
+			while (testDict && testDict.type == 'list'){
+				// only look at dictionaries
+				testDict = testDict.parent;
+			}
+			if (testDict){
+				return testDict.getValue(key);
+			}
+		}
 		if (keySplit.length == 1 || value === undefined){
 			return value;
 		}
