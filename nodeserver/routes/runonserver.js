@@ -21,7 +21,7 @@ const processResult = function(parm){
 		case 'url':
 			//console.debug('url=' + parm.path);
 			http.request({host:'localhost', path: parm.path, port:3000, method: 'GET'}, function(response){
-				result = [];
+				let result = [];
 				response.on('data', function (data) {
 					result.push(data.toString());
 				});
@@ -47,7 +47,7 @@ router.get('/:template', (req, res) => {
             //console.debug('templatedata='+data);
             if (data.startsWith('{')){
                 let dataObject = JSON.parse(data);
-                optionalData = dataObject.data;
+                let optionalData = dataObject.data;
                 textTemplateInterpreter.interpret(dataObject.template, processResult, {data: dataObject.data})
             } else {
                 textTemplateInterpreter.interpret(data, processResult);
